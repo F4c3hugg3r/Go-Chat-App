@@ -10,8 +10,9 @@ import (
 )
 
 type Client struct {
-	Name     string
+	name     string
 	clientId string
+	clientCh chan Message
 }
 
 type Message struct {
@@ -20,36 +21,51 @@ type Message struct {
 }
 
 var (
-	broadcast chan Message      = make(chan Message)
-	clients   map[string]Client = make(map[string]Client)
-	mu        sync.Mutex
+	clients map[string]Client = make(map[string]Client)
+	mu      sync.Mutex
 )
 
+// TODO allgemeine Documentation
 func main() {
-	http.HandleFunc("/user/messages", handleMessages)
+	//Eigentlichg Query-Param aber dafür müsste ich externe bib nutzen
 	http.HandleFunc("/user", handleRegistry)
-
-	go func() {
-		for {
-			select {
-			case msg := <-broadcast:
-				sendBroadcast(msg)
-			default:
-				time.Sleep(500 * time.Millisecond)
-			}
-		}
-	}()
+	http.HandleFunc("/message", handleMessages)
+	http.HandleFunc("/chat", handleGetRequest)
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-func sendBroadcast(msg Message) {
-	fmt.Printf("TODO")
+// handleGetRequest displays a message when received and times out after 500s
+// if nothing is being send
+// should receive a Path Parameter with clientId in it eg "clientId?fgbIUHBVIUHDCdvw"
+func handleGetRequest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "only GET Requests allowed", http.StatusBadRequest)
+	}
+
+	queryParams := r.URL.Query()
+	clientId := queryParams.Get("clientId")
+	if clientId == "" {
+		http.Error(w, "missing query parameter", http.StatusBadRequest)
+		return
+	}
+
+	select {
+	case msg := <-clients[clientId].clientCh:
+		message := msg.name + ": " + msg.content
+		fmt.Fprint(w, message)
+	case <-time.After(500 * time.Second):
+		fmt.Println("No message received in time")
+		return
+	}
 }
 
+// handleRegistry lets a client register by it's name and id
+// should receive a Path Parameter with clientId in it eg "clientId?fgbIUHBVIUHDCdvw"
+// should receive the self given client-name in the request body
 func handleRegistry(w http.ResponseWriter, r *http.Request) {
 	queryParams := r.URL.Query()
-	clientId := queryParams.Get("name")
+	clientId := queryParams.Get("id")
 
 	if r.Method != http.MethodPost {
 		http.Error(w, "only POST request allowed", http.StatusBadRequest)
@@ -72,14 +88,20 @@ func handleRegistry(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "client already defined", http.StatusBadRequest)
 		return
 	}
-	clients[clientId] = Client{string(body), clientId}
+
+	clientChan := make(chan Message)
+	clients[clientId] = Client{string(body), clientId, clientChan}
 	mu.Unlock()
 
+	fmt.Printf("New client '%s' registered.", string(body))
 }
 
+// handleMessages takes an incoming message and distributes it to all clients
+// should receive a Path Parameter with clientId in it eg "clientId?fgbIUHBVIUHDCdvw"
+// should receive the message in the request body
 func handleMessages(w http.ResponseWriter, r *http.Request) {
 	queryParams := r.URL.Query()
-	clientId := queryParams.Get("name")
+	clientId := queryParams.Get("clientId")
 	if clientId == "" {
 		http.Error(w, "missing query parameter", http.StatusBadRequest)
 		return
@@ -95,8 +117,23 @@ func handleMessages(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error reading request body", http.StatusInternalServerError)
 		return
 	}
+
 	mu.Lock()
-	name := clients[clientId].Name
-	broadcast <- Message{name, string(body)}
-	mu.Unlock()
+	defer mu.Unlock()
+	name := clients[clientId].name
+	sendBroadcast(Message{name, string(body)})
+}
+
+// sendBroadcast distributes an incomming message abroad all client Channels
+func sendBroadcast(msg Message) {
+	mu.Lock()
+	defer mu.Unlock()
+	for _, client := range clients {
+		select {
+		case client.clientCh <- msg:
+		default:
+			fmt.Printf("channel of client %s full, removing client", client.name)
+			delete(clients, client.clientId)
+		}
+	}
 }
