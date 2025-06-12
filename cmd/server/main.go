@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -9,12 +10,15 @@ import (
 	"time"
 )
 
+// Client is a communication participant who has a name, unique id and
+// channel to receive messages
 type Client struct {
 	name     string
 	clientId string
 	clientCh chan Message
 }
 
+// Message contains the name of the sender and the message (content) itsself
 type Message struct {
 	name    string
 	content string
@@ -25,14 +29,18 @@ var (
 	mu      sync.Mutex
 )
 
-// TODO allgemeine Documentation
+// TODO Flag definieren
 func main() {
+	var port = flag.Int("port", 8080, "HTTP Server Port")
+	flag.Parse()
+	portString := fmt.Sprintf(":%d", port)
+
 	//Eigentlichg Query-Param aber dafür müsste ich externe bib nutzen
 	http.HandleFunc("/user", handleRegistry)
 	http.HandleFunc("/message", handleMessages)
 	http.HandleFunc("/chat", handleGetRequest)
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(portString, nil))
 }
 
 // handleGetRequest displays a message when received and times out after 500s
