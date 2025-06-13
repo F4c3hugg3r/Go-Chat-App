@@ -15,9 +15,8 @@ import (
 
 var (
 	//normalerweise uuid
-	clientId   string = fmt.Sprintf("%d-%d", time.Now().UnixNano(), rand.Int())
-	clientName string
-	reader     *bufio.Reader = bufio.NewReader(os.Stdin)
+	clientId string        = fmt.Sprintf("%d-%d", time.Now().UnixNano(), rand.Int())
+	reader   *bufio.Reader = bufio.NewReader(os.Stdin)
 )
 
 // TODO Documentation
@@ -38,26 +37,25 @@ func main() {
 
 	for {
 		postMessage(url)
-		time.Sleep(2 * time.Second)
 	}
 }
 
 func postMessage(url string) {
 	parameteredUrl := url + "/message?clientId=" + clientId
 
-	fmt.Println("\nDeine Nachricht:")
 	message, err2 := reader.ReadString('\n')
+	fmt.Printf("\033[1A\033[K")
 	if err2 != nil {
 		fmt.Println("wrong input")
 		return
 	}
 
 	//Post
-	res, err := http.Post(parameteredUrl, "texp/plain", strings.NewReader(message))
+	_, err := http.Post(parameteredUrl, "texp/plain", strings.NewReader(message))
 	if err != nil {
 		log.Println("Fehler beim Absenden der Nachricht: ", err)
+		return
 	}
-	res.Body.Close()
 }
 
 func getMessages(url string) {
@@ -69,17 +67,18 @@ func getMessages(url string) {
 		log.Println("Fehler beim Abrufen ist aufgetreten: ", err)
 	}
 	body, err2 := io.ReadAll(res.Body)
+	defer res.Body.Close()
 	if err2 != nil {
 		log.Println("Fehler beim Lesen des Bodies ist aufgetreten: ", err2)
 	}
-	fmt.Println("\n" + string(body))
-	res.Body.Close()
+	fmt.Println(string(body))
 }
 
 func register(url string) error {
 	//Namen Scannen
 	fmt.Println("Gebe deinen Namen an:")
 	clientName, err2 := reader.ReadString('\n')
+	clientName = strings.ReplaceAll(clientName, "\n", "")
 	if err2 != nil {
 		fmt.Println("wrong input")
 		return err2

@@ -16,6 +16,8 @@ type Client struct {
 	name     string
 	clientId string
 	clientCh chan Message
+	quit     chan int
+	active   bool
 }
 
 // Message contains the name of the sender and the message (content) itsself
@@ -25,8 +27,8 @@ type Message struct {
 }
 
 var (
-	clients map[string]Client = make(map[string]Client)
-	mu      sync.Mutex
+	clients map[string]*Client = make(map[string]*Client)
+	mu      sync.RWMutex
 )
 
 func main() {
@@ -39,8 +41,27 @@ func main() {
 	http.HandleFunc("/message", handleMessages)
 	http.HandleFunc("/chat", handleGetRequest)
 
+	go func() {
+		for {
+			time.Sleep(15 * time.Second)
+			inactiveClientDeleter()
+		}
+	}()
+
 	fmt.Println("Server running on port:", *port)
 	log.Fatal(http.ListenAndServe(portString, nil))
+}
+
+func inactiveClientDeleter() {
+	mu.Lock()
+	defer mu.Unlock()
+
+	for clientId, client := range clients {
+		if !client.active {
+			fmt.Println("due to inactivity: deleting ", client.name)
+			delete(clients, clientId)
+		}
+	}
 }
 
 // handleRegistry lets a client register by it's name and id
@@ -49,35 +70,28 @@ func main() {
 func handleRegistry(w http.ResponseWriter, r *http.Request) {
 	queryParams := r.URL.Query()
 	clientId := queryParams.Get("clientId")
+	if clientId == "" {
+		http.Error(w, "missing query parameter", http.StatusBadRequest)
+		return
+	}
 
 	if r.Method != http.MethodPost {
 		http.Error(w, "only POST request allowed", http.StatusBadRequest)
 		return
 	}
 
-	if clientId == "" {
-		http.Error(w, "missing query parameter", http.StatusBadRequest)
-		return
-	}
-
 	body, err := io.ReadAll(r.Body)
+	defer r.Body.Close()
 	if err != nil {
 		http.Error(w, "error reading request body", http.StatusInternalServerError)
 		return
 	}
 
-	mu.Lock()
-	if _, ok := clients[clientId]; ok {
-		http.Error(w, "client already defined", http.StatusBadRequest)
+	err2 := registerClient(clientId, string(body))
+	if err2 != nil {
+		http.Error(w, err2.Error(), http.StatusBadRequest)
 		return
 	}
-
-	clientCh := make(chan Message)
-	clients[clientId] = Client{string(body), clientId, clientCh}
-	mu.Unlock()
-
-	fmt.Printf("\nNew client '%s' registered.", string(body))
-	r.Body.Close()
 }
 
 // handleMessages takes an incoming message and distributes it to all clients
@@ -97,25 +111,25 @@ func handleMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body, err := io.ReadAll(r.Body)
+	defer r.Body.Close()
 	if err != nil {
 		http.Error(w, "error reading request body", http.StatusInternalServerError)
 		return
 	}
-	//den Namen brauche ich eigentlich hier nicht mit angeben
-	mu.Lock()
+
+	mu.RLock()
 	name := clients[clientId].name
-	mu.Unlock()
+	mu.RUnlock()
+
 	sendBroadcast(Message{name, string(body)})
-	r.Body.Close()
 }
 
-// sendBroadcast distributes an incomming message abroad all client Channels
+// sendBroadcast distributes an incomming message abroad all client channels
 func sendBroadcast(msg Message) {
-	//
 	mu.Lock()
 	defer mu.Unlock()
 	if len(clients) <= 0 {
-		fmt.Printf("\n\nThere are no clients registered")
+		fmt.Printf("\nThere are no clients registered\n")
 		return
 	}
 
@@ -123,19 +137,21 @@ func sendBroadcast(msg Message) {
 		select {
 		case client.clientCh <- msg:
 			fmt.Println("success")
-		case <-time.After(3 * time.Second):
-			fmt.Printf("\n\nchannel of client %s full, removing client", client.name)
-			//delete(clients, client.clientId)
+		default:
+			client.active = false
 		}
 	}
 }
 
-// handleGetRequest displays a message when received and times out after 500s
+//TODO nur ein User darf auf einen Channel hören
+
+// handleGetRequest displays a message when received and times out after 250s
 // if nothing is being send
 // should receive a Path Parameter with clientId in it eg "clientId?fgbIUHBVIUHDCdvw"
 func handleGetRequest(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "only GET Requests allowed", http.StatusBadRequest)
+		return
 	}
 
 	queryParams := r.URL.Query()
@@ -144,16 +160,43 @@ func handleGetRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing query parameter", http.StatusBadRequest)
 		return
 	}
-	//allgemein auf deadlocks prüfen & user validieren bzw nur ein User darf
-	// auf einen Channel hören
-	//safe fuction zum client holen
+
+	mu.RLock()
+	client, ok := clients[clientId]
+	isActive := ok && client.active
+	mu.RUnlock()
+
+	if !isActive {
+		http.Error(w, "Client not found or not active", http.StatusNotFound)
+		return
+	}
+
 	select {
-	case msg := <-clients[clientId].clientCh:
+	case msg := <-client.clientCh:
 		message := msg.name + ": " + msg.content
 		fmt.Fprint(w, message)
-
+		return
+	case <-client.quit:
+		mu.Lock()
+		client.active = false
+		close(client.clientCh)
+		close(client.quit)
+		mu.Unlock()
 		return
 	case <-time.After(250 * time.Second):
 		return
 	}
+}
+
+func registerClient(clientId, body string) error {
+	mu.Lock()
+	if _, ok := clients[clientId]; ok {
+		return fmt.Errorf("client already defined")
+	}
+	clientCh := make(chan Message)
+	quit := make(chan int)
+	clients[clientId] = &Client{string(body), clientId, clientCh, quit, true}
+	mu.Unlock()
+	fmt.Printf("\nNew client '%s' registered.\n", body)
+	return nil
 }
