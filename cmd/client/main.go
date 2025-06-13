@@ -19,7 +19,6 @@ var (
 	reader   *bufio.Reader = bufio.NewReader(os.Stdin)
 )
 
-// TODO Documentation
 func main() {
 	var port = flag.Int("port", 8080, "HTTP Server Port")
 	flag.Parse()
@@ -40,6 +39,7 @@ func main() {
 	}
 }
 
+// postMessage sends a POST request to the endpoint, containing a message, read from the stdin
 func postMessage(url string) {
 	parameteredUrl := url + "/message?clientId=" + clientId
 
@@ -50,7 +50,6 @@ func postMessage(url string) {
 		return
 	}
 
-	//Post
 	_, err := http.Post(parameteredUrl, "texp/plain", strings.NewReader(message))
 	if err != nil {
 		log.Println("Fehler beim Absenden der Nachricht: ", err)
@@ -58,10 +57,10 @@ func postMessage(url string) {
 	}
 }
 
+// getMessages sends a GET request to the endpoint, displaying incoming messages
 func getMessages(url string) {
 	parameteredUrl := url + "/chat?clientId=" + clientId
 
-	//Get Anfrage ausführen
 	res, err := http.Get(parameteredUrl)
 	if err != nil {
 		log.Println("Fehler beim Abrufen ist aufgetreten: ", err)
@@ -74,8 +73,8 @@ func getMessages(url string) {
 	fmt.Println(string(body))
 }
 
+// register reads a self given name from the stdin and sends a POST request to the endpoint
 func register(url string) error {
-	//Namen Scannen
 	fmt.Println("Gebe deinen Namen an:")
 	clientName, err2 := reader.ReadString('\n')
 	clientName = strings.ReplaceAll(clientName, "\n", "")
@@ -86,7 +85,6 @@ func register(url string) error {
 
 	parameteredUrl := url + "/user?clientId=" + clientId
 
-	//Post
 	_, err := http.Post(parameteredUrl, "text/plain", strings.NewReader(clientName))
 	if err != nil {
 		fmt.Println("Die Registrierung hat nicht funktioniert, versuch es nochmal mit anderen Daten")

@@ -16,7 +16,6 @@ type Client struct {
 	name     string
 	clientId string
 	clientCh chan Message
-	quit     chan int
 	active   bool
 }
 
@@ -26,6 +25,7 @@ type Message struct {
 	content string
 }
 
+// clients who communicate with the sever
 var (
 	clients map[string]*Client = make(map[string]*Client)
 	mu      sync.RWMutex
@@ -36,7 +36,7 @@ func main() {
 	flag.Parse()
 	portString := fmt.Sprintf(":%d", *port)
 
-	//Eigentlichg Query-Param aber dafür müsste ich externe bib nutzen
+	//Eigentlichg Query-Param aber dafür müsste ich eine externe bib nutzen
 	http.HandleFunc("/user", handleRegistry)
 	http.HandleFunc("/message", handleMessages)
 	http.HandleFunc("/chat", handleGetRequest)
@@ -52,6 +52,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(portString, nil))
 }
 
+// inactiveClientDeleter searches for inactive clients and deletes them as well as closes their message-channel
 func inactiveClientDeleter() {
 	mu.Lock()
 	defer mu.Unlock()
@@ -59,12 +60,13 @@ func inactiveClientDeleter() {
 	for clientId, client := range clients {
 		if !client.active {
 			fmt.Println("due to inactivity: deleting ", client.name)
+			close(client.clientCh)
 			delete(clients, clientId)
 		}
 	}
 }
 
-// handleRegistry lets a client register by it's name and id
+// handleRegistry takes an incoming POST request and lets a client register by it's name and id
 // should receive a Path Parameter with clientId in it eg "clientId?fgbIUHBVIUHDCdvw"
 // should receive the self given client-name in the request body
 func handleRegistry(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +96,7 @@ func handleRegistry(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleMessages takes an incoming message and distributes it to all clients
+// handleMessages takes an incoming POST request with a message in i'ts body and distributes it to all clients
 // should receive a Path Parameter with clientId in it eg "clientId?fgbIUHBVIUHDCdvw"
 // should receive the message in the request body
 func handleMessages(w http.ResponseWriter, r *http.Request) {
@@ -124,7 +126,8 @@ func handleMessages(w http.ResponseWriter, r *http.Request) {
 	sendBroadcast(Message{name, string(body)})
 }
 
-// sendBroadcast distributes an incomming message abroad all client channels
+// sendBroadcast distributes an incomming message abroad all client channels if
+// a client can't receive, i'ts active status is set to false
 func sendBroadcast(msg Message) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -176,26 +179,20 @@ func handleGetRequest(w http.ResponseWriter, r *http.Request) {
 		message := msg.name + ": " + msg.content
 		fmt.Fprint(w, message)
 		return
-	case <-client.quit:
-		mu.Lock()
-		client.active = false
-		close(client.clientCh)
-		close(client.quit)
-		mu.Unlock()
-		return
 	case <-time.After(250 * time.Second):
 		return
 	}
 }
 
+// registerClient safely registeres a client by creating a Client with the received values
+// and putting them into the global clients map
 func registerClient(clientId, body string) error {
 	mu.Lock()
 	if _, ok := clients[clientId]; ok {
 		return fmt.Errorf("client already defined")
 	}
 	clientCh := make(chan Message)
-	quit := make(chan int)
-	clients[clientId] = &Client{string(body), clientId, clientCh, quit, true}
+	clients[clientId] = &Client{string(body), clientId, clientCh, true}
 	mu.Unlock()
 	fmt.Printf("\nNew client '%s' registered.\n", body)
 	return nil
