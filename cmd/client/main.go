@@ -2,21 +2,22 @@ package main
 
 import (
 	"bufio"
+	"crypto/rand"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
 	"strings"
-	"time"
 )
 
 var (
-	//normalerweise uuid
-	clientId string        = fmt.Sprintf("%d-%d", time.Now().UnixNano(), rand.Int())
-	reader   *bufio.Reader = bufio.NewReader(os.Stdin)
+	clientId   string        = generateSecureToken(32)
+	reader     *bufio.Reader = bufio.NewReader(os.Stdin)
+	authToken  string
+	httpClient = &http.Client{}
 )
 
 func main() {
@@ -41,16 +42,25 @@ func main() {
 
 // postMessage sends a POST request to the endpoint, containing a message, read from the stdin
 func postMessage(url string) {
-	parameteredUrl := url + "/message?clientId=" + clientId
+	parameteredUrl := fmt.Sprintf("%s/message?clientId=%s", url, clientId)
 
-	message, err2 := reader.ReadString('\n')
+	message, err := reader.ReadString('\n')
 	fmt.Printf("\033[1A\033[K")
-	if err2 != nil {
+	if err != nil {
 		fmt.Println("wrong input")
 		return
 	}
 
-	_, err := http.Post(parameteredUrl, "texp/plain", strings.NewReader(message))
+	req, err := http.NewRequest("POST", parameteredUrl, strings.NewReader(message))
+	if err != nil {
+		log.Println("Fehler beim Erstellen der POST req: ", err)
+		return
+	}
+
+	req.Header.Add("Authorization", authToken)
+	req.Header.Add("Content-Type", "text/plain")
+
+	_, err = httpClient.Do(req)
 	if err != nil {
 		log.Println("Fehler beim Absenden der Nachricht: ", err)
 		return
@@ -59,16 +69,24 @@ func postMessage(url string) {
 
 // getMessages sends a GET request to the endpoint, displaying incoming messages
 func getMessages(url string) {
-	parameteredUrl := url + "/chat?clientId=" + clientId
+	parameteredUrl := fmt.Sprintf("%s/chat?clientId=%s", url, clientId)
 
-	res, err := http.Get(parameteredUrl)
+	req, err := http.NewRequest("GET", parameteredUrl, nil)
+	if err != nil {
+		log.Println("Fehler beim erstellen der GET request: ", err)
+	}
+
+	req.Header.Add("Authorization", authToken)
+
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		log.Println("Fehler beim Abrufen ist aufgetreten: ", err)
 	}
-	body, err2 := io.ReadAll(res.Body)
-	defer res.Body.Close()
-	if err2 != nil {
-		log.Println("Fehler beim Lesen des Bodies ist aufgetreten: ", err2)
+
+	body, err := io.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	if err != nil {
+		log.Println("Fehler beim Lesen des Bodies ist aufgetreten: ", err)
 	}
 	fmt.Println(string(body))
 }
@@ -76,20 +94,37 @@ func getMessages(url string) {
 // register reads a self given name from the stdin and sends a POST request to the endpoint
 func register(url string) error {
 	fmt.Println("Gebe deinen Namen an:")
-	clientName, err2 := reader.ReadString('\n')
+	clientName, err := reader.ReadString('\n')
 	clientName = strings.ReplaceAll(clientName, "\n", "")
-	if err2 != nil {
+	if err != nil {
 		fmt.Println("wrong input")
-		return err2
+		return err
 	}
 
-	parameteredUrl := url + "/user?clientId=" + clientId
+	parameteredUrl := fmt.Sprintf("%s/user?clientId=%s", url, clientId)
 
-	_, err := http.Post(parameteredUrl, "text/plain", strings.NewReader(clientName))
+	resp, err := httpClient.Post(parameteredUrl, "text/plain", strings.NewReader(clientName))
 	if err != nil {
 		fmt.Println("Die Registrierung hat nicht funktioniert, versuch es nochmal mit anderen Daten")
 		return err
 	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Println("Fehler beim Lesen des Bodies ist aufgetreten: ", err)
+	}
+	defer resp.Body.Close()
+	authToken = string(body)
+
 	fmt.Println("\nDu wurdest registriert.")
 	return nil
+}
+
+// generateSecureToken generates a token containing random chars
+func generateSecureToken(length int) string {
+	b := make([]byte, length)
+	if _, err := rand.Read(b); err != nil {
+		panic(err)
+	}
+	return base64.RawURLEncoding.EncodeToString(b)
 }

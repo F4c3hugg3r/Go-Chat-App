@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"io"
@@ -13,10 +15,11 @@ import (
 // Client is a communication participant who has a name, unique id and
 // channel to receive messages
 type Client struct {
-	name     string
-	clientId string
-	clientCh chan Message
-	active   bool
+	name      string
+	clientId  string
+	clientCh  chan Message
+	active    bool
+	authToken string
 }
 
 // Message contains the name of the sender and the message (content) itsself
@@ -89,11 +92,13 @@ func handleRegistry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err2 := registerClient(clientId, string(body))
+	token, err2 := registerClient(clientId, string(body))
 	if err2 != nil {
 		http.Error(w, err2.Error(), http.StatusBadRequest)
 		return
 	}
+
+	w.Write([]byte(token))
 }
 
 // handleMessages takes an incoming POST request with a message in i'ts body and distributes it to all clients
@@ -146,7 +151,14 @@ func sendBroadcast(msg Message) {
 	}
 }
 
-//TODO nur ein User darf auf einen Channel hören
+// TODO nur ein User darf auf einen Channel hören
+// TODO dafür middleware Methode implementieren
+func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		next(w, r)
+		return
+	}
+}
 
 // handleGetRequest displays a message when received and times out after 250s
 // if nothing is being send
@@ -166,11 +178,10 @@ func handleGetRequest(w http.ResponseWriter, r *http.Request) {
 
 	mu.RLock()
 	client, ok := clients[clientId]
-	isActive := ok && client.active
 	mu.RUnlock()
 
-	if !isActive {
-		http.Error(w, "Client not found or not active", http.StatusNotFound)
+	if !ok {
+		http.Error(w, "Client not found ", http.StatusNotFound)
 		return
 	}
 
@@ -185,15 +196,26 @@ func handleGetRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 // registerClient safely registeres a client by creating a Client with the received values
-// and putting them into the global clients map
-func registerClient(clientId, body string) error {
+// and putting it into the global clients map
+func registerClient(clientId, body string) (token string, e error) {
+	token = generateSecureToken(64)
+
 	mu.Lock()
 	if _, ok := clients[clientId]; ok {
-		return fmt.Errorf("client already defined")
+		return token, fmt.Errorf("client already defined")
 	}
 	clientCh := make(chan Message)
-	clients[clientId] = &Client{string(body), clientId, clientCh, true}
+	clients[clientId] = &Client{string(body), clientId, clientCh, true, token}
 	mu.Unlock()
 	fmt.Printf("\nNew client '%s' registered.\n", body)
-	return nil
+	return token, nil
+}
+
+// generateSecureToken generates a token containing random chars
+func generateSecureToken(length int) string {
+	b := make([]byte, length)
+	if _, err := rand.Read(b); err != nil {
+		panic(err)
+	}
+	return base64.RawURLEncoding.EncodeToString(b)
 }
