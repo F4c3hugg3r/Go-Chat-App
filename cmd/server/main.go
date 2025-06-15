@@ -39,10 +39,9 @@ func main() {
 	flag.Parse()
 	portString := fmt.Sprintf(":%d", *port)
 
-	//Eigentlichg Query-Param aber dafür müsste ich eine externe bib nutzen
-	http.HandleFunc("/user", handleRegistry)
-	http.HandleFunc("/message", authMiddleware(handleMessages))
-	http.HandleFunc("/chat", authMiddleware(handleGetRequest))
+	http.HandleFunc("/users/{clientId}", handleRegistry)
+	http.HandleFunc("/users/{clientId}/message", authMiddleware(handleMessages))
+	http.HandleFunc("/users/{clientId}/chat", authMiddleware(handleGetRequest))
 
 	go func() {
 		for {
@@ -73,9 +72,9 @@ func inactiveClientDeleter() {
 // should receive a Path Parameter with clientId in it eg "clientId?fgbIUHBVIUHDCdvw"
 // should receive the self given client-name in the request body
 func handleRegistry(w http.ResponseWriter, r *http.Request) {
-	clientId := r.URL.Query().Get("clientId")
+	clientId := r.PathValue("clientId")
 	if clientId == "" {
-		http.Error(w, "missing query parameter", http.StatusBadRequest)
+		http.Error(w, "missing path parameter clientId", http.StatusBadRequest)
 		return
 	}
 
@@ -104,9 +103,9 @@ func handleRegistry(w http.ResponseWriter, r *http.Request) {
 // should receive a Path Parameter with clientId in it eg "clientId?fgbIUHBVIUHDCdvw"
 // should receive the message in the request body
 func handleMessages(w http.ResponseWriter, r *http.Request) {
-	clientId := r.URL.Query().Get("clientId")
+	clientId := r.PathValue("clientId")
 	if clientId == "" {
-		http.Error(w, "missing query parameter", http.StatusBadRequest)
+		http.Error(w, "missing path parameter clientId", http.StatusBadRequest)
 		return
 	}
 
@@ -154,21 +153,20 @@ func sendBroadcast(msg Message) {
 func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := r.Header.Get("Authorization")
-		clientId := r.URL.Query().Get("clientId")
+		clientId := r.PathValue("clientId")
 		if token == "" || clientId == "" {
-			http.Error(w, "missing query parameter or authToken", http.StatusBadRequest)
+			http.Error(w, "missing path parameter clientId or authToken", http.StatusBadRequest)
 			return
 		}
 
 		mu.RLock()
 		if token != clients[clientId].authToken {
-			http.Error(w, "missing query parameter or authToken", http.StatusForbidden)
+			http.Error(w, "missing path parameter clientId or authToken", http.StatusForbidden)
 			return
 		}
 		mu.RUnlock()
 
 		next(w, r)
-		return
 	}
 }
 
@@ -181,9 +179,9 @@ func handleGetRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clientId := r.URL.Query().Get("clientId")
+	clientId := r.PathValue("clientId")
 	if clientId == "" {
-		http.Error(w, "missing query parameter", http.StatusBadRequest)
+		http.Error(w, "missing path parameter clientId", http.StatusBadRequest)
 		return
 	}
 

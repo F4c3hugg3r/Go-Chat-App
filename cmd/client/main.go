@@ -42,7 +42,7 @@ func main() {
 
 // postMessage sends a POST request to the endpoint, containing a message, read from the stdin
 func postMessage(url string) {
-	parameteredUrl := fmt.Sprintf("%s/message?clientId=%s", url, clientId)
+	parameteredUrl := fmt.Sprintf("%s/users/%s/message", url, clientId)
 
 	message, err := reader.ReadString('\n')
 	fmt.Printf("\033[1A\033[K")
@@ -69,7 +69,7 @@ func postMessage(url string) {
 
 // getMessages sends a GET request to the endpoint, displaying incoming messages
 func getMessages(url string) {
-	parameteredUrl := fmt.Sprintf("%s/chat?clientId=%s", url, clientId)
+	parameteredUrl := fmt.Sprintf("%s/users/%s/chat", url, clientId)
 
 	req, err := http.NewRequest("GET", parameteredUrl, nil)
 	if err != nil {
@@ -101,7 +101,7 @@ func register(url string) error {
 		return err
 	}
 
-	parameteredUrl := fmt.Sprintf("%s/user?clientId=%s", url, clientId)
+	parameteredUrl := fmt.Sprintf("%s/users/%s", url, clientId)
 
 	resp, err := httpClient.Post(parameteredUrl, "text/plain", strings.NewReader(clientName))
 	if err != nil {
