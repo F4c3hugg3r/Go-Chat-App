@@ -34,6 +34,11 @@ var (
 	mu      sync.RWMutex
 )
 
+// TODO Vorschläge
+// Tests
+// Abmelden
+// Nachrichten an alle bei neuem user
+// HTTPS
 func main() {
 	var port = flag.Int("port", 8080, "HTTP Server Port")
 	flag.Parse()
@@ -68,8 +73,29 @@ func inactiveClientDeleter() {
 	}
 }
 
+// authMiddleware checks if the authToken is fitting the token given while registry and throws
+// an error if not
+func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := r.Header.Get("Authorization")
+		clientId := r.PathValue("clientId")
+		if token == "" || clientId == "" {
+			http.Error(w, "missing path parameter clientId or authToken", http.StatusBadRequest)
+			return
+		}
+
+		mu.RLock()
+		if client, exists := clients[clientId]; !exists || token != client.authToken {
+			http.Error(w, "client does not exist or token doesn't match", http.StatusForbidden)
+		}
+		mu.RUnlock()
+
+		next(w, r)
+	}
+}
+
 // handleRegistry takes an incoming POST request and lets a client register by it's name and id
-// should receive a Path Parameter with clientId in it eg "clientId?fgbIUHBVIUHDCdvw"
+// should receive a Path Parameter with clientId in it
 // should receive the self given client-name in the request body
 func handleRegistry(w http.ResponseWriter, r *http.Request) {
 	clientId := r.PathValue("clientId")
@@ -83,10 +109,11 @@ func handleRegistry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	body, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
-	if err != nil {
-		http.Error(w, "error reading request body", http.StatusInternalServerError)
+	if err != nil || string(body) == "" {
+		http.Error(w, "request body too large or empty", http.StatusBadRequest)
 		return
 	}
 
@@ -99,8 +126,24 @@ func handleRegistry(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(token))
 }
 
+// registerClient safely registeres a client by creating a Client with the received values
+// and putting it into the global clients map
+func registerClient(clientId, body string) (token string, e error) {
+	token = generateSecureToken(64)
+
+	mu.Lock()
+	if _, exists := clients[clientId]; exists {
+		return token, fmt.Errorf("client already defined")
+	}
+	clientCh := make(chan Message)
+	clients[clientId] = &Client{string(body), clientId, clientCh, true, token}
+	mu.Unlock()
+	fmt.Printf("\nNew client '%s' registered.\n", body)
+	return token, nil
+}
+
 // handleMessages takes an incoming POST request with a message in i'ts body and distributes it to all clients
-// should receive a Path Parameter with clientId in it eg "clientId?fgbIUHBVIUHDCdvw"
+// should receive a Path Parameter with clientId in it
 // should receive the message in the request body
 func handleMessages(w http.ResponseWriter, r *http.Request) {
 	clientId := r.PathValue("clientId")
@@ -114,6 +157,7 @@ func handleMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	body, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
 	if err != nil {
@@ -122,10 +166,15 @@ func handleMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mu.RLock()
-	name := clients[clientId].name
-	mu.RUnlock()
-
-	sendBroadcast(Message{name, string(body)})
+	if client, exists := clients[clientId]; exists {
+		name := client.name
+		mu.RUnlock()
+		sendBroadcast(Message{name, string(body)})
+	} else {
+		mu.RUnlock()
+		http.Error(w, "client doesn't exist", http.StatusForbidden)
+		return
+	}
 }
 
 // sendBroadcast distributes an incomming message abroad all client channels if
@@ -148,31 +197,9 @@ func sendBroadcast(msg Message) {
 	}
 }
 
-// authMiddleware checks if the authToken is fitting the token given while registry and throws
-// an error if not
-func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		token := r.Header.Get("Authorization")
-		clientId := r.PathValue("clientId")
-		if token == "" || clientId == "" {
-			http.Error(w, "missing path parameter clientId or authToken", http.StatusBadRequest)
-			return
-		}
-
-		mu.RLock()
-		if token != clients[clientId].authToken {
-			http.Error(w, "missing path parameter clientId or authToken", http.StatusForbidden)
-			return
-		}
-		mu.RUnlock()
-
-		next(w, r)
-	}
-}
-
-// handleGetRequest displays a message when received and times out after 250s
+// handleGetRequest displays a message when received and times out after 30s
 // if nothing is being send
-// should receive a Path Parameter with clientId in it eg "clientId?fgbIUHBVIUHDCdvw"
+// should receive a Path Parameter with clientId in it
 func handleGetRequest(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "only GET Requests allowed", http.StatusBadRequest)
@@ -186,38 +213,27 @@ func handleGetRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mu.RLock()
-	client, ok := clients[clientId]
-	mu.RUnlock()
-
-	if !ok {
+	client, exists := clients[clientId]
+	if !exists {
+		mu.RUnlock()
 		http.Error(w, "Client not found ", http.StatusNotFound)
 		return
 	}
+	clientCh := client.clientCh
+	mu.RUnlock()
 
 	select {
-	case msg := <-client.clientCh:
+	case msg, ok := <-clientCh:
+		if !ok {
+			http.Error(w, "client already deleted", http.StatusGone)
+			return
+		}
 		message := msg.name + ": " + msg.content
 		fmt.Fprint(w, message)
 		return
-	case <-time.After(250 * time.Second):
+	case <-time.After(30 * time.Second):
 		return
 	}
-}
-
-// registerClient safely registeres a client by creating a Client with the received values
-// and putting it into the global clients map
-func registerClient(clientId, body string) (token string, e error) {
-	token = generateSecureToken(64)
-
-	mu.Lock()
-	if _, ok := clients[clientId]; ok {
-		return token, fmt.Errorf("client already defined")
-	}
-	clientCh := make(chan Message)
-	clients[clientId] = &Client{string(body), clientId, clientCh, true, token}
-	mu.Unlock()
-	fmt.Printf("\nNew client '%s' registered.\n", body)
-	return token, nil
 }
 
 // generateSecureToken generates a token containing random chars
