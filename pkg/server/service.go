@@ -1,11 +1,11 @@
 package server
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"net/http"
 	"sync"
+
+	tokenGenerator "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
 // clients who communicate with the sever
@@ -56,7 +56,7 @@ func (s *ChatService) AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 // registerClient safely registeres a client by creating a Client with the received values
 // and putting it into the global clients map
 func (s *ChatService) RegisterClient(clientId, body string) (token string, e error) {
-	token = generateSecureToken(64)
+	token = tokenGenerator.GenerateSecureToken(64)
 
 	s.mu.Lock()
 	if _, exists := s.clients[clientId]; exists {
@@ -87,13 +87,4 @@ func (s *ChatService) SendBroadcast(msg Message) {
 			client.active = false
 		}
 	}
-}
-
-// generateSecureToken generates a token containing random chars
-func generateSecureToken(length int) string {
-	b := make([]byte, length)
-	if _, err := rand.Read(b); err != nil {
-		panic(err)
-	}
-	return base64.RawURLEncoding.EncodeToString(b)
 }
