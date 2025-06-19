@@ -8,11 +8,21 @@ import (
 )
 
 type ServerHandler struct {
-	service *ChatService
+	service     *ChatService
+	registerer  ClientRegisterer
+	broadcaster MessageBroadcaster
 }
 
+type ClientRegisterer func(clientId, body string) (token string, e error)
+
+type MessageBroadcaster func(msg Message)
+
 func NewServerHandler(chatService *ChatService) *ServerHandler {
-	return &ServerHandler{service: chatService}
+	return &ServerHandler{
+		service:     chatService,
+		registerer:  chatService.RegisterClient,
+		broadcaster: chatService.SendBroadcast,
+	}
 }
 
 // handleGetRequest displays a message when received and times out after 30s
@@ -58,14 +68,14 @@ func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Re
 // should receive a Path Parameter with clientId in it
 // should receive the message in the request body
 func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Request) {
-	clientId := r.PathValue("clientId")
-	if clientId == "" {
-		http.Error(w, "missing path parameter clientId", http.StatusBadRequest)
+	if r.Method != http.MethodPost {
+		http.Error(w, "only POST request allowed", http.StatusBadRequest)
 		return
 	}
 
-	if r.Method != http.MethodPost {
-		http.Error(w, "only POST request allowed", http.StatusBadRequest)
+	clientId := r.PathValue("clientId")
+	if clientId == "" {
+		http.Error(w, "missing path parameter clientId", http.StatusBadRequest)
 		return
 	}
 
@@ -81,7 +91,7 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 	if client, exists := handler.service.clients[clientId]; exists {
 		name := client.name
 		handler.service.mu.RUnlock()
-		handler.service.SendBroadcast(Message{name, string(body)})
+		handler.broadcaster(Message{name, string(body)})
 	} else {
 		handler.service.mu.RUnlock()
 		http.Error(w, "client doesn't exist", http.StatusForbidden)
@@ -93,14 +103,14 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 // should receive a Path Parameter with clientId in it
 // should receive the self given client-name in the request body
 func (handler *ServerHandler) HandleRegistry(w http.ResponseWriter, r *http.Request) {
-	clientId := r.PathValue("clientId")
-	if clientId == "" {
-		http.Error(w, "missing path parameter clientId", http.StatusBadRequest)
+	if r.Method != http.MethodPost {
+		http.Error(w, "only POST request allowed", http.StatusBadRequest)
 		return
 	}
 
-	if r.Method != http.MethodPost {
-		http.Error(w, "only POST request allowed", http.StatusBadRequest)
+	clientId := r.PathValue("clientId")
+	if clientId == "" {
+		http.Error(w, "missing path parameter clientId", http.StatusBadRequest)
 		return
 	}
 
@@ -112,7 +122,7 @@ func (handler *ServerHandler) HandleRegistry(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	token, err2 := handler.service.RegisterClient(clientId, string(body))
+	token, err2 := handler.registerer(clientId, string(body))
 	if err2 != nil {
 		http.Error(w, err2.Error(), http.StatusBadRequest)
 		return
