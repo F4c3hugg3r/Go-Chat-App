@@ -40,18 +40,14 @@ func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	handler.service.mu.RLock()
-	client, exists := handler.service.clients[clientId]
-	if !exists {
-		handler.service.mu.RUnlock()
+	client, err := handler.service.getClient(clientId)
+	if err != nil {
 		http.Error(w, "Client not found ", http.StatusNotFound)
 		return
 	}
-	clientCh := client.clientCh
-	handler.service.mu.RUnlock()
 
 	select {
-	case msg, ok := <-clientCh:
+	case msg, ok := <-client.clientCh:
 		if !ok {
 			http.Error(w, "client already deleted", http.StatusGone)
 			return
@@ -87,14 +83,10 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	handler.service.mu.RLock()
-	if client, exists := handler.service.clients[clientId]; exists {
-		name := client.name
-		handler.service.mu.RUnlock()
-		handler.broadcaster(Message{name, string(body)})
+	if client, err := handler.service.getClient(clientId); err == nil {
+		handler.broadcaster(Message{client.name, string(body)})
 	} else {
-		handler.service.mu.RUnlock()
-		http.Error(w, "client doesn't exist", http.StatusForbidden)
+		http.Error(w, "client not found", http.StatusForbidden)
 		return
 	}
 }
@@ -129,4 +121,24 @@ func (handler *ServerHandler) HandleRegistry(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.Write([]byte(token))
+}
+
+// authMiddleware checks if the authToken is fitting the token given while registry and throws
+// an error if not
+func (handler *ServerHandler) AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := r.Header.Get("Authorization")
+		clientId := r.PathValue("clientId")
+		if token == "" || clientId == "" {
+			http.Error(w, "missing path parameter clientId or authToken", http.StatusBadRequest)
+			return
+		}
+
+		if client, err := handler.service.getClient(clientId); err != nil || token != client.authToken {
+			http.Error(w, "client does not exist or token doesn't match", http.StatusForbidden)
+			return
+		}
+
+		next(w, r)
+	}
 }

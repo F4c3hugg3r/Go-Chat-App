@@ -24,8 +24,8 @@ func main() {
 	handler := server.NewServerHandler(service)
 
 	http.HandleFunc("/users/{clientId}", handler.HandleRegistry)
-	http.HandleFunc("/users/{clientId}/message", service.AuthMiddleware(handler.HandleMessages))
-	http.HandleFunc("/users/{clientId}/chat", service.AuthMiddleware(handler.HandleGetRequest))
+	http.HandleFunc("/users/{clientId}/message", handler.AuthMiddleware(handler.HandleMessages))
+	http.HandleFunc("/users/{clientId}/chat", handler.AuthMiddleware(handler.HandleGetRequest))
 
 	go func() {
 		for {
