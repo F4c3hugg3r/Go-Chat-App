@@ -11,21 +11,17 @@ type ServerHandler struct {
 	service     *ChatService
 	registerer  ClientRegisterer
 	broadcaster MessageBroadcaster
-	deleter     ClientDeleter
 }
 
 type ClientRegisterer func(clientId, body string) (token string, e error)
 
 type MessageBroadcaster func(msg Message)
 
-type ClientDeleter func(clientId string) error
-
 func NewServerHandler(chatService *ChatService) *ServerHandler {
 	return &ServerHandler{
 		service:     chatService,
 		registerer:  chatService.registerClient,
 		broadcaster: chatService.sendBroadcast,
-		deleter:     chatService.logOutClient,
 	}
 }
 
@@ -90,7 +86,7 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 
 	if client, err := handler.service.getClient(clientId); err == nil {
 		if string(body) == "quit\n" {
-			handler.deleter(clientId)
+			handler.service.logOutClient(clientId)
 			handler.broadcaster(Message{fmt.Sprint("Server message - ", client.name), "logged out!\n"})
 			return
 		}

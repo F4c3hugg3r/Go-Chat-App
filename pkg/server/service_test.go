@@ -23,6 +23,23 @@ var (
 	}
 )
 
+func TestLogOutClient(t *testing.T) {
+	service.clients[clientId] = dummyClient
+	if len(service.clients) != 1 {
+		t.Errorf(("Setup incorrect there should be just 1 client but there is %d"), len(service.clients))
+	}
+
+	err := service.logOutClient(clientId)
+	if len(service.clients) != 0 || err != nil {
+		t.Errorf(("There should be 0 client but there is %d"), len(service.clients))
+	}
+
+	err = service.logOutClient(clientId)
+	if len(service.clients) != 0 || err == nil {
+		t.Errorf(("There should be 0 client but there is %d"), len(service.clients))
+	}
+}
+
 func TestInactiveClientDeleter(t *testing.T) {
 	service.clients[clientId] = dummyClientInactive
 	if len(service.clients) != 1 {
