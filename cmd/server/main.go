@@ -11,8 +11,6 @@ import (
 )
 
 // TODO Vorschläge
-// Tests
-// Abmelden
 // Nachrichten an alle bei neuem user
 // HTTPS
 func main() {

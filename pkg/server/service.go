@@ -17,7 +17,23 @@ func NewChatService() *ChatService {
 	return &ChatService{clients: make(map[string]*Client)}
 }
 
-// inactiveClientDeleter searches for inactive clients and deletes them as well as closes their message-channel
+// logOutClient deleted a client out of the clients map
+func (s *ChatService) logOutClient(clientId string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if client, ok := s.clients[clientId]; ok {
+		fmt.Println("logged out ", client.name)
+		close(client.clientCh)
+		delete(s.clients, clientId)
+		return nil
+	} else {
+		return fmt.Errorf("client already deleted")
+	}
+
+}
+
+// InactiveClientDeleter searches for inactive clients and deletes them as well as closes their message-channel
 func (s *ChatService) InactiveClientDeleter() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -33,7 +49,7 @@ func (s *ChatService) InactiveClientDeleter() {
 
 // registerClient safely registeres a client by creating a Client with the received values
 // and putting it into the global clients map
-func (s *ChatService) RegisterClient(clientId, body string) (token string, e error) {
+func (s *ChatService) registerClient(clientId, body string) (token string, e error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -51,7 +67,7 @@ func (s *ChatService) RegisterClient(clientId, body string) (token string, e err
 
 // sendBroadcast distributes an incomming message abroad all client channels if
 // a client can't receive, i'ts active status is set to false
-func (s *ChatService) SendBroadcast(msg Message) {
+func (s *ChatService) sendBroadcast(msg Message) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

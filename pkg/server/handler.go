@@ -11,17 +11,21 @@ type ServerHandler struct {
 	service     *ChatService
 	registerer  ClientRegisterer
 	broadcaster MessageBroadcaster
+	deleter     ClientDeleter
 }
 
 type ClientRegisterer func(clientId, body string) (token string, e error)
 
 type MessageBroadcaster func(msg Message)
 
+type ClientDeleter func(clientId string) error
+
 func NewServerHandler(chatService *ChatService) *ServerHandler {
 	return &ServerHandler{
 		service:     chatService,
-		registerer:  chatService.RegisterClient,
-		broadcaster: chatService.SendBroadcast,
+		registerer:  chatService.registerClient,
+		broadcaster: chatService.sendBroadcast,
+		deleter:     chatService.logOutClient,
 	}
 }
 
@@ -56,6 +60,7 @@ func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Re
 		fmt.Fprint(w, message)
 		return
 	case <-time.After(30 * time.Second):
+		fmt.Fprintf(w, "\033[1A\033[K")
 		return
 	}
 }
@@ -84,6 +89,11 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 	}
 
 	if client, err := handler.service.getClient(clientId); err == nil {
+		if string(body) == "quit\n" {
+			handler.deleter(clientId)
+			handler.broadcaster(Message{fmt.Sprint("Server message - ", client.name), "logged out!\n"})
+			return
+		}
 		handler.broadcaster(Message{client.name, string(body)})
 	} else {
 		http.Error(w, "client not found", http.StatusForbidden)
@@ -120,6 +130,7 @@ func (handler *ServerHandler) HandleRegistry(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	//handler.broadcaster(Message{fmt.Sprint("\nServer message - ", string(body)), "joined the chat!\n"})
 	w.Write([]byte(token))
 }
 

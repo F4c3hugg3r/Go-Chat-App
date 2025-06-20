@@ -18,9 +18,11 @@ var (
 	reader     *bufio.Reader = bufio.NewReader(os.Stdin)
 	authToken  string
 	httpClient = &http.Client{}
+	quit       error
 )
 
 func main() {
+	quit = nil
 	var port = flag.Int("port", 8080, "HTTP Server Port")
 	flag.Parse()
 	url := fmt.Sprintf("http://localhost:%d", *port)
@@ -30,26 +32,28 @@ func main() {
 	}
 
 	go func() {
-		for {
+		for quit == nil {
 			getMessages(url)
 		}
 	}()
 
-	for {
-		postMessage(url)
+	for quit == nil {
+		quit = postMessage(url)
 	}
 }
 
 // postMessage sends a POST request to the endpoint, containing a message, read from the stdin
-func postMessage(url string) {
+func postMessage(url string) (quit error) {
+	quit = nil
 	parameteredUrl := fmt.Sprintf("%s/users/%s/message", url, clientId)
 
 	message, err := reader.ReadString('\n')
-	fmt.Printf("\033[1A\033[K")
 	if err != nil {
 		fmt.Println("wrong input")
 		return
 	}
+
+	fmt.Printf("\033[1A\033[K")
 
 	req, err := http.NewRequest("POST", parameteredUrl, strings.NewReader(message))
 	if err != nil {
@@ -65,6 +69,12 @@ func postMessage(url string) {
 		log.Println("Fehler beim Absenden der Nachricht: ", err)
 		return
 	}
+
+	if message == "quit\n" {
+		quit = fmt.Errorf("\nDu hast den Channel verlassen.")
+	}
+
+	return
 }
 
 // getMessages sends a GET request to the endpoint, displaying incoming messages
@@ -105,7 +115,7 @@ func register(url string) error {
 
 	resp, err := httpClient.Post(parameteredUrl, "text/plain", strings.NewReader(clientName))
 	if err != nil {
-		fmt.Println("Die Registrierung hat nicht funktioniert, versuch es nochmal mit anderen Daten")
+		fmt.Println("\nDie Registrierung hat nicht funktioniert, versuch es nochmal mit anderen Daten\n")
 		return err
 	}
 
@@ -116,7 +126,7 @@ func register(url string) error {
 	defer resp.Body.Close()
 	authToken = string(body)
 
-	fmt.Println("\nDu wurdest registriert.")
+	fmt.Println("\nDu wurdest registriert. Gebe 'quit' ein, um den Chat zu verlassen\n")
 	return nil
 }
 

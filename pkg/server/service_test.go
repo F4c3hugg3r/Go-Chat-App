@@ -40,7 +40,7 @@ func TestRegisterClient(t *testing.T) {
 	if len(service.clients) != 1 {
 		t.Errorf(("Setup incorrect there should be just 1 client but there is %d"), len(service.clients))
 	}
-	token, err := service.RegisterClient(clientId2, name)
+	token, err := service.registerClient(clientId2, name)
 
 	if len(service.clients) != 2 {
 		t.Errorf(("There should be just 1 client but there is %d"), len(service.clients))
@@ -53,7 +53,7 @@ func TestRegisterClient(t *testing.T) {
 		t.Errorf("token should be 86 chars long but is %d: %s", len(token), token)
 	}
 
-	_, err = service.RegisterClient(clientId, name)
+	_, err = service.registerClient(clientId, name)
 	if err == nil {
 		t.Error("there should be an error but instead is nil")
 	}
@@ -65,7 +65,7 @@ func TestSendBroadcast(t *testing.T) {
 
 	go func() {
 		time.Sleep(time.Second)
-		service.SendBroadcast(Message{name: "Arndt", content: "wubbalubbadubdub"})
+		service.sendBroadcast(Message{name: "Arndt", content: "wubbalubbadubdub"})
 	}()
 
 	select {
