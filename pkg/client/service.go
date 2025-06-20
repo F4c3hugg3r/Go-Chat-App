@@ -12,19 +12,29 @@ import (
 	tokenGenerator "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
-var (
-	clientId   string        = tokenGenerator.GenerateSecureToken(32)
-	reader     *bufio.Reader = bufio.NewReader(os.Stdin)
+type Client struct {
+	clientId   string
+	reader     *bufio.Reader
+	writer     io.Writer
 	authToken  string
-	httpClient = &http.Client{}
-)
+	httpClient *http.Client
+}
+
+func NewClient() *Client {
+	return &Client{
+		clientId:   tokenGenerator.GenerateSecureToken(32),
+		reader:     bufio.NewReader(os.Stdin),
+		writer:     io.Writer(os.Stdout),
+		httpClient: &http.Client{},
+	}
+}
 
 // PostMessage sends a POST request to the endpoint, containing a message, read from the stdin
-func PostMessage(url string) (quit error) {
+func (c *Client) PostMessage(url string) (quit error) {
 	quit = nil
-	parameteredUrl := fmt.Sprintf("%s/users/%s/message", url, clientId)
+	parameteredUrl := fmt.Sprintf("%s/users/%s/message", url, c.clientId)
 
-	message, err := reader.ReadString('\n')
+	message, err := c.reader.ReadString('\n')
 	if err != nil {
 		fmt.Println("wrong input")
 		return
@@ -38,34 +48,34 @@ func PostMessage(url string) (quit error) {
 		return
 	}
 
-	req.Header.Add("Authorization", authToken)
+	req.Header.Add("Authorization", c.authToken)
 	req.Header.Add("Content-Type", "text/plain")
 
-	_, err = httpClient.Do(req)
+	_, err = c.httpClient.Do(req)
 	if err != nil {
 		log.Println("Fehler beim Absenden der Nachricht: ", err)
 		return
 	}
 
 	if message == "quit\n" {
-		quit = fmt.Errorf("\nDu hast den Channel verlassen.")
+		quit = fmt.Errorf("du hast den Channel verlassen")
 	}
 
 	return
 }
 
 // GetMessages sends a GET request to the endpoint, displaying incoming messages
-func GetMessages(url string) {
-	parameteredUrl := fmt.Sprintf("%s/users/%s/chat", url, clientId)
+func (c *Client) GetMessages(url string) {
+	parameteredUrl := fmt.Sprintf("%s/users/%s/chat", url, c.clientId)
 
 	req, err := http.NewRequest("GET", parameteredUrl, nil)
 	if err != nil {
 		log.Println("Fehler beim erstellen der GET request: ", err)
 	}
 
-	req.Header.Add("Authorization", authToken)
+	req.Header.Add("Authorization", c.authToken)
 
-	resp, err := httpClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		log.Println("Fehler beim Abrufen ist aufgetreten: ", err)
 	}
@@ -75,24 +85,24 @@ func GetMessages(url string) {
 	if err != nil {
 		log.Println("Fehler beim Lesen des Bodies ist aufgetreten: ", err)
 	}
-	fmt.Println(string(body))
+	fmt.Fprint(c.writer, string(body))
 }
 
 // Register reads a self given name from the stdin and sends a POST request to the endpoint
-func Register(url string) error {
+func (c *Client) Register(url string) error {
 	fmt.Println("Gebe deinen Namen an:")
-	clientName, err := reader.ReadString('\n')
-	clientName = strings.ReplaceAll(clientName, "\n", "")
+	clientName, err := c.reader.ReadString('\n')
 	if err != nil {
 		fmt.Println("wrong input")
 		return err
 	}
+	clientName = strings.ReplaceAll(clientName, "\n", "")
 
-	parameteredUrl := fmt.Sprintf("%s/users/%s", url, clientId)
+	parameteredUrl := fmt.Sprintf("%s/users/%s", url, c.clientId)
 
-	resp, err := httpClient.Post(parameteredUrl, "text/plain", strings.NewReader(clientName))
+	resp, err := c.httpClient.Post(parameteredUrl, "text/plain", strings.NewReader(clientName))
 	if err != nil {
-		fmt.Println("\nDie Registrierung hat nicht funktioniert, versuch es nochmal mit anderen Daten\n")
+		fmt.Println("Die Registrierung hat nicht funktioniert, versuch es nochmal mit anderen Daten")
 		return err
 	}
 
@@ -101,8 +111,8 @@ func Register(url string) error {
 		log.Println("Fehler beim Lesen des Bodies ist aufgetreten: ", err)
 	}
 	defer resp.Body.Close()
-	authToken = string(body)
+	c.authToken = string(body)
 
-	fmt.Println("\nDu wurdest registriert. Gebe 'quit' ein, um den Chat zu verlassen\n")
+	fmt.Println("Du wurdest registriert. Gebe 'quit' ein, um den Chat zu verlassen")
 	return nil
 }

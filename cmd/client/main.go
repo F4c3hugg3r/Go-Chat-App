@@ -19,17 +19,19 @@ func main() {
 
 	url := fmt.Sprintf("http://localhost:%d", *port)
 
-	if err := service.Register(url); err != nil {
+	client := service.NewClient()
+
+	if err := client.Register(url); err != nil {
 		log.Fatal(err)
 	}
 
 	go func() {
 		for quit == nil {
-			service.GetMessages(url)
+			client.GetMessages(url)
 		}
 	}()
 
 	for quit == nil {
-		quit = service.PostMessage(url)
+		quit = client.PostMessage(url)
 	}
 }
