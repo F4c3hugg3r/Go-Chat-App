@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -94,7 +93,7 @@ func (s *ChatService) echo(clientId string, msg []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	content := fmt.Sprint(strings.Join(msg, ", "), "\n")
+	content := fmt.Sprint(strings.Join(msg, " "), "\n")
 
 	if client, ok := s.clients[clientId]; ok {
 		client.clientCh <- Message{"Plugin message", content}
@@ -123,8 +122,7 @@ func (s *ChatService) ListClients() (clientsSlice []string) {
 	defer s.mu.RUnlock()
 
 	for _, client := range s.clients {
-		jsonString, _ := json.Marshal(client)
-		clientsSlice = append(clientsSlice, string(jsonString))
+		clientsSlice = append(clientsSlice, fmt.Sprintf("Name: %s, Active: %t\n", client.Name, client.Active))
 	}
 	return
 }
