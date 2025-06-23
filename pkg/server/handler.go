@@ -56,8 +56,13 @@ func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Re
 			return
 		}
 
-		messageString := msg.Name + ": " + msg.Content
-		fmt.Fprint(w, messageString)
+		json, err := json.Marshal(msg)
+		if err != nil {
+			http.Error(w, "Error formatting message to json", http.StatusInternalServerError)
+			return
+		}
+
+		fmt.Fprint(w, string(json))
 		return
 	case <-time.After(30 * time.Second):
 		fmt.Fprintf(w, "\033[1A\033[K")

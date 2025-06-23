@@ -87,7 +87,15 @@ func (c *Client) GetMessages(url string) {
 	if err != nil {
 		log.Println("Fehler beim Lesen des Bodies ist aufgetreten: ", err)
 	}
-	fmt.Fprint(c.writer, string(body))
+
+	msg := Message{}
+	dec := json.NewDecoder(strings.NewReader(string(body)))
+	dec.Decode(&msg)
+
+	messageString := msg.Name + ": " + msg.Content
+	if messageString != ": " {
+		fmt.Fprint(c.writer, messageString)
+	}
 }
 
 // Register reads a self given name from the stdin and sends a POST request to the endpoint

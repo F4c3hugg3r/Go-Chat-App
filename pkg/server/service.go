@@ -61,7 +61,7 @@ func (s *ChatService) registerClient(clientId string, body Message) (token strin
 	clientCh := make(chan Message)
 	s.clients[clientId] = &Client{body.Name, clientId, clientCh, true, token}
 
-	fmt.Printf("\nNew client '%s' registered.\n", body)
+	fmt.Printf("\nNew client '%s' registered.\n", body.Name)
 	return token, nil
 }
 
