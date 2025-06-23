@@ -1,7 +1,9 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 
 	tokenGenerator "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
@@ -23,7 +25,7 @@ func (s *ChatService) logOutClient(clientId string) error {
 	defer s.mu.Unlock()
 
 	if client, ok := s.clients[clientId]; ok {
-		fmt.Println("logged out ", client.name)
+		fmt.Println("logged out ", client.Name)
 		close(client.clientCh)
 		delete(s.clients, clientId)
 		return nil
@@ -39,8 +41,8 @@ func (s *ChatService) InactiveClientDeleter() {
 	defer s.mu.Unlock()
 
 	for clientId, client := range s.clients {
-		if !client.active {
-			fmt.Println("due to inactivity: deleting ", client.name)
+		if !client.Active {
+			fmt.Println("due to inactivity: deleting ", client.Name)
 			close(client.clientCh)
 			delete(s.clients, clientId)
 		}
@@ -80,10 +82,22 @@ func (s *ChatService) sendBroadcast(msg Message) {
 		select {
 		case client.clientCh <- msg:
 			fmt.Println("success")
-			client.active = true
+			client.Active = true
 		default:
-			client.active = false
+			client.Active = false
 		}
+	}
+}
+
+// echo sends a message to the request submitter
+func (s *ChatService) echo(clientId string, msg []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	content := fmt.Sprint(strings.Join(msg, ", "), "\n")
+
+	if client, ok := s.clients[clientId]; ok {
+		client.clientCh <- Message{"Plugin message", content}
 	}
 }
 
@@ -99,5 +113,18 @@ func (s *ChatService) getClient(clientId string) (client *Client, err error) {
 		return
 	}
 	err = nil
+	return
+}
+
+// ListClients returns a string slice containing every client with name
+// and active status
+func (s *ChatService) ListClients() (clientsSlice []string) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, client := range s.clients {
+		jsonString, _ := json.Marshal(client)
+		clientsSlice = append(clientsSlice, string(jsonString))
+	}
 	return
 }

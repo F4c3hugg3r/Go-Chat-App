@@ -8,17 +8,17 @@ import (
 var (
 	name2               = "Len"
 	dummyClientInactive = &Client{
-		name:      name,
+		Name:      name,
 		clientId:  clientId,
 		clientCh:  make(chan Message),
-		active:    false,
+		Active:    false,
 		authToken: authToken,
 	}
 	dummyClient2 = &Client{
-		name:      name2,
+		Name:      name2,
 		clientId:  clientId2,
 		clientCh:  make(chan Message),
-		active:    true,
+		Active:    true,
 		authToken: authToken2,
 	}
 

@@ -79,7 +79,8 @@ type dummyRequests struct {
 
 func TestAuthMiddleware(t *testing.T) {
 	service := NewChatService()
-	handler := NewServerHandler(service)
+	plugin := RegisterPlugins(service)
+	handler := NewServerHandler(service, plugin)
 	service.clients[clientId] = dummyClient
 	for i := 2; i < 9; i++ {
 		if i == 3 {
@@ -126,7 +127,8 @@ func TestAuthMiddleware(t *testing.T) {
 
 func TestHandleMessages(t *testing.T) {
 	service := NewChatService()
-	handler := NewServerHandler(service)
+	plugin := RegisterPlugins(service)
+	handler := NewServerHandler(service, plugin)
 	broadcastTest := 0
 	handler.broadcaster = func(msg Message) { broadcastTest += 1 }
 	for i := 1; i < 6; i++ {
@@ -158,7 +160,8 @@ func TestHandleMessages(t *testing.T) {
 
 func TestHandleRegistry(t *testing.T) {
 	service := NewChatService()
-	handler := NewServerHandler(service)
+	plugin := RegisterPlugins(service)
+	handler := NewServerHandler(service, plugin)
 	handler.registerer = registerClient
 
 	for i := 1; i < 6; i++ {
@@ -194,7 +197,9 @@ func TestHandleRegistry(t *testing.T) {
 
 func TestHandleGetRequest(t *testing.T) {
 	service := NewChatService()
-	handler := NewServerHandler(service)
+	plugin := RegisterPlugins(service)
+	handler := NewServerHandler(service, plugin)
+
 	service.clients[clientId] = dummyClient
 	go func() {
 		time.Sleep(1 * time.Second)

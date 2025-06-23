@@ -65,7 +65,6 @@ func (c *Client) PostMessage(url string) (quit error) {
 	return
 }
 
-// TODO Json erhalten und eigenständig in Nachricht umwandeln
 // GetMessages sends a GET request to the endpoint, displaying incoming messages
 func (c *Client) GetMessages(url string) {
 	parameteredUrl := fmt.Sprintf("%s/users/%s/chat", url, c.clientId)
@@ -93,7 +92,7 @@ func (c *Client) GetMessages(url string) {
 	dec.Decode(&msg)
 
 	messageString := msg.Name + ": " + msg.Content
-	if messageString != ": " {
+	if msg.Content != "" {
 		fmt.Fprint(c.writer, messageString)
 	}
 }
@@ -129,6 +128,6 @@ func (c *Client) Register(url string) error {
 	defer resp.Body.Close()
 	c.authToken = string(body)
 
-	fmt.Println("Du wurdest registriert. Gebe 'quit' ein, um den Chat zu verlassen")
+	fmt.Println("- Du wurdest registriert. -\n-> Gebe 'quit' ein, um den Chat zu verlassen\n-> Oder /help um Commands auzuführen")
 	return nil
 }

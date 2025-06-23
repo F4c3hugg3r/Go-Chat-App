@@ -3,10 +3,10 @@ package server
 // Client is a communication participant who has a name, unique id and
 // channel to receive messages
 type Client struct {
-	name      string
+	Name      string
 	clientId  string
 	clientCh  chan Message
-	active    bool
+	Active    bool
 	authToken string
 }
 
@@ -14,5 +14,4 @@ type Client struct {
 type Message struct {
 	Name    string `json:"name"`
 	Content string `json:"content"`
-	// Plugin string `json:"plugin"`
 }

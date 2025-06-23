@@ -16,7 +16,8 @@ func main() {
 	portString := fmt.Sprintf(":%d", *port)
 
 	service := server.NewChatService()
-	handler := server.NewServerHandler(service)
+	plugin := server.RegisterPlugins(service)
+	handler := server.NewServerHandler(service, plugin)
 
 	http.HandleFunc("/users/{clientId}", handler.HandleRegistry)
 	http.HandleFunc("/users/{clientId}/message", handler.AuthMiddleware(handler.HandleMessages))

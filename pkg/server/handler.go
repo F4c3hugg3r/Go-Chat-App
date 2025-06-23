@@ -11,6 +11,7 @@ import (
 
 type ServerHandler struct {
 	service     *ChatService
+	plugins     *PluginRegistry
 	registerer  ClientRegisterer
 	broadcaster MessageBroadcaster
 }
@@ -19,11 +20,12 @@ type ClientRegisterer func(clientId string, body Message) (token string, e error
 
 type MessageBroadcaster func(msg Message)
 
-func NewServerHandler(chatService *ChatService) *ServerHandler {
+func NewServerHandler(chatService *ChatService, pluginReg *PluginRegistry) *ServerHandler {
 	return &ServerHandler{
 		service:     chatService,
 		registerer:  chatService.registerClient,
 		broadcaster: chatService.sendBroadcast,
+		plugins:     pluginReg,
 	}
 }
 
@@ -99,11 +101,15 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 
 	if client, err := handler.service.getClient(clientId); err == nil {
 		if message.Content == "quit\n" {
-			handler.broadcaster(Message{"", fmt.Sprintf("Server message - logging out %s!\n", client.name)})
+			handler.broadcaster(Message{"Server message", fmt.Sprintf("logging out %s!\n", client.Name)})
 			handler.service.logOutClient(clientId)
 			return
 		}
-		handler.broadcaster(Message{client.name, message.Content})
+		if result, err := handler.plugins.FindAndExecute(strings.ReplaceAll(message.Content, "\n", "")); err == nil {
+			handler.service.echo(clientId, result)
+			return
+		}
+		handler.broadcaster(Message{client.Name, message.Content})
 	} else {
 		http.Error(w, "client not found", http.StatusForbidden)
 		return
