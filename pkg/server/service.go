@@ -80,6 +80,7 @@ func (s *ChatService) sendBroadcast(msg Message) {
 		select {
 		case client.clientCh <- msg:
 			fmt.Println("success")
+			client.active = true
 		default:
 			client.active = false
 		}

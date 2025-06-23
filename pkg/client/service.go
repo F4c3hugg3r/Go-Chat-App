@@ -65,6 +65,7 @@ func (c *Client) PostMessage(url string) (quit error) {
 	return
 }
 
+// TODO Json erhalten und eigenständig in Nachricht umwandeln
 // GetMessages sends a GET request to the endpoint, displaying incoming messages
 func (c *Client) GetMessages(url string) {
 	parameteredUrl := fmt.Sprintf("%s/users/%s/chat", url, c.clientId)

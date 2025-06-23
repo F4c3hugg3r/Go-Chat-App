@@ -88,27 +88,18 @@ func TestSendBroadcast(t *testing.T) {
 	service.clients[clientId2] = dummyClient2
 
 	go func() {
-		time.Sleep(5 * time.Second)
+		time.Sleep(2 * time.Second)
 		service.sendBroadcast(Message{Name: "Arndt", Content: "wubbalubbadubdub"})
 	}()
 
-	select {
-	case <-service.clients[clientId].clientCh:
-		select {
-		case <-service.clients[clientId2].clientCh:
-
-		case <-time.After(15 * time.Second):
-			t.Error("message wasn't broadcastet")
-		}
-	case <-service.clients[clientId2].clientCh:
-		select {
-		case <-service.clients[clientId].clientCh:
-
-		case <-time.After(15 * time.Second):
-			t.Error("message wasn't broadcastet")
-		}
-	case <-time.After(15 * time.Second):
-		t.Error("message wasn't broadcastet")
+	for _, client := range service.clients {
+		go func() {
+			select {
+			case <-client.clientCh:
+			case <-time.After(3 * time.Second):
+				t.Error("message wasn't broadcastet")
+			}
+		}()
 	}
 }
 
