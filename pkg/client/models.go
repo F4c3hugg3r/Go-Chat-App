@@ -1,13 +1,17 @@
-package server
+package client
 
-// Client is a communication participant who has a name, unique id and
-// channel to receive messages
+import (
+	"bufio"
+	"io"
+	"net/http"
+)
+
 type Client struct {
-	name      string
-	clientId  string
-	clientCh  chan Message
-	active    bool
-	authToken string
+	clientId   string
+	reader     *bufio.Reader
+	writer     io.Writer
+	authToken  string
+	httpClient *http.Client
 }
 
 // Message contains the name of the sender and the message (content) itsself

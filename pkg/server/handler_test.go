@@ -10,16 +10,13 @@ import (
 )
 
 var (
-	broadcastTest = 0
 	name          = "Max"
-	service       = NewChatService()
-	handler       = NewServerHandler(service)
 	clientId      = "clientId-DyGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRw"
 	clientId2     = "clientId2-yGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRw"
 	authToken     = "authId-5EDyGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRwc7ex1dt5EDyGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRw"
 	authToken2    = "authId2-EDyGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRwc7ex1dt5EDyGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRw"
 	dummyClient   = &Client{name, clientId, make(chan Message), true, authToken}
-	dummyMessage  = Message{name: name, content: "What's poppin"}
+	dummyMessage  = Message{Name: name, Content: "What's poppin"}
 	dummyExamples = []dummyRequests{
 		{
 			method:   "GET",
@@ -68,8 +65,7 @@ var (
 	}
 )
 
-func registerClient(clientId, body string) (token string, e error) { return authToken, nil }
-func sendBroadcast(msg Message)                                    { broadcastTest += 1 }
+func registerClient(clientId string, body Message) (token string, e error) { return authToken, nil }
 func (handler *ServerHandler) dummyHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("success"))
 }
@@ -82,6 +78,8 @@ type dummyRequests struct {
 }
 
 func TestAuthMiddleware(t *testing.T) {
+	service := NewChatService()
+	handler := NewServerHandler(service)
 	service.clients[clientId] = dummyClient
 	for i := 2; i < 9; i++ {
 		if i == 3 {
@@ -127,7 +125,10 @@ func TestAuthMiddleware(t *testing.T) {
 }
 
 func TestHandleMessages(t *testing.T) {
-	handler.broadcaster = sendBroadcast
+	service := NewChatService()
+	handler := NewServerHandler(service)
+	broadcastTest := 0
+	handler.broadcaster = func(msg Message) { broadcastTest += 1 }
 	for i := 1; i < 6; i++ {
 		req := httptest.NewRequest(dummyExamples[i].method, "/users/{clientId}/message", strings.NewReader(dummyExamples[i].body))
 		req.SetPathValue("clientId", dummyExamples[i].clientId)
@@ -141,7 +142,7 @@ func TestHandleMessages(t *testing.T) {
 		case 2:
 			{
 				if res.StatusCode != http.StatusOK && broadcastTest != 1 {
-					t.Errorf("Status should be %v but was %v instead. And broadcastTest variable"+
+					t.Errorf("Status should be %v but was %v instead. And broadcastTest variable "+
 						"should be 1 but was %d", http.StatusOK, res.StatusCode, broadcastTest)
 				}
 			}
@@ -156,6 +157,8 @@ func TestHandleMessages(t *testing.T) {
 }
 
 func TestHandleRegistry(t *testing.T) {
+	service := NewChatService()
+	handler := NewServerHandler(service)
 	handler.registerer = registerClient
 
 	for i := 1; i < 6; i++ {
@@ -190,6 +193,8 @@ func TestHandleRegistry(t *testing.T) {
 }
 
 func TestHandleGetRequest(t *testing.T) {
+	service := NewChatService()
+	handler := NewServerHandler(service)
 	service.clients[clientId] = dummyClient
 	go func() {
 		time.Sleep(1 * time.Second)

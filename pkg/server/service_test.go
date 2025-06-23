@@ -21,9 +21,13 @@ var (
 		active:    true,
 		authToken: authToken2,
 	}
+
+	registerMessage1 = Message{Name: name}
+	registerMessage2 = Message{Name: name2}
 )
 
 func TestLogOutClient(t *testing.T) {
+	service := NewChatService()
 	service.clients[clientId] = dummyClient
 	if len(service.clients) != 1 {
 		t.Errorf(("Setup incorrect there should be just 1 client but there is %d"), len(service.clients))
@@ -41,6 +45,7 @@ func TestLogOutClient(t *testing.T) {
 }
 
 func TestInactiveClientDeleter(t *testing.T) {
+	service := NewChatService()
 	service.clients[clientId] = dummyClientInactive
 	if len(service.clients) != 1 {
 		t.Errorf(("Setup incorrect there should be just 1 client but there is %d"), len(service.clients))
@@ -53,11 +58,12 @@ func TestInactiveClientDeleter(t *testing.T) {
 }
 
 func TestRegisterClient(t *testing.T) {
+	service := NewChatService()
 	service.clients[clientId] = dummyClientInactive
 	if len(service.clients) != 1 {
 		t.Errorf(("Setup incorrect there should be just 1 client but there is %d"), len(service.clients))
 	}
-	token, err := service.registerClient(clientId2, name)
+	token, err := service.registerClient(clientId2, registerMessage2)
 
 	if len(service.clients) != 2 {
 		t.Errorf(("There should be just 1 client but there is %d"), len(service.clients))
@@ -70,19 +76,20 @@ func TestRegisterClient(t *testing.T) {
 		t.Errorf("token should be 86 chars long but is %d: %s", len(token), token)
 	}
 
-	_, err = service.registerClient(clientId, name)
+	_, err = service.registerClient(clientId, registerMessage1)
 	if err == nil {
 		t.Error("there should be an error but instead is nil")
 	}
 }
 
 func TestSendBroadcast(t *testing.T) {
+	service := NewChatService()
 	service.clients[clientId] = dummyClient
 	service.clients[clientId2] = dummyClient2
 
 	go func() {
-		time.Sleep(time.Second)
-		service.sendBroadcast(Message{name: "Arndt", content: "wubbalubbadubdub"})
+		time.Sleep(5 * time.Second)
+		service.sendBroadcast(Message{Name: "Arndt", Content: "wubbalubbadubdub"})
 	}()
 
 	select {
@@ -106,6 +113,7 @@ func TestSendBroadcast(t *testing.T) {
 }
 
 func TestGetClient(t *testing.T) {
+	service := NewChatService()
 	_, err := service.getClient(clientId)
 	if err == nil {
 		t.Error("there should be an error but instead it's nil")

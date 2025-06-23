@@ -2,6 +2,8 @@ package client
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -11,14 +13,6 @@ import (
 
 	tokenGenerator "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
-
-type Client struct {
-	clientId   string
-	reader     *bufio.Reader
-	writer     io.Writer
-	authToken  string
-	httpClient *http.Client
-}
 
 func NewClient() *Client {
 	return &Client{
@@ -34,22 +28,29 @@ func (c *Client) PostMessage(url string) (quit error) {
 	quit = nil
 	parameteredUrl := fmt.Sprintf("%s/users/%s/message", url, c.clientId)
 
-	message, err := c.reader.ReadString('\n')
+	input, err := c.reader.ReadString('\n')
 	if err != nil {
-		fmt.Println("wrong input")
+		fmt.Printf("wrong input: %s", input)
 		return
 	}
 
 	fmt.Printf("\033[1A\033[K")
 
-	req, err := http.NewRequest("POST", parameteredUrl, strings.NewReader(message))
+	message := Message{Content: input}
+	json, err := json.Marshal(message)
+	if err != nil {
+		fmt.Printf("wrong input: %s", json)
+		return
+	}
+
+	req, err := http.NewRequest("POST", parameteredUrl, bytes.NewReader(json))
 	if err != nil {
 		log.Println("Fehler beim Erstellen der POST req: ", err)
 		return
 	}
 
 	req.Header.Add("Authorization", c.authToken)
-	req.Header.Add("Content-Type", "text/plain")
+	req.Header.Add("Content-Type", "application/json")
 
 	_, err = c.httpClient.Do(req)
 	if err != nil {
@@ -57,7 +58,7 @@ func (c *Client) PostMessage(url string) (quit error) {
 		return
 	}
 
-	if message == "quit\n" {
+	if input == "quit\n" {
 		quit = fmt.Errorf("du hast den Channel verlassen")
 	}
 
@@ -100,7 +101,13 @@ func (c *Client) Register(url string) error {
 
 	parameteredUrl := fmt.Sprintf("%s/users/%s", url, c.clientId)
 
-	resp, err := c.httpClient.Post(parameteredUrl, "text/plain", strings.NewReader(clientName))
+	message := Message{Name: clientName}
+	json, err := json.Marshal(message)
+	if err != nil {
+		return fmt.Errorf("wrong input: %s", json)
+	}
+
+	resp, err := c.httpClient.Post(parameteredUrl, "application/json", bytes.NewReader(json))
 	if err != nil {
 		fmt.Println("Die Registrierung hat nicht funktioniert, versuch es nochmal mit anderen Daten")
 		return err

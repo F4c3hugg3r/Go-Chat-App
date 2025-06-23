@@ -49,7 +49,7 @@ func (s *ChatService) InactiveClientDeleter() {
 
 // registerClient safely registeres a client by creating a Client with the received values
 // and putting it into the global clients map
-func (s *ChatService) registerClient(clientId, body string) (token string, e error) {
+func (s *ChatService) registerClient(clientId string, body Message) (token string, e error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -59,7 +59,7 @@ func (s *ChatService) registerClient(clientId, body string) (token string, e err
 		return token, fmt.Errorf("client already defined")
 	}
 	clientCh := make(chan Message)
-	s.clients[clientId] = &Client{string(body), clientId, clientCh, true, token}
+	s.clients[clientId] = &Client{body.Name, clientId, clientCh, true, token}
 
 	fmt.Printf("\nNew client '%s' registered.\n", body)
 	return token, nil

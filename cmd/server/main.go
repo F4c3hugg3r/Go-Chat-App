@@ -10,9 +10,6 @@ import (
 	server "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server"
 )
 
-// TODO Vorschläge
-// Nachrichten an alle bei neuem user
-// HTTPS
 func main() {
 	var port = flag.Int("port", 8080, "HTTP Server Port")
 	flag.Parse()

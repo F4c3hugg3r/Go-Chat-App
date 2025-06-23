@@ -1,9 +1,11 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -13,7 +15,7 @@ type ServerHandler struct {
 	broadcaster MessageBroadcaster
 }
 
-type ClientRegisterer func(clientId, body string) (token string, e error)
+type ClientRegisterer func(clientId string, body Message) (token string, e error)
 
 type MessageBroadcaster func(msg Message)
 
@@ -29,6 +31,7 @@ func NewServerHandler(chatService *ChatService) *ServerHandler {
 // if nothing is being send
 // should receive a Path Parameter with clientId in it
 func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Request) {
+
 	if r.Method != http.MethodGet {
 		http.Error(w, "only GET Requests allowed", http.StatusBadRequest)
 		return
@@ -52,8 +55,9 @@ func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Re
 			http.Error(w, "client already deleted", http.StatusGone)
 			return
 		}
-		message := msg.name + ": " + msg.content
-		fmt.Fprint(w, message)
+
+		messageString := msg.Name + ": " + msg.Content
+		fmt.Fprint(w, messageString)
 		return
 	case <-time.After(30 * time.Second):
 		fmt.Fprintf(w, "\033[1A\033[K")
@@ -84,13 +88,17 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	message := Message{}
+	dec := json.NewDecoder(strings.NewReader(string(body)))
+	dec.Decode(&message)
+
 	if client, err := handler.service.getClient(clientId); err == nil {
-		if string(body) == "quit\n" {
+		if message.Content == "quit\n" {
+			handler.broadcaster(Message{"", fmt.Sprintf("Server message - logging out %s!\n", client.name)})
 			handler.service.logOutClient(clientId)
-			handler.broadcaster(Message{fmt.Sprint("Server message - ", client.name), "logged out!\n"})
 			return
 		}
-		handler.broadcaster(Message{client.name, string(body)})
+		handler.broadcaster(Message{client.name, message.Content})
 	} else {
 		http.Error(w, "client not found", http.StatusForbidden)
 		return
@@ -120,13 +128,16 @@ func (handler *ServerHandler) HandleRegistry(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	token, err2 := handler.registerer(clientId, string(body))
+	message := Message{}
+	dec := json.NewDecoder(strings.NewReader(string(body)))
+	dec.Decode(&message)
+
+	token, err2 := handler.registerer(clientId, message)
 	if err2 != nil {
 		http.Error(w, err2.Error(), http.StatusBadRequest)
 		return
 	}
 
-	//handler.broadcaster(Message{fmt.Sprint("\nServer message - ", string(body)), "joined the chat!\n"})
 	w.Write([]byte(token))
 }
 
