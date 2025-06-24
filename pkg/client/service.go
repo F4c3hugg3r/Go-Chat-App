@@ -24,14 +24,14 @@ func NewClient() *Client {
 }
 
 // PostMessage sends a POST request to the endpoint, containing a message, read from the stdin
-func (c *Client) PostMessage(url string) (quit error) {
-	quit = nil
+func (c *Client) PostMessage(url string) (int, error) {
+	quit := 0
 	parameteredUrl := fmt.Sprintf("%s/users/%s/message", url, c.clientId)
 
 	input, err := c.reader.ReadString('\n')
 	if err != nil {
 		fmt.Printf("wrong input: %s", input)
-		return
+		return quit, err
 	}
 
 	fmt.Printf("\033[1A\033[K")
@@ -40,29 +40,31 @@ func (c *Client) PostMessage(url string) (quit error) {
 	json, err := json.Marshal(message)
 	if err != nil {
 		fmt.Printf("wrong input: %s", json)
-		return
+		return quit, err
 	}
 
 	req, err := http.NewRequest("POST", parameteredUrl, bytes.NewReader(json))
 	if err != nil {
 		log.Println("Fehler beim Erstellen der POST req: ", err)
-		return
+		return quit, err
 	}
 
 	req.Header.Add("Authorization", c.authToken)
 	req.Header.Add("Content-Type", "application/json")
 
-	_, err = c.httpClient.Do(req)
+	res, err := c.httpClient.Do(req)
 	if err != nil {
 		log.Println("Fehler beim Absenden der Nachricht: ", err)
-		return
+		return quit, err
 	}
+	defer res.Body.Close()
 
 	if input == "quit\n" {
-		quit = fmt.Errorf("du hast den Channel verlassen")
+		quit = 1
+		fmt.Println("du hast den Channel verlassen")
 	}
 
-	return
+	return quit, nil
 }
 
 // GetMessages sends a GET request to the endpoint, displaying incoming messages
@@ -89,7 +91,10 @@ func (c *Client) GetMessages(url string) {
 
 	msg := Message{}
 	dec := json.NewDecoder(strings.NewReader(string(body)))
-	dec.Decode(&msg)
+	err = dec.Decode(&msg)
+	if err != nil {
+		log.Println("Fehler beim Lesen des Bodies ist aufgetreten: ", err)
+	}
 
 	messageString := msg.Name + ": " + msg.Content
 	if msg.Content != "" {

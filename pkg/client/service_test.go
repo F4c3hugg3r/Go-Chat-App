@@ -71,10 +71,12 @@ func TestPostMessages(t *testing.T) {
 	ts.URL = fmt.Sprintf("%s/users/%s/message", ts.URL, clientId)
 
 	clientService.reader = bufio.NewReader(strings.NewReader("Max: wubbalubbadubdub" + "\n"))
-	err := clientService.PostMessage(ts.URL)
+	quit, err := clientService.PostMessage(ts.URL)
 	assert.Nil(t, err)
+	assert.Equal(t, 0, quit)
 
 	clientService.reader = bufio.NewReader(strings.NewReader("quit" + "\n"))
-	err = clientService.PostMessage(ts.URL)
+	quit, err = clientService.PostMessage(ts.URL)
 	assert.Error(t, err)
+	assert.Equal(t, 1, quit)
 }

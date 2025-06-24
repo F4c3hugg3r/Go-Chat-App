@@ -9,11 +9,12 @@ import (
 )
 
 var (
-	quit error
+	quit int
+	err  error
 )
 
 func main() {
-	quit = nil
+	quit = 0
 	var port = flag.Int("port", 8080, "HTTP Server Port")
 	flag.Parse()
 
@@ -26,12 +27,15 @@ func main() {
 	}
 
 	go func() {
-		for quit == nil {
+		for quit == 0 {
 			client.GetMessages(url)
 		}
 	}()
 
-	for quit == nil {
-		quit = client.PostMessage(url)
+	for quit == 0 {
+		quit, err = client.PostMessage(url)
+		if err != nil {
+			log.Println("Fehler beim Absenden der Nachricht: ", err)
+		}
 	}
 }

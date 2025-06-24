@@ -23,15 +23,14 @@ func (s *ChatService) logOutClient(clientId string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if client, ok := s.clients[clientId]; ok {
+	client, ok := s.clients[clientId]
+	if ok {
 		fmt.Println("logged out ", client.Name)
 		close(client.clientCh)
 		delete(s.clients, clientId)
 		return nil
-	} else {
-		return fmt.Errorf("client already deleted")
 	}
-
+	return fmt.Errorf("client already deleted")
 }
 
 // InactiveClientDeleter searches for inactive clients and deletes them as well as closes their message-channel
@@ -50,16 +49,16 @@ func (s *ChatService) InactiveClientDeleter() {
 
 // registerClient safely registeres a client by creating a Client with the received values
 // and putting it into the global clients map
-func (s *ChatService) registerClient(clientId string, body Message) (token string, e error) {
+func (s *ChatService) registerClient(clientId string, body Message) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	token = tokenGenerator.GenerateSecureToken(64)
+	clientCh := make(chan Message)
+	token := tokenGenerator.GenerateSecureToken(64)
 
 	if _, exists := s.clients[clientId]; exists {
 		return token, fmt.Errorf("client already defined")
 	}
-	clientCh := make(chan Message)
 	s.clients[clientId] = &Client{body.Name, clientId, clientCh, true, token}
 
 	fmt.Printf("\nNew client '%s' registered.\n", body.Name)
@@ -95,34 +94,35 @@ func (s *ChatService) echo(clientId string, msg []string) {
 
 	content := fmt.Sprint(strings.Join(msg, " "), "\n")
 
-	if client, ok := s.clients[clientId]; ok {
+	client, ok := s.clients[clientId]
+	if ok {
 		client.clientCh <- Message{"Plugin message", content}
 	}
 }
 
 // getClientChannel tests if there is a registered client to the given clientId ans returns
 // it's channel and name
-func (s *ChatService) getClient(clientId string) (client *Client, err error) {
+func (s *ChatService) getClient(clientId string) (*Client, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	client, exists := s.clients[clientId]
 	if !exists {
-		err = fmt.Errorf("there is no client with id: %s registered", clientId)
-		return
+		return client, fmt.Errorf("there is no client with id: %s registered", clientId)
 	}
-	err = nil
-	return
+	return client, nil
 }
 
 // ListClients returns a string slice containing every client with name
 // and active status
-func (s *ChatService) ListClients() (clientsSlice []string) {
+func (s *ChatService) ListClients() []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
+	clientsSlice := []string{}
 
 	for _, client := range s.clients {
 		clientsSlice = append(clientsSlice, fmt.Sprintf("Name: %s, Active: %t\n", client.Name, client.Active))
 	}
-	return
+	return clientsSlice
 }

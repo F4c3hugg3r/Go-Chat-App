@@ -6,6 +6,7 @@ import (
 )
 
 type PluginInterface interface {
+	//TODO take Json and produce Json
 	Execute() []string
 }
 
@@ -21,12 +22,11 @@ func RegisterPlugins(chatService *ChatService) *PluginRegistry {
 	return &pr
 }
 
-func (pr *PluginRegistry) FindAndExecute(command string) (result []string, err error) {
+func (pr *PluginRegistry) FindAndExecute(command string) ([]string, error) {
 	if plugin, ok := pr.plugins[command]; ok {
 		return plugin.Execute(), nil
-	} else {
-		return []string{}, fmt.Errorf("no such plugin found: %s", command)
 	}
+	return []string{}, fmt.Errorf("no such plugin found: %s", command)
 }
 
 // TimePlugin tells you the current time

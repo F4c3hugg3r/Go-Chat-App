@@ -1,0 +1,100 @@
+#had to use $ golangci-lint migrate
+version: "2"
+run:
+  issues-exit-code: 1
+  tests: true
+output:
+  formats:
+    text:
+      path: stdout
+      print-linter-name: true
+      print-issued-lines: true
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - dogsled
+    - errcheck
+    - errname
+    - errorlint
+    - goconst
+    - gocyclo
+    - govet
+    - ineffassign
+    - nakedret
+    - prealloc
+    - sqlclosecheck
+    - unconvert
+    - unparam
+    - unused
+    - wastedassign
+    - whitespace
+    - wsl
+  settings:
+    dupl:
+      threshold: 100
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+    goconst:
+      min-len: 2
+      min-occurrences: 2
+    govet:
+      enable:
+        - shadow
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - govet
+        text: 'shadow: declaration of "(err|ctx)" shadows declaration at'
+      - path: (.+)\.go$
+        text: G104
+      - path: (.+)\.go$
+        text: exported func * returns unexported type *, which can be annoying to use
+      - path: (.+)\.go$
+        text: should have a package comment, unless it's in another file for this package
+      - path: (.+)\.go$
+        text: don't use an underscore in package name
+      - path: (.+)\.go$
+        text: Error return value of .((os\.)?std(out|err)\..*|.*Close|.*Flush|os\.Remove(All)?|.*printf?|os\.(Un)?Setenv|.*Rollback). is not checked
+      - path: (.+)\.go$
+        text: should check returned error before deferring
+      - path: (.+)\.go$
+        text: error returned from external package is unwrapped
+      - path: (.+)\.go$
+        text: variable name '*' is too short for the scope of its usage
+    paths:
+      - \.pb\.go$
+      - \.pb\.goclay\.go$
+      - _test\.go$
+      - .git
+      - bin
+      - vendor
+      - node_modules
+      - var
+      - gen
+      - tmp
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - \.pb\.go$
+      - \.pb\.goclay\.go$
+      - _test\.go$
+      - .git
+      - bin
+      - vendor
+      - node_modules
+      - var
+      - gen
+      - tmp
+      - third_party$
+      - builtin$
+      - examples$
