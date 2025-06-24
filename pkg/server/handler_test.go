@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,8 +16,9 @@ var (
 	clientId2     = "clientId2-yGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRw"
 	authToken     = "authId-5EDyGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRwc7ex1dt5EDyGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRw"
 	authToken2    = "authId2-EDyGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRwc7ex1dt5EDyGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRw"
-	dummyClient   = &Client{name, clientId, make(chan Message), true, authToken, time.Now()}
+	dummyClient   = &Client{name, clientId, make(chan Response), true, authToken, time.Now()}
 	dummyMessage  = Message{Name: name, Content: "What's poppin"}
+	dummyResponse = Response{Name: name, Content: "What's poppin"}
 	dummyExamples = []dummyRequests{
 		{
 			method:   "GET",
@@ -125,12 +127,13 @@ func TestAuthMiddleware(t *testing.T) {
 
 }
 
+// läuft noch nicht weil Message ohne Plugin übergeben wird
 func TestHandleMessages(t *testing.T) {
 	service := NewChatService()
 	plugin := RegisterPlugins(service)
 	handler := NewServerHandler(service, plugin)
 	broadcastTest := 0
-	handler.broadcaster = func(msg Message) { broadcastTest += 1 }
+	handler.broadcaster = func(msg *Message) { broadcastTest += 1 }
 	for i := 1; i < 6; i++ {
 		req := httptest.NewRequest(dummyExamples[i].method, "/users/{clientId}/message", strings.NewReader(dummyExamples[i].body))
 		req.SetPathValue("clientId", dummyExamples[i].clientId)
@@ -158,6 +161,7 @@ func TestHandleMessages(t *testing.T) {
 	}
 }
 
+// läuft noch nicht weil Message ohne Plugin übergeben wird
 func TestHandleRegistry(t *testing.T) {
 	service := NewChatService()
 	plugin := RegisterPlugins(service)
@@ -203,7 +207,7 @@ func TestHandleGetRequest(t *testing.T) {
 	service.clients[clientId] = dummyClient
 	go func() {
 		time.Sleep(1 * time.Second)
-		dummyClient.clientCh <- dummyMessage
+		dummyClient.clientCh <- dummyResponse
 	}()
 
 	for i := 0; i < 3; i++ {
@@ -223,7 +227,11 @@ func TestHandleGetRequest(t *testing.T) {
 					t.Errorf("expected error == nil, got %v instead", err)
 				}
 
-				if string(data) != "Max: What's poppin" {
+				comparator, err := json.Marshal(dummyResponse)
+				if err != nil {
+					t.Errorf("error extractiong json %v", err)
+				}
+				if string(data) != string(comparator) {
 					t.Errorf("expected body:'Max: What's poppin' but was %s", string(data))
 				}
 			}

@@ -18,7 +18,7 @@ type ServerHandler struct {
 
 type ClientRegisterer func(clientId string, body Message) (string, error)
 
-type MessageBroadcaster func(msg Message)
+type MessageBroadcaster func(msg *Message)
 
 func NewServerHandler(chatService *ChatService, pluginReg *PluginRegistry) *ServerHandler {
 	return &ServerHandler{
@@ -29,7 +29,7 @@ func NewServerHandler(chatService *ChatService, pluginReg *PluginRegistry) *Serv
 	}
 }
 
-// handleGetRequest displays a message when received and times out after 30s
+// handleGetRequest displays a response when received and times out after 30s
 // if nothing is being send
 // should receive a Path Parameter with clientId in it
 func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Request) {
@@ -51,15 +51,15 @@ func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Re
 	}
 
 	select {
-	case msg, ok := <-client.clientCh:
+	case rsp, ok := <-client.clientCh:
 		if !ok {
 			http.Error(w, "client already deleted", http.StatusGone)
 			return
 		}
 
-		json, err := json.Marshal(msg)
+		json, err := json.Marshal(rsp)
 		if err != nil {
-			http.Error(w, "Error formatting message to json", http.StatusInternalServerError)
+			http.Error(w, "Error formatting response to json", http.StatusInternalServerError)
 			return
 		}
 
@@ -104,18 +104,18 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 
 	if client, err := handler.service.getClient(clientId); err == nil {
 		if message.Content == "quit\n" {
-			handler.broadcaster(Message{"Server message", fmt.Sprintf("logging out %s!\n", client.Name)})
+			handler.broadcaster(&Message{"Server message", fmt.Sprintf("logging out %s!\n", client.Name), "TODO"})
 			err = handler.service.logOutClient(clientId)
 			if err != nil {
 				http.Error(w, "error deleting client", http.StatusInternalServerError)
 			}
 			return
 		}
-		if result, err := handler.plugins.FindAndExecute(strings.ReplaceAll(message.Content, "\n", "")); err == nil {
-			handler.service.echo(clientId, result)
+		if result, err := handler.plugins.FindAndExecute(&message); err == nil {
+			handler.service.echo(clientId, result.Content)
 			return
 		}
-		handler.broadcaster(Message{client.Name, message.Content})
+		handler.broadcaster(&Message{client.Name, message.Content, "TODO"})
 		return
 	}
 	http.Error(w, "client not found", http.StatusForbidden)
@@ -149,6 +149,7 @@ func (handler *ServerHandler) HandleRegistry(w http.ResponseWriter, r *http.Requ
 	err = dec.Decode(&message)
 	if err != nil {
 		http.Error(w, "error decoding request body", http.StatusBadRequest)
+		return
 	}
 
 	token, err2 := handler.registerer(clientId, message)

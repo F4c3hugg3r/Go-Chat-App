@@ -10,14 +10,14 @@ var (
 	dummyClientInactive = &Client{
 		Name:      name,
 		clientId:  clientId,
-		clientCh:  make(chan Message),
+		clientCh:  make(chan Response),
 		Active:    false,
 		authToken: authToken,
 	}
 	dummyClient2 = &Client{
 		Name:      name2,
 		clientId:  clientId2,
-		clientCh:  make(chan Message),
+		clientCh:  make(chan Response),
 		Active:    true,
 		authToken: authToken2,
 	}
@@ -89,7 +89,7 @@ func TestSendBroadcast(t *testing.T) {
 
 	go func() {
 		time.Sleep(2 * time.Second)
-		service.sendBroadcast(Message{Name: "Arndt", Content: "wubbalubbadubdub"})
+		service.sendBroadcast(&Message{Name: "Arndt", Content: "wubbalubbadubdub"})
 	}()
 
 	for _, client := range service.clients {

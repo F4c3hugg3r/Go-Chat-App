@@ -6,8 +6,8 @@ import (
 )
 
 type PluginInterface interface {
-	//TODO take Json and produce Json
-	Execute() []string
+	//consumes Message and produces Response
+	Execute(message *Message) (Response, error)
 }
 
 type PluginRegistry struct {
@@ -22,11 +22,11 @@ func RegisterPlugins(chatService *ChatService) *PluginRegistry {
 	return &pr
 }
 
-func (pr *PluginRegistry) FindAndExecute(command string) ([]string, error) {
-	if plugin, ok := pr.plugins[command]; ok {
-		return plugin.Execute(), nil
+func (pr *PluginRegistry) FindAndExecute(message *Message) (Response, error) {
+	if plugin, ok := pr.plugins[message.Plugin]; ok {
+		return plugin.Execute(message)
 	}
-	return []string{}, fmt.Errorf("no such plugin found: %s", command)
+	return Response{message.Name, fmt.Sprintf("no such plugin found: %s", message.Plugin)}, fmt.Errorf("no such plugin found: %s", message.Plugin)
 }
 
 // TimePlugin tells you the current time
@@ -38,18 +38,19 @@ func NewHelpPlugin(pr *PluginRegistry) *HelpPlugin {
 	return &HelpPlugin{pr: pr}
 }
 
-func (h *HelpPlugin) Execute() []string {
-	return ListPlugins(h.pr)
+func (h *HelpPlugin) Execute(message *Message) (Response, error) {
+	ListPlugins(h.pr)
+	return Response{message.Plugin, "TODO"}, nil
 }
 
 // ListPlugins lists all Plugins with correspontig commands
-func ListPlugins(pr *PluginRegistry) []string {
+func ListPlugins(pr *PluginRegistry) string {
 	slice := []string{"You can execute a command by typing one of the the following commands:"}
 
 	for commands := range pr.plugins {
 		slice = append(slice, commands)
 	}
-	return slice
+	return "TODO"
 }
 
 // UserPlugin tells you information about all the current users
@@ -61,8 +62,9 @@ func NewUserPlugin(s *ChatService) *UserPlugin {
 	return &UserPlugin{chatService: s}
 }
 
-func (u *UserPlugin) Execute() []string {
-	return u.chatService.ListClients()
+func (u *UserPlugin) Execute(messsage *Message) (Response, error) {
+	u.chatService.ListClients()
+	return Response{messsage.Name, "TODO"}, nil
 }
 
 // TimePlugin tells you the current time
@@ -72,6 +74,6 @@ func NewTimePlugin() *TimePlugin {
 	return &TimePlugin{}
 }
 
-func (t *TimePlugin) Execute() []string {
-	return []string{time.Now().String()}
+func (t *TimePlugin) Execute(message *Message) (Response, error) {
+	return Response{message.Name, time.Now().String()}, nil
 }

@@ -2,7 +2,6 @@ package server
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -57,7 +56,7 @@ func (s *ChatService) registerClient(clientId string, body Message) (string, err
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	clientCh := make(chan Message, 100)
+	clientCh := make(chan Response, 100)
 	token := tokenGenerator.GenerateSecureToken(64)
 
 	if _, exists := s.clients[clientId]; exists {
@@ -71,7 +70,7 @@ func (s *ChatService) registerClient(clientId string, body Message) (string, err
 
 // sendBroadcast distributes an incomming message abroad all client channels if
 // a client can't receive, i'ts active status is set to false
-func (s *ChatService) sendBroadcast(msg Message) {
+func (s *ChatService) sendBroadcast(msg *Message) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -80,9 +79,11 @@ func (s *ChatService) sendBroadcast(msg Message) {
 		return
 	}
 
+	rsp := Response{Name: msg.Name, Content: msg.Content}
+
 	for _, client := range s.clients {
 		select {
-		case client.clientCh <- msg:
+		case client.clientCh <- rsp:
 			fmt.Println("success")
 			client.Active = true
 			client.lastSign = time.Now()
@@ -92,17 +93,15 @@ func (s *ChatService) sendBroadcast(msg Message) {
 	}
 }
 
-// echo sends a message to the request submitter
-func (s *ChatService) echo(clientId string, msg []string) {
+// echo sends a response to the request submitter
+func (s *ChatService) echo(clientId string, msg string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	content := fmt.Sprint(strings.Join(msg, " "), "\n")
 
 	client, ok := s.clients[clientId]
 	if ok {
 		select {
-		case client.clientCh <- Message{"Plugin message", content}:
+		case client.clientCh <- Response{"Plugin response", msg}:
 			fmt.Println("success")
 			client.Active = true
 			client.lastSign = time.Now()
