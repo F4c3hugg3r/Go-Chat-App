@@ -15,7 +15,7 @@ var (
 	clientId2     = "clientId2-yGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRw"
 	authToken     = "authId-5EDyGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRwc7ex1dt5EDyGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRw"
 	authToken2    = "authId2-EDyGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRwc7ex1dt5EDyGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRw"
-	dummyClient   = &Client{name, clientId, make(chan Message), true, authToken}
+	dummyClient   = &Client{name, clientId, make(chan Message), true, authToken, time.Now()}
 	dummyMessage  = Message{Name: name, Content: "What's poppin"}
 	dummyExamples = []dummyRequests{
 		{

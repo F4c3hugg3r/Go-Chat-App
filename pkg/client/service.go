@@ -86,14 +86,14 @@ func (c *Client) GetMessages(url string) {
 	body, err := io.ReadAll(resp.Body)
 	defer resp.Body.Close()
 	if err != nil {
-		log.Println("Fehler beim Lesen des Bodies ist aufgetreten: ", err)
+		return
 	}
 
 	msg := Message{}
 	dec := json.NewDecoder(strings.NewReader(string(body)))
 	err = dec.Decode(&msg)
 	if err != nil {
-		log.Println("Fehler beim Lesen des Bodies ist aufgetreten: ", err)
+		return
 	}
 
 	messageString := msg.Name + ": " + msg.Content

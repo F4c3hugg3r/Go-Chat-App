@@ -12,6 +12,7 @@ import (
 
 func main() {
 	var port = flag.Int("port", 8080, "HTTP Server Port")
+	//var timeLimit = flag.Int("limit", 30, "Time limit for inactive clients in minutes")
 	flag.Parse()
 	portString := fmt.Sprintf(":%d", *port)
 

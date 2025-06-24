@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	tokenGenerator "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
@@ -39,6 +40,9 @@ func (s *ChatService) InactiveClientDeleter() {
 	defer s.mu.Unlock()
 
 	for clientId, client := range s.clients {
+		if time.Since(client.lastSign) >= (time.Second * 30) {
+			client.Active = false
+		}
 		if !client.Active {
 			fmt.Println("due to inactivity: deleting ", client.Name)
 			close(client.clientCh)
@@ -53,13 +57,13 @@ func (s *ChatService) registerClient(clientId string, body Message) (string, err
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	clientCh := make(chan Message)
+	clientCh := make(chan Message, 100)
 	token := tokenGenerator.GenerateSecureToken(64)
 
 	if _, exists := s.clients[clientId]; exists {
 		return token, fmt.Errorf("client already defined")
 	}
-	s.clients[clientId] = &Client{body.Name, clientId, clientCh, true, token}
+	s.clients[clientId] = &Client{body.Name, clientId, clientCh, true, token, time.Now()}
 
 	fmt.Printf("\nNew client '%s' registered.\n", body.Name)
 	return token, nil
@@ -81,7 +85,8 @@ func (s *ChatService) sendBroadcast(msg Message) {
 		case client.clientCh <- msg:
 			fmt.Println("success")
 			client.Active = true
-		default:
+			client.lastSign = time.Now()
+		case <-time.After(500 * time.Millisecond):
 			client.Active = false
 		}
 	}
@@ -96,11 +101,18 @@ func (s *ChatService) echo(clientId string, msg []string) {
 
 	client, ok := s.clients[clientId]
 	if ok {
-		client.clientCh <- Message{"Plugin message", content}
+		select {
+		case client.clientCh <- Message{"Plugin message", content}:
+			fmt.Println("success")
+			client.Active = true
+			client.lastSign = time.Now()
+		case <-time.After(500 * time.Millisecond):
+			client.Active = false
+		}
 	}
 }
 
-// getClientChannel tests if there is a registered client to the given clientId ans returns
+// getClientChannel tests if there is a registered client to the given clientId and returns
 // it's channel and name
 func (s *ChatService) getClient(clientId string) (*Client, error) {
 	s.mu.RLock()
