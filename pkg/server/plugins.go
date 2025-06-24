@@ -1,35 +1,11 @@
 package server
 
 import (
-	"fmt"
+	"encoding/json"
 	"time"
 )
 
-type PluginInterface interface {
-	//consumes Message and produces Response
-	Execute(message *Message) (Response, error)
-}
-
-type PluginRegistry struct {
-	plugins map[string]PluginInterface
-}
-
-func RegisterPlugins(chatService *ChatService) *PluginRegistry {
-	pr := PluginRegistry{plugins: make(map[string]PluginInterface)}
-	pr.plugins["/help"] = NewHelpPlugin(&pr)
-	pr.plugins["/time"] = NewTimePlugin()
-	pr.plugins["/users"] = NewUserPlugin(chatService)
-	return &pr
-}
-
-func (pr *PluginRegistry) FindAndExecute(message *Message) (Response, error) {
-	if plugin, ok := pr.plugins[message.Plugin]; ok {
-		return plugin.Execute(message)
-	}
-	return Response{message.Name, fmt.Sprintf("no such plugin found: %s", message.Plugin)}, fmt.Errorf("no such plugin found: %s", message.Plugin)
-}
-
-// TimePlugin tells you the current time
+// HelpPlugin tells you information about available plugins
 type HelpPlugin struct {
 	pr *PluginRegistry
 }
@@ -39,18 +15,21 @@ func NewHelpPlugin(pr *PluginRegistry) *HelpPlugin {
 }
 
 func (h *HelpPlugin) Execute(message *Message) (Response, error) {
-	ListPlugins(h.pr)
-	return Response{message.Plugin, "TODO"}, nil
+	jsonList, err := json.Marshal(ListPlugins(h.pr))
+	if err != nil {
+		return Response{message.Name, "error parsing plugins to json"}, err
+	}
+	return Response{message.Name, string(jsonList)}, nil
 }
 
 // ListPlugins lists all Plugins with correspontig commands
-func ListPlugins(pr *PluginRegistry) string {
-	slice := []string{"You can execute a command by typing one of the the following commands:"}
+func ListPlugins(pr *PluginRegistry) []string {
+	stringSlice := []string{"You can execute a command by typing one of the the following commands:"}
 
 	for commands := range pr.plugins {
-		slice = append(slice, commands)
+		stringSlice = append(stringSlice, commands)
 	}
-	return "TODO"
+	return stringSlice
 }
 
 // UserPlugin tells you information about all the current users
@@ -62,9 +41,12 @@ func NewUserPlugin(s *ChatService) *UserPlugin {
 	return &UserPlugin{chatService: s}
 }
 
-func (u *UserPlugin) Execute(messsage *Message) (Response, error) {
-	u.chatService.ListClients()
-	return Response{messsage.Name, "TODO"}, nil
+func (u *UserPlugin) Execute(message *Message) (Response, error) {
+	jsonList, err := json.Marshal(u.chatService.ListClients())
+	if err != nil {
+		return Response{message.Name, "error parsing users to json"}, err
+	}
+	return Response{message.Name, string(jsonList)}, nil
 }
 
 // TimePlugin tells you the current time

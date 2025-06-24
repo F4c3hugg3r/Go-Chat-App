@@ -36,7 +36,7 @@ func (c *Client) PostMessage(url string) (int, error) {
 
 	fmt.Printf("\033[1A\033[K")
 
-	message := Message{Content: input}
+	message := extractInputToMessageFields(input)
 	json, err := json.Marshal(message)
 	if err != nil {
 		fmt.Printf("wrong input: %s", json)
@@ -135,4 +135,19 @@ func (c *Client) Register(url string) error {
 
 	fmt.Println("- Du wurdest registriert. -\n-> Gebe 'quit' ein, um den Chat zu verlassen\n-> Oder /help um Commands auzuführen")
 	return nil
+}
+
+// extractInputToMessageFields creates a Message type message out of the given
+// input string. If the string starts with "/text", "/text" will be the plugin
+func extractInputToMessageFields(input string) Message {
+	if !strings.HasPrefix(input, "/") {
+		return Message{Plugin: "", Name: "", Content: input}
+	}
+
+	plugin := strings.Fields(input)[0]
+
+	content := strings.Replace(input, plugin, "", -1)
+	content, _ = strings.CutPrefix(content, " ")
+
+	return Message{Plugin: plugin, Name: "", Content: content}
 }
