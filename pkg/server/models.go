@@ -6,7 +6,7 @@ import "time"
 // channel to receive messages
 type Client struct {
 	Name      string
-	clientId  string
+	ClientId  string
 	clientCh  chan Response
 	Active    bool
 	authToken string
@@ -15,9 +15,10 @@ type Client struct {
 
 // Message contains the name of the requester and the message (content) itsself
 type Message struct {
-	Name    string `json:"name"`
-	Content string `json:"content"`
-	Plugin  string `json:"plugin"`
+	Name     string `json:"name"`
+	Content  string `json:"content"`
+	Plugin   string `json:"plugin"`
+	ClientId string `json:"clientId"`
 }
 
 // Response contains the name of the sender and the response (content) itsself

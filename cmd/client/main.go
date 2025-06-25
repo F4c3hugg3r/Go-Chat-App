@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	service "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client"
+	"github.com/F4c3hugg3r/Go-Chat-Server/pkg/client"
 )
 
 var (
@@ -20,7 +20,7 @@ func main() {
 
 	url := fmt.Sprintf("http://localhost:%d", *port)
 
-	client := service.NewClient()
+	client := client.NewClient()
 
 	if err := client.Register(url); err != nil {
 		log.Fatal(err)
@@ -28,7 +28,7 @@ func main() {
 
 	go func() {
 		for quit == 0 {
-			client.GetMessages(url)
+			quit = client.GetMessages(url)
 		}
 	}()
 

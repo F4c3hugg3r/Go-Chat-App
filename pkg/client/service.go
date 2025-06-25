@@ -11,12 +11,12 @@ import (
 	"os"
 	"strings"
 
-	tokenGenerator "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
+	"github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
 func NewClient() *Client {
 	return &Client{
-		clientId:   tokenGenerator.GenerateSecureToken(32),
+		clientId:   shared.GenerateSecureToken(32),
 		reader:     bufio.NewReader(os.Stdin),
 		writer:     io.Writer(os.Stdout),
 		httpClient: &http.Client{},
@@ -25,28 +25,29 @@ func NewClient() *Client {
 
 // PostMessage sends a POST request to the endpoint, containing a message, read from the stdin
 func (c *Client) PostMessage(url string) (int, error) {
-	quit := 0
 	parameteredUrl := fmt.Sprintf("%s/users/%s/message", url, c.clientId)
 
 	input, err := c.reader.ReadString('\n')
 	if err != nil {
 		fmt.Printf("wrong input: %s", input)
-		return quit, err
+		return 0, err
 	}
 
 	fmt.Printf("\033[1A\033[K")
 
 	message := extractInputToMessageFields(input)
+	message.ClientId = c.clientId
+	message.Name = c.clientName
 	json, err := json.Marshal(message)
 	if err != nil {
 		fmt.Printf("wrong input: %s", json)
-		return quit, err
+		return 0, err
 	}
 
 	req, err := http.NewRequest("POST", parameteredUrl, bytes.NewReader(json))
 	if err != nil {
 		log.Println("Fehler beim Erstellen der POST req: ", err)
-		return quit, err
+		return 0, err
 	}
 
 	req.Header.Add("Authorization", c.authToken)
@@ -55,25 +56,26 @@ func (c *Client) PostMessage(url string) (int, error) {
 	res, err := c.httpClient.Do(req)
 	if err != nil {
 		log.Println("Fehler beim Absenden der Nachricht: ", err)
-		return quit, err
+		return 0, err
 	}
 	defer res.Body.Close()
 
-	if input == "quit\n" {
-		quit = 1
+	if input == "/quit\n" {
 		fmt.Println("du hast den Channel verlassen")
+		return 1, nil
 	}
 
-	return quit, nil
+	return 0, nil
 }
 
 // GetMessages sends a GET request to the endpoint, displaying incoming messages
-func (c *Client) GetMessages(url string) {
+func (c *Client) GetMessages(url string) int {
 	parameteredUrl := fmt.Sprintf("%s/users/%s/chat", url, c.clientId)
 
 	req, err := http.NewRequest("GET", parameteredUrl, nil)
 	if err != nil {
 		log.Println("Fehler beim erstellen der GET request: ", err)
+		return 0
 	}
 
 	req.Header.Add("Authorization", c.authToken)
@@ -81,25 +83,30 @@ func (c *Client) GetMessages(url string) {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		log.Println("Fehler beim Abrufen ist aufgetreten: ", err)
+		return 0
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	defer resp.Body.Close()
 	if err != nil {
-		return
+		return 0
 	}
 
-	msg := Message{}
-	dec := json.NewDecoder(strings.NewReader(string(body)))
-	err = dec.Decode(&msg)
+	rsp, err := DecodeToResponse(body)
 	if err != nil {
-		return
+		return 0
 	}
 
-	messageString := msg.Name + ": " + msg.Content
-	if msg.Content != "" {
-		fmt.Fprint(c.writer, messageString)
+	if rsp.Name == "inactive" {
+		fmt.Println("You got kicked out due to inactivity")
+		return 1
 	}
+
+	responseString := rsp.Name + ": " + rsp.Content
+	if rsp.Content != "" {
+		fmt.Fprint(c.writer, responseString)
+	}
+	return 0
 }
 
 // Register reads a self given name from the stdin and sends a POST request to the endpoint
@@ -114,7 +121,7 @@ func (c *Client) Register(url string) error {
 
 	parameteredUrl := fmt.Sprintf("%s/users/%s", url, c.clientId)
 
-	message := Message{Name: clientName}
+	message := Message{Content: clientName, ClientId: c.clientId, Plugin: "/register"}
 	json, err := json.Marshal(message)
 	if err != nil {
 		return fmt.Errorf("wrong input: %s", json)
@@ -129,10 +136,18 @@ func (c *Client) Register(url string) error {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Println("Fehler beim Lesen des Bodies ist aufgetreten: ", err)
+		return err
 	}
 	defer resp.Body.Close()
-	c.authToken = string(body)
 
+	rsp, err := DecodeToResponse(body)
+	if err != nil {
+		log.Println("Fehler beim decoden des bodies aufgetreten: ", err)
+		return err
+	}
+	c.authToken = rsp.Content
+
+	c.clientName = clientName
 	fmt.Println("- Du wurdest registriert. -\n-> Gebe 'quit' ein, um den Chat zu verlassen\n-> Oder /help um Commands auzuführen")
 	return nil
 }
@@ -141,13 +156,24 @@ func (c *Client) Register(url string) error {
 // input string. If the string starts with "/text", "/text" will be the plugin
 func extractInputToMessageFields(input string) Message {
 	if !strings.HasPrefix(input, "/") {
-		return Message{Plugin: "", Name: "", Content: input}
+		return Message{Plugin: "/broadcast", Content: input}
 	}
 
 	plugin := strings.Fields(input)[0]
 
-	content := strings.Replace(input, plugin, "", -1)
+	content := strings.ReplaceAll(input, plugin, "")
 	content, _ = strings.CutPrefix(content, " ")
 
-	return Message{Plugin: plugin, Name: "", Content: content}
+	return Message{Plugin: plugin, Content: content}
+}
+
+// DecodeToResponse decodes a responseBody to a Response struct
+func DecodeToResponse(body []byte) (Response, error) {
+	response := Response{}
+	dec := json.NewDecoder(strings.NewReader(string(body)))
+	err := dec.Decode(&response)
+	if err != nil {
+		return response, err
+	}
+	return response, nil
 }

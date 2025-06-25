@@ -7,6 +7,7 @@ import (
 )
 
 type Client struct {
+	clientName string
 	clientId   string
 	reader     *bufio.Reader
 	writer     io.Writer
@@ -14,9 +15,16 @@ type Client struct {
 	httpClient *http.Client
 }
 
-// Message contains the name of the sender and the message (content) itsself
+// Message contains the name of the requester and the message (content) itsself
 type Message struct {
+	Name     string `json:"name"`
+	Content  string `json:"content"`
+	Plugin   string `json:"plugin"`
+	ClientId string `json:"clientId"`
+}
+
+// Response contains the name of the sender and the response (content) itsself
+type Response struct {
 	Name    string `json:"name"`
 	Content string `json:"content"`
-	Plugin  string `json:"plugin"`
 }

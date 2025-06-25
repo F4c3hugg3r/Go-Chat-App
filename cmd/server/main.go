@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	server "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server"
+	"github.com/F4c3hugg3r/Go-Chat-Server/pkg/server"
 )
 
 func main() {
@@ -20,7 +20,7 @@ func main() {
 	plugin := server.RegisterPlugins(service)
 	handler := server.NewServerHandler(service, plugin)
 
-	http.HandleFunc("/users/{clientId}", handler.HandleRegistry)
+	http.HandleFunc("/users/{clientId}", handler.HandleMessages)
 	http.HandleFunc("/users/{clientId}/message", handler.AuthMiddleware(handler.HandleMessages))
 	http.HandleFunc("/users/{clientId}/chat", handler.AuthMiddleware(handler.HandleGetRequest))
 

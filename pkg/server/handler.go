@@ -5,27 +5,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 )
 
 type ServerHandler struct {
-	service     *ChatService
-	plugins     *PluginRegistry
-	registerer  ClientRegisterer
-	broadcaster MessageBroadcaster
+	service *ChatService
+	plugins *PluginRegistry
 }
-
-type ClientRegisterer func(clientId string, body Message) (string, error)
-
-type MessageBroadcaster func(msg *Message)
 
 func NewServerHandler(chatService *ChatService, pluginReg *PluginRegistry) *ServerHandler {
 	return &ServerHandler{
-		service:     chatService,
-		registerer:  chatService.registerClient,
-		broadcaster: chatService.sendBroadcast,
-		plugins:     pluginReg,
+		service: chatService,
+		plugins: pluginReg,
 	}
 }
 
@@ -63,7 +54,7 @@ func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Re
 			return
 		}
 
-		fmt.Fprint(w, string(json))
+		w.Write(json)
 		return
 	case <-time.After(30 * time.Second):
 		fmt.Fprintf(w, "\033[1A\033[K")
@@ -94,75 +85,26 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	message := Message{}
-	dec := json.NewDecoder(strings.NewReader(string(body)))
-	err = dec.Decode(&message)
+	message, err := DecodeToMessage(body)
 	if err != nil {
-		http.Error(w, "error decoding request body", http.StatusBadRequest)
+		http.Error(w, "error decoding request body", http.StatusInternalServerError)
 		return
 	}
 
-	if client, err := handler.service.getClient(clientId); err == nil {
-		if message.Content == "quit\n" {
-			handler.broadcaster(&Message{"Server message", fmt.Sprintf("logging out %s!\n", client.Name), "TODO"})
-			err = handler.service.logOutClient(clientId)
-			if err != nil {
-				http.Error(w, "error deleting client", http.StatusInternalServerError)
-			}
-			return
+	res, err := handler.plugins.FindAndExecute(&message)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if res.Name == "authToken" {
+		body, err = json.Marshal(res)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
-		if result, err := handler.plugins.FindAndExecute(&message); err == nil {
-			handler.service.echo(clientId, result.Content)
-			return
-		}
-		handler.broadcaster(&Message{client.Name, message.Content, "TODO"})
+		w.Write(body)
 		return
 	}
-	http.Error(w, "client not found", http.StatusForbidden)
-}
-
-// handleRegistry takes an incoming POST request and lets a client register by it's name and id
-// should receive a Path Parameter with clientId in it
-// should receive the self given client-name in the request body
-func (handler *ServerHandler) HandleRegistry(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "only POST request allowed", http.StatusBadRequest)
-		return
-	}
-
-	clientId := r.PathValue("clientId")
-	if clientId == "" {
-		http.Error(w, "missing path parameter clientId", http.StatusBadRequest)
-		return
-	}
-
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-	body, err := io.ReadAll(r.Body)
-	defer r.Body.Close()
-	if err != nil || string(body) == "" {
-		http.Error(w, "request body too large or empty", http.StatusBadRequest)
-		return
-	}
-
-	message := Message{}
-	dec := json.NewDecoder(strings.NewReader(string(body)))
-	err = dec.Decode(&message)
-	if err != nil {
-		http.Error(w, "error decoding request body", http.StatusBadRequest)
-		return
-	}
-
-	token, err2 := handler.registerer(clientId, message)
-	if err2 != nil {
-		http.Error(w, err2.Error(), http.StatusBadRequest)
-		return
-	}
-
-	_, err = w.Write([]byte(token))
-	if err != nil {
-		http.Error(w, "error writing request body", http.StatusInternalServerError)
-		return
-	}
+	handler.service.echo(clientId, res)
 }
 
 // authMiddleware checks if the authToken is fitting the token given while registry and throws
