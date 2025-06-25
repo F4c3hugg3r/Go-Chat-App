@@ -106,7 +106,7 @@ func (h *HelpPlugin) Execute(message *Message) (Response, error) {
 	if err != nil {
 		return Response{Name: "error parsing plugins to json"}, err
 	}
-	return Response{message.Name, string(jsonList)}, nil
+	return Response{"Help", string(jsonList)}, nil
 }
 
 // UserPlugin tells you information about all the current users
@@ -123,7 +123,7 @@ func (u *UserPlugin) Execute(message *Message) (Response, error) {
 	if err != nil {
 		return Response{Name: "error parsing users to json"}, err
 	}
-	return Response{message.Name, string(jsonList)}, nil
+	return Response{"Users", string(jsonList)}, nil
 }
 
 // TimePlugin tells you the current time
@@ -134,5 +134,5 @@ func NewTimePlugin() *TimePlugin {
 }
 
 func (t *TimePlugin) Execute(message *Message) (Response, error) {
-	return Response{message.Name, time.Now().String()}, nil
+	return Response{"Time", time.Now().String()}, nil
 }

@@ -25,9 +25,10 @@ func NewClient() *Client {
 
 // PostMessage sends a POST request to the endpoint, containing a message, read from the stdin
 func (c *Client) PostMessage(url string) (int, error) {
-	parameteredUrl := fmt.Sprintf("%s/users/%s/message", url, c.clientId)
+	parameteredUrl := fmt.Sprintf("%s/users/%s/run", url, c.clientId)
 
 	input, err := c.reader.ReadString('\n')
+	input = strings.TrimSuffix(input, "\n")
 	if err != nil {
 		fmt.Printf("wrong input: %s", input)
 		return 0, err
@@ -42,6 +43,15 @@ func (c *Client) PostMessage(url string) (int, error) {
 	if err != nil {
 		fmt.Printf("wrong input: %s", json)
 		return 0, err
+	}
+
+	if input == "/quit" {
+		err = c.deleteClient(url, json)
+		if err != nil {
+			return 1, fmt.Errorf("%v: client could't be deleted", err)
+		}
+		fmt.Println("du hast den Channel verlassen")
+		return 1, nil
 	}
 
 	req, err := http.NewRequest("POST", parameteredUrl, bytes.NewReader(json))
@@ -60,12 +70,28 @@ func (c *Client) PostMessage(url string) (int, error) {
 	}
 	defer res.Body.Close()
 
-	if input == "/quit\n" {
-		fmt.Println("du hast den Channel verlassen")
-		return 1, nil
+	return 0, nil
+}
+
+// deleteClient sends a DELETE Request to delete the client out of the server
+func (c *Client) deleteClient(url string, json []byte) error {
+	parameteredUrl := fmt.Sprintf("%s/users/%s", url, c.clientId)
+	req, err := http.NewRequest("DELETE", parameteredUrl, bytes.NewReader(json))
+	if err != nil {
+		log.Println("Fehler beim Erstellen der DELETE req: ", err)
+		return err
 	}
 
-	return 0, nil
+	req.Header.Add("Authorization", c.authToken)
+	req.Header.Add("Content-Type", "application/json")
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		log.Println("Fehler beim Absenden des Deletes: ", err)
+		return err
+	}
+	defer res.Body.Close()
+	return nil
 }
 
 // GetMessages sends a GET request to the endpoint, displaying incoming messages
@@ -83,7 +109,7 @@ func (c *Client) GetMessages(url string) int {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		log.Println("Fehler beim Abrufen ist aufgetreten: ", err)
-		return 0
+		return 1
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -102,7 +128,7 @@ func (c *Client) GetMessages(url string) int {
 		return 1
 	}
 
-	responseString := rsp.Name + ": " + rsp.Content
+	responseString := rsp.Name + ": " + rsp.Content + "\n"
 	if rsp.Content != "" {
 		fmt.Fprint(c.writer, responseString)
 	}

@@ -79,7 +79,7 @@ func (s *ChatService) ListClients() []string {
 	clientsSlice := []string{}
 
 	for _, client := range s.clients {
-		clientsSlice = append(clientsSlice, fmt.Sprintf("Name: %s, Active: %t\n", client.Name, client.Active))
+		clientsSlice = append(clientsSlice, fmt.Sprintf("Name: %s, Active: %t, Id; %s\n", client.Name, client.Active, client.ClientId))
 	}
 	return clientsSlice
 }

@@ -10,19 +10,26 @@ import (
 	"github.com/F4c3hugg3r/Go-Chat-Server/pkg/server"
 )
 
+type Config struct {
+	Port      int
+	TimeLimit time.Duration
+}
+
 func main() {
-	var port = flag.Int("port", 8080, "HTTP Server Port")
-	//var timeLimit = flag.Int("limit", 30, "Time limit for inactive clients in minutes")
-	flag.Parse()
-	portString := fmt.Sprintf(":%d", *port)
+	cfg := ParseFlags()
 
 	service := server.NewChatService()
 	plugin := server.RegisterPlugins(service)
 	handler := server.NewServerHandler(service, plugin)
 
-	http.HandleFunc("/users/{clientId}", handler.HandleMessages)
-	http.HandleFunc("/users/{clientId}/message", handler.AuthMiddleware(handler.HandleMessages))
-	http.HandleFunc("/users/{clientId}/chat", handler.AuthMiddleware(handler.HandleGetRequest))
+	router := handler.BuildMultiplexer()
+	server := &http.Server{
+		Addr:              fmt.Sprintf(":%d", cfg.Port),
+		Handler:           router,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		ReadHeaderTimeout: 15 * time.Second,
+	}
 
 	go func() {
 		for {
@@ -31,6 +38,14 @@ func main() {
 		}
 	}()
 
-	fmt.Println("Server running on port:", *port)
-	log.Fatal(http.ListenAndServe(portString, nil))
+	fmt.Println("Server running on port:", cfg.Port)
+	log.Fatal(server.ListenAndServe())
+}
+
+func ParseFlags() Config {
+	var cfg Config
+	flag.IntVar(&cfg.Port, "port", 8080, "HTTP Server Port")
+	flag.DurationVar(&cfg.TimeLimit, "timeLimit", 30, "Time limit for inactive clients in minutes")
+	flag.Parse()
+	return cfg
 }

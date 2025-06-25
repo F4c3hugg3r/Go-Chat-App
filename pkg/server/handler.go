@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,10 +21,13 @@ func NewServerHandler(chatService *ChatService, pluginReg *PluginRegistry) *Serv
 	}
 }
 
-// handleGetRequest displays a response when received and times out after 30s
+// handleGetRequest displays a response when received and times out after 10s
 // if nothing is being send
 // should receive a Path Parameter with clientId in it
 func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
+	defer cancel()
+
 	if r.Method != http.MethodGet {
 		http.Error(w, "only GET Requests allowed", http.StatusBadRequest)
 		return
@@ -56,7 +60,7 @@ func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Re
 
 		w.Write(json)
 		return
-	case <-time.After(30 * time.Second):
+	case <-ctx.Done():
 		fmt.Fprintf(w, "\033[1A\033[K")
 		return
 	}
@@ -66,11 +70,6 @@ func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Re
 // should receive a Path Parameter with clientId in it
 // should receive the message in the request body
 func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "only POST request allowed", http.StatusBadRequest)
-		return
-	}
-
 	clientId := r.PathValue("clientId")
 	if clientId == "" {
 		http.Error(w, "missing path parameter clientId", http.StatusBadRequest)

@@ -26,6 +26,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	//TODO quit channel zum stoppen nutzen!
 	go func() {
 		for quit == 0 {
 			quit = client.GetMessages(url)
