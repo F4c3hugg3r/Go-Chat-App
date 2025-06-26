@@ -58,7 +58,11 @@ func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Re
 			return
 		}
 
-		w.Write(json)
+		_, err = w.Write(json)
+		if err != nil {
+			http.Error(w, "couldn't write response", http.StatusInternalServerError)
+		}
+
 		return
 	case <-ctx.Done():
 		fmt.Fprintf(w, "\033[1A\033[K")
@@ -77,8 +81,10 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
 	body, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
+
 	if err != nil {
 		http.Error(w, "error reading request body", http.StatusInternalServerError)
 		return
@@ -94,16 +100,24 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		handler.Service.echo(clientId, res)
 		http.Error(w, err.Error(), http.StatusBadRequest)
+
 		return
 	}
+
 	if res.Name == "authToken" {
 		body, err = json.Marshal(res)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
-		w.Write(body)
+
+		_, err = w.Write(body)
+		if err != nil {
+			http.Error(w, "couldn't write response", http.StatusInternalServerError)
+		}
+
 		return
 	}
+
 	handler.Service.echo(clientId, res)
 }
 
@@ -111,8 +125,9 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 // an error if not
 func (handler *ServerHandler) AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		token := r.Header.Get("Authorization")
 		clientId := r.PathValue("clientId")
+
+		token := r.Header.Get("Authorization")
 		if token == "" || clientId == "" {
 			http.Error(w, "missing path parameter clientId or authToken", http.StatusBadRequest)
 			return
@@ -122,6 +137,7 @@ func (handler *ServerHandler) AuthMiddleware(next http.HandlerFunc) http.Handler
 			http.Error(w, "client does not exist or token doesn't match", http.StatusForbidden)
 			return
 		}
+
 		next(w, r)
 	}
 }

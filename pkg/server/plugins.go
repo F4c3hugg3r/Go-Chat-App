@@ -26,8 +26,10 @@ func (lp *LogOutPlugin) Execute(message *Message) (Response, error) {
 		fmt.Println("logged out ", client.Name)
 		close(client.clientCh)
 		delete(lp.chatService.clients, message.ClientId)
+
 		return Response{Name: message.Name, Content: "logged out"}, nil
 	}
+
 	return Response{Name: "client already deleted"}, fmt.Errorf("client already deleted")
 }
 
@@ -59,6 +61,7 @@ func (rp *RegisterClientPlugin) Execute(message *Message) (Response, error) {
 	rp.chatService.clients[message.ClientId] = &Client{message.Content, message.ClientId, clientCh, true, token, time.Now()}
 
 	fmt.Printf("\nNew client '%s' registered.\n", message.Content)
+
 	return Response{Name: "authToken", Content: token}, nil
 }
 
@@ -87,13 +90,16 @@ func (bp *BroadcastPlugin) Execute(message *Message) (Response, error) {
 			select {
 			case client.clientCh <- rsp:
 				fmt.Println("success")
+
 				client.Active = true
 				client.lastSign = time.Now()
+
 			case <-time.After(500 * time.Millisecond):
 				client.Active = false
 			}
 		}
 	}
+
 	return rsp, nil
 }
 
@@ -111,6 +117,7 @@ func (h *HelpPlugin) Execute(message *Message) (Response, error) {
 	if err != nil {
 		return Response{Name: "error parsing plugins to json"}, err
 	}
+
 	return Response{"Help", string(jsonList)}, nil
 }
 
@@ -128,6 +135,7 @@ func (u *UserPlugin) Execute(message *Message) (Response, error) {
 	if err != nil {
 		return Response{Name: "error parsing users to json"}, err
 	}
+
 	return Response{"Users", string(jsonList)}, nil
 }
 

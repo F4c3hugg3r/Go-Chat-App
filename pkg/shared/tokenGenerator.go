@@ -11,5 +11,6 @@ func GenerateSecureToken(length int) string {
 	if _, err := rand.Read(b); err != nil {
 		panic(err)
 	}
+
 	return base64.RawURLEncoding.EncodeToString(b)
 }

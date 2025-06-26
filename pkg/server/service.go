@@ -28,6 +28,7 @@ func (s *ChatService) InactiveClientDeleter(timeLimit time.Duration) {
 		if time.Since(client.lastSign) >= timeLimit {
 			client.Active = false
 		}
+
 		if !client.Active {
 			fmt.Println("due to inactivity: deleting ", client.Name)
 			select {
@@ -50,6 +51,7 @@ func (s *ChatService) echo(clientId string, rsp Response) {
 		select {
 		case client.clientCh <- rsp:
 			fmt.Println("success")
+
 			client.Active = true
 			client.lastSign = time.Now()
 		case <-time.After(500 * time.Millisecond):
@@ -68,6 +70,7 @@ func (s *ChatService) getClient(clientId string) (*Client, error) {
 	if !exists {
 		return client, fmt.Errorf("there is no client with id: %s registered", clientId)
 	}
+
 	return client, nil
 }
 
@@ -82,6 +85,7 @@ func (s *ChatService) ListClients() []string {
 	for _, client := range s.clients {
 		clientsSlice = append(clientsSlice, fmt.Sprintf("Name: %s, Active: %t, Id; %s\n", client.Name, client.Active, client.ClientId))
 	}
+
 	return clientsSlice
 }
 
@@ -90,8 +94,10 @@ func DecodeToMessage(body []byte) (Message, error) {
 	message := Message{}
 	dec := json.NewDecoder(strings.NewReader(string(body)))
 	err := dec.Decode(&message)
+
 	if err != nil {
 		return message, err
 	}
+
 	return message, nil
 }

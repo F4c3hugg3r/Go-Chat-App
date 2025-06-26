@@ -15,7 +15,7 @@ var (
 
 func main() {
 	quit = 0
-	var port = flag.Int("port", 8080, "HTTP Server Port")
+	port := flag.Int("port", 8080, "HTTP Server Port")
 	flag.Parse()
 
 	url := fmt.Sprintf("http://localhost:%d", *port)

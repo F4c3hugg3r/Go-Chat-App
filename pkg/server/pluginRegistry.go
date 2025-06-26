@@ -26,6 +26,7 @@ func RegisterPlugins(chatService *ChatService) *PluginRegistry {
 	//	pr.plugins["/private"] = NewPrivateMessagePlugin(chatService)
 
 	pr.invisible = append(pr.invisible, "/register", "/broadcast")
+
 	return &pr
 }
 
@@ -33,6 +34,7 @@ func (pr *PluginRegistry) FindAndExecute(message *Message) (Response, error) {
 	if plugin, ok := pr.plugins[message.Plugin]; ok {
 		return plugin.Execute(message)
 	}
+
 	return Response{message.Name, fmt.Sprintf("no such plugin found: %s", message.Plugin)}, fmt.Errorf("no such plugin found: %s", message.Plugin)
 }
 
@@ -45,6 +47,7 @@ func (pr *PluginRegistry) ListPlugins() []string {
 			stringSlice = append(stringSlice, command)
 		}
 	}
+
 	return stringSlice
 }
 

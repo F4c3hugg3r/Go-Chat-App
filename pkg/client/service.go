@@ -28,11 +28,12 @@ func (c *Client) PostMessage(url string) (int, error) {
 	parameteredUrl := fmt.Sprintf("%s/users/%s/run", url, c.clientId)
 
 	input, err := c.reader.ReadString('\n')
-	input = strings.TrimSuffix(input, "\n")
 	if err != nil {
 		fmt.Printf("wrong input: %s", input)
 		return 0, err
 	}
+
+	input = strings.TrimSuffix(input, "\n")
 
 	fmt.Printf("\033[1A\033[K")
 
@@ -40,6 +41,7 @@ func (c *Client) PostMessage(url string) (int, error) {
 	message.ClientId = c.clientId
 	message.Name = c.clientName
 	json, err := json.Marshal(message)
+
 	if err != nil {
 		fmt.Printf("wrong input: %s", json)
 		return 0, err
@@ -48,9 +50,11 @@ func (c *Client) PostMessage(url string) (int, error) {
 	if input == "/quit" {
 		err = c.deleteClient(url, json)
 		if err != nil {
-			return 1, fmt.Errorf("%v: client could't be deleted", err)
+			return 1, fmt.Errorf("%w: client could't be deleted", err)
 		}
+
 		fmt.Println("du hast den Channel verlassen")
+
 		return 1, nil
 	}
 
@@ -77,6 +81,7 @@ func (c *Client) PostMessage(url string) (int, error) {
 func (c *Client) deleteClient(url string, json []byte) error {
 	parameteredUrl := fmt.Sprintf("%s/users/%s", url, c.clientId)
 	req, err := http.NewRequest("DELETE", parameteredUrl, bytes.NewReader(json))
+
 	if err != nil {
 		log.Println("Fehler beim Erstellen der DELETE req: ", err)
 		return err
@@ -90,7 +95,9 @@ func (c *Client) deleteClient(url string, json []byte) error {
 		log.Println("Fehler beim Absenden des Deletes: ", err)
 		return err
 	}
+
 	defer res.Body.Close()
+
 	return nil
 }
 
@@ -114,6 +121,7 @@ func (c *Client) GetMessages(url string) int {
 
 	body, err := io.ReadAll(resp.Body)
 	defer resp.Body.Close()
+
 	if err != nil {
 		return 0
 	}
@@ -132,23 +140,26 @@ func (c *Client) GetMessages(url string) int {
 	if rsp.Content != "" {
 		fmt.Fprint(c.writer, responseString)
 	}
+
 	return 0
 }
 
 // Register reads a self given name from the stdin and sends a POST request to the endpoint
 func (c *Client) Register(url string) error {
 	fmt.Println("Gebe deinen Namen an:")
+
 	clientName, err := c.reader.ReadString('\n')
 	if err != nil {
 		fmt.Println("wrong input")
 		return err
 	}
-	clientName = strings.ReplaceAll(clientName, "\n", "")
 
+	clientName = strings.ReplaceAll(clientName, "\n", "")
 	parameteredUrl := fmt.Sprintf("%s/users/%s", url, c.clientId)
 
 	message := Message{Content: clientName, ClientId: c.clientId, Plugin: "/register"}
 	json, err := json.Marshal(message)
+
 	if err != nil {
 		return fmt.Errorf("wrong input: %s", json)
 	}
@@ -167,15 +178,18 @@ func (c *Client) Register(url string) error {
 	defer resp.Body.Close()
 
 	fmt.Println(string(body))
+
 	rsp, err := DecodeToResponse(body)
 	if err != nil {
 		log.Println("Fehler beim decoden des bodies aufgetreten: ", err)
 		return err
 	}
-	c.authToken = rsp.Content
 
+	c.authToken = rsp.Content
 	c.clientName = clientName
+
 	fmt.Println("- Du wurdest registriert. -\n-> Gebe 'quit' ein, um den Chat zu verlassen\n-> Oder /help um Commands auzuführen")
+
 	return nil
 }
 
@@ -198,9 +212,11 @@ func extractInputToMessageFields(input string) Message {
 func DecodeToResponse(body []byte) (Response, error) {
 	response := Response{}
 	dec := json.NewDecoder(strings.NewReader(string(body)))
+
 	err := dec.Decode(&response)
 	if err != nil {
 		return response, err
 	}
+
 	return response, nil
 }

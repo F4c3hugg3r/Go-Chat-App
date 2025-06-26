@@ -24,6 +24,7 @@ type Config struct {
 
 func main() {
 	cfg := ParseFlags()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -43,7 +44,9 @@ func main() {
 
 	interChan := make(chan os.Signal, 2)
 	signal.Notify(interChan, os.Interrupt, syscall.SIGTERM)
+
 	wg.Add(1)
+
 	go interruptListener(interChan, server, wg, cancel)
 
 	ln, err := net.Listen("tcp", server.Addr)
@@ -51,10 +54,10 @@ func main() {
 		log.Println(err.Error())
 		return
 	}
-	defer ln.Close()
-	log.Println("API running")
 
-	fmt.Println("Server running on port:", cfg.Port)
+	defer ln.Close()
+	log.Println("Server running on port:", cfg.Port)
+
 	err = server.Serve(ln)
 	if err != nil {
 		log.Println(err.Error())
@@ -77,6 +80,7 @@ func interruptListener(interChan chan os.Signal, server *http.Server, wg *sync.W
 	if err != nil {
 		log.Printf("unable to shutdown server: %s", err)
 	}
+
 	cancel()
 
 	log.Println("Shutting down Server")
@@ -87,10 +91,14 @@ func setUp(server *http.Server, handler *server.ServerHandler, timeLimit time.Du
 	server.Handler = handler.BuildMultiplexer()
 
 	wg.Add(1)
+
 	go func() {
 		defer wg.Done()
+
 		ticker := time.NewTicker(15 * time.Second)
+
 		defer ticker.Stop()
+
 		for {
 			select {
 			case <-ticker.C:
@@ -105,9 +113,11 @@ func setUp(server *http.Server, handler *server.ServerHandler, timeLimit time.Du
 // ParseFlags parses server port, maximum users and tiemout duration flags
 func ParseFlags() Config {
 	var cfg Config
+
 	flag.IntVar(&cfg.Port, "port", 8080, "HTTP Server Port")
 	flag.IntVar(&cfg.maxUsers, "maxUsers", 100, "Maximum number of active users allowed")
 	flag.DurationVar(&cfg.TimeLimit, "timeLimit", 30*time.Minute, "Time limit for inactive clients in minutes")
 	flag.Parse()
+
 	return cfg
 }
