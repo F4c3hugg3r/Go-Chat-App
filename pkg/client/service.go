@@ -3,6 +3,7 @@ package client
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,18 +20,21 @@ func NewClient() *Client {
 		clientId:   shared.GenerateSecureToken(32),
 		reader:     bufio.NewReader(os.Stdin),
 		writer:     io.Writer(os.Stdout),
-		httpClient: &http.Client{},
+		HttpClient: &http.Client{},
 	}
 }
 
 // PostMessage sends a POST request to the endpoint, containing a message, read from the stdin
-func (c *Client) PostMessage(url string) (int, error) {
+func (c *Client) PostMessage(url string, cancel context.CancelFunc, input string) error {
 	parameteredUrl := fmt.Sprintf("%s/users/%s/run", url, c.clientId)
 
-	input, err := c.reader.ReadString('\n')
-	if err != nil {
-		fmt.Printf("wrong input: %s", input)
-		return 0, err
+	var err error
+	if input == "" {
+		input, err = c.reader.ReadString('\n')
+		if err != nil {
+			fmt.Printf("wrong input: %s", input)
+			return err
+		}
 	}
 
 	input = strings.TrimSuffix(input, "\n")
@@ -43,41 +47,39 @@ func (c *Client) PostMessage(url string) (int, error) {
 
 	if err != nil {
 		fmt.Printf("wrong input: %s", json)
-		return 0, err
+		return err
 	}
 
 	if input == "/quit" {
-		err = c.deleteClient(url, json)
+		err = c.DeleteClient(url, json)
 		if err != nil {
-			return 1, fmt.Errorf("%w: client could't be deleted", err)
+			return fmt.Errorf("%w: client could't be deleted", err)
 		}
-
-		fmt.Println("du hast den Channel verlassen")
-
-		return 1, nil
+		cancel()
+		return nil
 	}
 
 	req, err := http.NewRequest("POST", parameteredUrl, bytes.NewReader(json))
 	if err != nil {
 		log.Println("Fehler beim Erstellen der POST req: ", err)
-		return 0, err
+		return err
 	}
 
 	req.Header.Add("Authorization", c.authToken)
 	req.Header.Add("Content-Type", "application/json")
 
-	res, err := c.httpClient.Do(req)
+	res, err := c.HttpClient.Do(req)
 	if err != nil {
 		log.Println("Fehler beim Absenden der Nachricht: ", err)
-		return 0, err
+		return err
 	}
 	defer res.Body.Close()
 
-	return 0, nil
+	return nil
 }
 
-// deleteClient sends a DELETE Request to delete the client out of the server
-func (c *Client) deleteClient(url string, json []byte) error {
+// DeleteClient sends a DELETE Request to delete the client out of the server
+func (c *Client) DeleteClient(url string, json []byte) error {
 	parameteredUrl := fmt.Sprintf("%s/users/%s", url, c.clientId)
 	req, err := http.NewRequest("DELETE", parameteredUrl, bytes.NewReader(json))
 
@@ -89,7 +91,7 @@ func (c *Client) deleteClient(url string, json []byte) error {
 	req.Header.Add("Authorization", c.authToken)
 	req.Header.Add("Content-Type", "application/json")
 
-	res, err := c.httpClient.Do(req)
+	res, err := c.HttpClient.Do(req)
 	if err != nil {
 		log.Println("Fehler beim Absenden des Deletes: ", err)
 		return err
@@ -101,38 +103,42 @@ func (c *Client) deleteClient(url string, json []byte) error {
 }
 
 // GetMessages sends a GET request to the endpoint, displaying incoming messages
-func (c *Client) GetMessages(url string) int {
+func (c *Client) GetMessages(url string, cancel context.CancelFunc) {
 	parameteredUrl := fmt.Sprintf("%s/users/%s/chat", url, c.clientId)
 
 	req, err := http.NewRequest("GET", parameteredUrl, nil)
 	if err != nil {
 		log.Println("Fehler beim erstellen der GET request: ", err)
-		return 0
+		return
 	}
 
 	req.Header.Add("Authorization", c.authToken)
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.HttpClient.Do(req)
 	if err != nil {
 		log.Println("Fehler beim Abrufen ist aufgetreten: ", err)
-		return 1
+		cancel()
+
+		return
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	defer resp.Body.Close()
 
 	if err != nil {
-		return 0
+		return
 	}
 
 	rsp, err := DecodeToResponse(body)
 	if err != nil {
-		return 0
+		return
 	}
 
 	if rsp.Name == "inactive" {
 		log.Println("You got kicked out due to inactivity")
-		return 1
+		cancel()
+
+		return
 	}
 
 	if strings.HasPrefix(rsp.Content, "[") {
@@ -141,19 +147,17 @@ func (c *Client) GetMessages(url string) int {
 		if err != nil {
 			log.Println("Fehler beim Abrufen ist aufgetreten: ", err)
 
-			return 0
+			return
 		}
 		fmt.Fprint(c.writer, output)
 
-		return 0
+		return
 	}
 
 	responseString := rsp.Name + ": " + rsp.Content + "\n"
 	if rsp.Content != "" {
 		fmt.Fprint(c.writer, responseString)
 	}
-
-	return 0
 }
 
 // Register reads a self given name from the stdin and sends a POST request to the endpoint
@@ -176,7 +180,7 @@ func (c *Client) Register(url string) error {
 		return fmt.Errorf("wrong input: %s", json)
 	}
 
-	resp, err := c.httpClient.Post(parameteredUrl, "application/json", bytes.NewReader(json))
+	resp, err := c.HttpClient.Post(parameteredUrl, "application/json", bytes.NewReader(json))
 	if err != nil {
 		fmt.Println("Die Registrierung hat nicht funktioniert, versuch es nochmal mit anderen Daten")
 		return err

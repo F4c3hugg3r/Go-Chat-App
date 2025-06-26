@@ -12,7 +12,7 @@ type Client struct {
 	reader     *bufio.Reader
 	writer     io.Writer
 	authToken  string
-	httpClient *http.Client
+	HttpClient *http.Client
 }
 
 // Message contains the name of the requester and the message (content) itsself

@@ -24,13 +24,13 @@ type Config struct {
 
 func main() {
 	cfg := ParseFlags()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	service := server.NewChatService(cfg.maxUsers)
 	plugin := server.RegisterPlugins(service)
 	handler := server.NewServerHandler(service, plugin)
+	wg := &sync.WaitGroup{}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
@@ -39,7 +39,6 @@ func main() {
 		ReadHeaderTimeout: 15 * time.Second,
 	}
 
-	wg := &sync.WaitGroup{}
 	setUp(server, handler, cfg.TimeLimit, wg, ctx)
 
 	interChan := make(chan os.Signal, 2)
