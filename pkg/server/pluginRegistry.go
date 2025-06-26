@@ -16,6 +16,7 @@ type PluginRegistry struct {
 	invisible []string
 }
 
+// RegisterPlugins sets up all the plugins
 func RegisterPlugins(chatService *ChatService) *PluginRegistry {
 	pr := PluginRegistry{plugins: make(map[string]PluginInterface)}
 	pr.plugins["/help"] = NewHelpPlugin(&pr)
@@ -24,7 +25,7 @@ func RegisterPlugins(chatService *ChatService) *PluginRegistry {
 	pr.plugins["/register"] = NewRegisterClientPlugin(chatService)
 	pr.plugins["/broadcast"] = NewBroadcastPlugin(chatService)
 	pr.plugins["/quit"] = NewLogOutPlugin(chatService)
-	//	pr.plugins["/private"] = NewPrivateMessagePlugin(chatService)
+	pr.plugins["/private"] = NewPrivateMessagePlugin(chatService)
 
 	pr.invisible = append(pr.invisible, "/register", "/broadcast")
 
@@ -45,6 +46,7 @@ func (pr *PluginRegistry) ListPlugins() []json.RawMessage {
 		{Command: "/help", Description: "tells every plugin and their description"},
 		{Command: "/time", Description: "tells you the current time"},
 		{Command: "/users", Description: "tells you information about all the current users"},
+		{Command: "/private", Description: "lets you send a private message to someone - template: '/private {Id} {message}'"},
 		{Command: "/quit", Description: "loggs you out of the chat"},
 	}
 

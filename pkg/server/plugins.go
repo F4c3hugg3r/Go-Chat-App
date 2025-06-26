@@ -8,6 +8,39 @@ import (
 	"github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
+// PrivateMessage Plugin lets a client send a private message to another client identified by it's clientId
+type PrivateMessagePlugin struct {
+	chatService *ChatService
+}
+
+func NewPrivateMessagePlugin(s *ChatService) *PrivateMessagePlugin {
+	return &PrivateMessagePlugin{chatService: s}
+}
+
+func (pp *PrivateMessagePlugin) Execute(message *Message) (Response, error) {
+	pp.chatService.mu.Lock()
+	defer pp.chatService.mu.Unlock()
+
+	client, ok := pp.chatService.clients[message.ClientId]
+	if !ok {
+		return Response{Name: "client not available"}, fmt.Errorf("client not available")
+	}
+	rsp := Response{fmt.Sprintf("[Private] - %s", message.Name), message.Content}
+
+	select {
+	case client.clientCh <- rsp:
+		fmt.Printf("successfully sent to %s", client.Name)
+
+		client.Active = true
+		client.lastSign = time.Now()
+		return rsp, nil
+
+	case <-time.After(500 * time.Millisecond):
+		client.Active = false
+		return Response{Name: "client not available"}, fmt.Errorf("client not available")
+	}
+}
+
 // LogOutPlugin logs out a client by deleting it out of the clients map
 type LogOutPlugin struct {
 	chatService *ChatService

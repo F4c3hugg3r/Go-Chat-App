@@ -37,8 +37,7 @@ func (c *Client) PostMessage(url string) (int, error) {
 
 	fmt.Printf("\033[1A\033[K")
 
-	message := extractInputToMessageFields(input)
-	message.ClientId = c.clientId
+	message := extractInputToMessageFields(input, c.clientId)
 	message.Name = c.clientName
 	json, err := json.Marshal(message)
 
@@ -206,9 +205,16 @@ func (c *Client) Register(url string) error {
 
 // extractInputToMessageFields creates a Message type message out of the given
 // input string. If the string starts with "/text", "/text" will be the plugin
-func extractInputToMessageFields(input string) Message {
+func extractInputToMessageFields(input string, clientId string) Message {
 	if !strings.HasPrefix(input, "/") {
-		return Message{Plugin: "/broadcast", Content: input}
+		return Message{Plugin: "/broadcast", Content: input, ClientId: clientId}
+	}
+
+	if strings.HasPrefix(input, "/private") {
+		opposingClientId := strings.Fields(input)[1]
+		message, _ := strings.CutPrefix(input, fmt.Sprintf("/private %s ", opposingClientId))
+
+		return Message{Plugin: "/private", ClientId: opposingClientId, Content: message}
 	}
 
 	plugin := strings.Fields(input)[0]
@@ -216,7 +222,7 @@ func extractInputToMessageFields(input string) Message {
 	content := strings.ReplaceAll(input, plugin, "")
 	content, _ = strings.CutPrefix(content, " ")
 
-	return Message{Plugin: plugin, Content: content}
+	return Message{Plugin: plugin, Content: content, ClientId: clientId}
 }
 
 // DecodeToResponse decodes a responseBody to a Response struct
