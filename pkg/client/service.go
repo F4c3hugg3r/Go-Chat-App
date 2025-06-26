@@ -166,6 +166,7 @@ func (c *Client) Register(url string) error {
 	}
 	defer resp.Body.Close()
 
+	fmt.Println(string(body))
 	rsp, err := DecodeToResponse(body)
 	if err != nil {
 		log.Println("Fehler beim decoden des bodies aufgetreten: ", err)

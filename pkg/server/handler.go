@@ -10,14 +10,14 @@ import (
 )
 
 type ServerHandler struct {
-	service *ChatService
-	plugins *PluginRegistry
+	Service *ChatService
+	Plugins *PluginRegistry
 }
 
 func NewServerHandler(chatService *ChatService, pluginReg *PluginRegistry) *ServerHandler {
 	return &ServerHandler{
-		service: chatService,
-		plugins: pluginReg,
+		Service: chatService,
+		Plugins: pluginReg,
 	}
 }
 
@@ -39,7 +39,7 @@ func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	client, err := handler.service.getClient(clientId)
+	client, err := handler.Service.getClient(clientId)
 	if err != nil {
 		http.Error(w, "Client not found ", http.StatusNotFound)
 		return
@@ -90,8 +90,9 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	res, err := handler.plugins.FindAndExecute(&message)
+	res, err := handler.Plugins.FindAndExecute(&message)
 	if err != nil {
+		handler.Service.echo(clientId, res)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -103,7 +104,7 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 		w.Write(body)
 		return
 	}
-	handler.service.echo(clientId, res)
+	handler.Service.echo(clientId, res)
 }
 
 // authMiddleware checks if the authToken is fitting the token given while registry and throws
@@ -117,7 +118,7 @@ func (handler *ServerHandler) AuthMiddleware(next http.HandlerFunc) http.Handler
 			return
 		}
 
-		if client, err := handler.service.getClient(clientId); err != nil || token != client.authToken {
+		if client, err := handler.Service.getClient(clientId); err != nil || token != client.authToken {
 			http.Error(w, "client does not exist or token doesn't match", http.StatusForbidden)
 			return
 		}

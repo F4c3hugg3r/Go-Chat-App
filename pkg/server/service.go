@@ -10,21 +10,22 @@ import (
 
 // clients who communicate with the sever
 type ChatService struct {
-	clients map[string]*Client
-	mu      sync.RWMutex
+	clients  map[string]*Client
+	maxUsers int
+	mu       sync.RWMutex
 }
 
-func NewChatService() *ChatService {
-	return &ChatService{clients: make(map[string]*Client)}
+func NewChatService(maxUsers int) *ChatService {
+	return &ChatService{clients: make(map[string]*Client), maxUsers: maxUsers}
 }
 
 // InactiveClientDeleter searches for inactive clients and deletes them as well as closes their message-channel
-func (s *ChatService) InactiveClientDeleter() {
+func (s *ChatService) InactiveClientDeleter(timeLimit time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	for clientId, client := range s.clients {
-		if time.Since(client.lastSign) >= (time.Minute * 5) {
+		if time.Since(client.lastSign) >= timeLimit {
 			client.Active = false
 		}
 		if !client.Active {

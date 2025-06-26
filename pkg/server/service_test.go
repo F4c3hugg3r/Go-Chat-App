@@ -2,6 +2,7 @@ package server
 
 import (
 	"testing"
+	"time"
 )
 
 var (
@@ -44,13 +45,13 @@ var (
 // }
 
 func TestInactiveClientDeleter(t *testing.T) {
-	service := NewChatService()
+	service := NewChatService(100)
 	service.clients[clientId] = dummyClientInactive
 	if len(service.clients) != 1 {
 		t.Errorf(("Setup incorrect there should be just 1 client but there is %d"), len(service.clients))
 	}
 
-	service.InactiveClientDeleter()
+	service.InactiveClientDeleter(30 * time.Minute)
 	if len(service.clients) != 0 {
 		t.Errorf(("There should be 0 client but there is %d"), len(service.clients))
 	}
@@ -103,7 +104,7 @@ func TestInactiveClientDeleter(t *testing.T) {
 // }
 
 func TestGetClient(t *testing.T) {
-	service := NewChatService()
+	service := NewChatService(100)
 	_, err := service.getClient(clientId)
 	if err == nil {
 		t.Error("there should be an error but instead it's nil")

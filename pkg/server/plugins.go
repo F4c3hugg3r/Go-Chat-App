@@ -45,6 +45,11 @@ func (rp *RegisterClientPlugin) Execute(message *Message) (Response, error) {
 	rp.chatService.mu.Lock()
 	defer rp.chatService.mu.Unlock()
 
+	if len(rp.chatService.clients) >= rp.chatService.maxUsers {
+		return Response{Name: "usercap already reached, try again later"},
+			fmt.Errorf("usercap %d reached, try again later. users:%d", rp.chatService.maxUsers, len(rp.chatService.clients))
+	}
+
 	if _, exists := rp.chatService.clients[message.ClientId]; exists {
 		return Response{Name: "client already defined"}, fmt.Errorf("client already defined")
 	}
