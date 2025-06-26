@@ -26,3 +26,8 @@ type Response struct {
 	Name    string `json:"name"`
 	Content string `json:"content"`
 }
+
+type Plugin struct {
+	Command     string
+	Description string
+}

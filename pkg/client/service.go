@@ -132,8 +132,21 @@ func (c *Client) GetMessages(url string) int {
 	}
 
 	if rsp.Name == "inactive" {
-		fmt.Println("You got kicked out due to inactivity")
+		log.Println("You got kicked out due to inactivity")
 		return 1
+	}
+
+	if strings.HasPrefix(rsp.Content, "[") {
+
+		output, err := JSONToTable(rsp.Content)
+		if err != nil {
+			log.Println("Fehler beim Abrufen ist aufgetreten: ", err)
+
+			return 0
+		}
+		fmt.Fprint(c.writer, output)
+
+		return 0
 	}
 
 	responseString := rsp.Name + ": " + rsp.Content + "\n"
@@ -176,8 +189,6 @@ func (c *Client) Register(url string) error {
 		return err
 	}
 	defer resp.Body.Close()
-
-	fmt.Println(string(body))
 
 	rsp, err := DecodeToResponse(body)
 	if err != nil {

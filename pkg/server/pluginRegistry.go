@@ -1,8 +1,9 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
-	"slices"
+	"log"
 )
 
 type PluginInterface interface {
@@ -39,18 +40,23 @@ func (pr *PluginRegistry) FindAndExecute(message *Message) (Response, error) {
 }
 
 // ListPlugins lists all Plugins with correspontig commands
-func (pr *PluginRegistry) ListPlugins() []string {
-	stringSlice := []string{"You can execute a command by typing one of the the following commands:"}
-
-	for command := range pr.plugins {
-		if !slices.Contains(pr.invisible, command) {
-			stringSlice = append(stringSlice, command)
-		}
+func (pr *PluginRegistry) ListPlugins() []json.RawMessage {
+	pluginSlice := []Plugin{
+		{Command: "/help", Description: "tells every plugin and their description"},
+		{Command: "/time", Description: "tells you the current time"},
+		{Command: "/users", Description: "tells you information about all the current users"},
+		{Command: "/quit", Description: "loggs you out of the chat"},
 	}
 
-	return stringSlice
-}
+	jsonSlice := []json.RawMessage{}
 
-// TODO Vorschlag
-// /help abstrahieren, sodass man /help für jedes Plugin aufrufen kann
-// dafür Help() Funktion im Interface
+	for _, plugin := range pluginSlice {
+		jsonString, err := json.Marshal(plugin)
+		if err != nil {
+			log.Printf("error parsing plugin %s to json", plugin.Command)
+		}
+		jsonSlice = append(jsonSlice, jsonString)
+	}
+
+	return jsonSlice
+}

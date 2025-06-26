@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -76,14 +77,18 @@ func (s *ChatService) getClient(clientId string) (*Client, error) {
 
 // ListClients returns a string slice containing every client with name
 // and active status
-func (s *ChatService) ListClients() []string {
+func (s *ChatService) ListClients() []json.RawMessage {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	clientsSlice := []string{}
+	clientsSlice := []json.RawMessage{}
 
 	for _, client := range s.clients {
-		clientsSlice = append(clientsSlice, fmt.Sprintf("Name: %s, Active: %t, Id; %s\n", client.Name, client.Active, client.ClientId))
+		jsonString, err := json.Marshal(client)
+		if err != nil {
+			log.Printf("error parsing client %s to json", client.Name)
+		}
+		clientsSlice = append(clientsSlice, jsonString)
 	}
 
 	return clientsSlice
