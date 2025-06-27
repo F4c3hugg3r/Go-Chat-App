@@ -8,11 +8,10 @@ import (
 
 // JSONToTable converts JSON array to formatted table
 func JSONToTable(jsonStr string) (string, error) {
-
 	// Parse generic JSON
 	var data []map[string]interface{}
 	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
-		return "", fmt.Errorf("invalid JSON: %v", err)
+		return "", fmt.Errorf("invalid JSON: %w", err)
 	}
 
 	if len(data) == 0 {
@@ -35,11 +34,13 @@ func JSONToTable(jsonStr string) (string, error) {
 	// Table rows
 	for _, row := range data {
 		values := make([]string, len(headers))
+
 		for i, h := range headers {
 			if val, exists := row[h]; exists {
 				values[i] = fmt.Sprintf("%v", val)
 			}
 		}
+
 		writeRow(&builder, values, widths)
 		builder.WriteString("\n")
 	}
@@ -50,6 +51,7 @@ func JSONToTable(jsonStr string) (string, error) {
 // Helper functions
 func getHeaders(data []map[string]interface{}) []string {
 	headerMap := make(map[string]bool)
+
 	for _, row := range data {
 		for key := range row {
 			headerMap[key] = true
@@ -60,6 +62,7 @@ func getHeaders(data []map[string]interface{}) []string {
 	for key := range headerMap {
 		headers = append(headers, key)
 	}
+
 	return headers
 }
 
@@ -93,6 +96,7 @@ func calculateWidths(data []map[string]interface{}, headers []string) []int {
 
 func writeRow(b *strings.Builder, values []string, widths []int) {
 	b.WriteString("|")
+
 	for i, val := range values {
 		fmt.Fprintf(b, " %-*s |", widths[i]-1, val)
 	}
@@ -100,6 +104,7 @@ func writeRow(b *strings.Builder, values []string, widths []int) {
 
 func writeSeparator(b *strings.Builder, widths []int) {
 	b.WriteString("+")
+
 	for _, w := range widths {
 		b.WriteString(strings.Repeat("-", w))
 		b.WriteString("+")

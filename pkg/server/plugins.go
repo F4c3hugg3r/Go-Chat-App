@@ -25,6 +25,7 @@ func (pp *PrivateMessagePlugin) Execute(message *Message) (Response, error) {
 	if !ok {
 		return Response{Name: "client not available"}, fmt.Errorf("client not available")
 	}
+
 	rsp := Response{fmt.Sprintf("[Private] - %s", message.Name), message.Content}
 
 	select {
@@ -33,6 +34,7 @@ func (pp *PrivateMessagePlugin) Execute(message *Message) (Response, error) {
 
 		client.Active = true
 		client.lastSign = time.Now()
+
 		return rsp, nil
 
 	case <-time.After(500 * time.Millisecond):

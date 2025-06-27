@@ -55,7 +55,9 @@ func (c *Client) PostMessage(url string, cancel context.CancelFunc, input string
 		if err != nil {
 			return fmt.Errorf("%w: client could't be deleted", err)
 		}
+
 		cancel()
+
 		return nil
 	}
 
@@ -142,13 +144,13 @@ func (c *Client) GetMessages(url string, cancel context.CancelFunc) {
 	}
 
 	if strings.HasPrefix(rsp.Content, "[") {
-
 		output, err := JSONToTable(rsp.Content)
 		if err != nil {
 			log.Println("Fehler beim Abrufen ist aufgetreten: ", err)
 
 			return
 		}
+
 		fmt.Fprint(c.writer, output)
 
 		return

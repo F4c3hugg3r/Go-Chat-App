@@ -57,6 +57,7 @@ func (pr *PluginRegistry) ListPlugins() []json.RawMessage {
 		if err != nil {
 			log.Printf("error parsing plugin %s to json", plugin.Command)
 		}
+
 		jsonSlice = append(jsonSlice, jsonString)
 	}
 

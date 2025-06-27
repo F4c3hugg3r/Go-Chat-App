@@ -50,7 +50,11 @@ func interruptListener(interChan chan os.Signal, cancel context.CancelFunc, wg *
 
 	select {
 	case <-interChan:
-		client.PostMessage(url, cancel, "/quit")
+		err := client.PostMessage(url, cancel, "/quit")
+		if err != nil {
+			log.Print(err)
+		}
+
 		cancel()
 	case <-ctx.Done():
 	}

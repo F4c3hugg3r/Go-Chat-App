@@ -88,6 +88,7 @@ func (s *ChatService) ListClients() []json.RawMessage {
 		if err != nil {
 			log.Printf("error parsing client %s to json", client.Name)
 		}
+
 		clientsSlice = append(clientsSlice, jsonString)
 	}
 
