@@ -43,22 +43,24 @@ func (s *ChatService) InactiveClientDeleter(timeLimit time.Duration) {
 }
 
 // echo sends a response to the request submitter
-func (s *ChatService) echo(clientId string, rsp Response) {
+func (s *ChatService) echo(clientId string, rsp Response) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	client, ok := s.clients[clientId]
-	if ok {
-		select {
-		case client.clientCh <- rsp:
-			fmt.Println("success")
-
-			client.Active = true
-			client.lastSign = time.Now()
-		case <-time.After(500 * time.Millisecond):
-			client.Active = false
-		}
+	if !ok {
+		return fmt.Errorf("%w: message couldn't be echoed", ClientNotAvailableError)
 	}
+	select {
+	case client.clientCh <- rsp:
+		fmt.Println("success")
+
+		client.Active = true
+		client.lastSign = time.Now()
+	case <-time.After(500 * time.Millisecond):
+		client.Active = false
+	}
+	return nil
 }
 
 // getClientChannel tests if there is a registered client to the given clientId and returns
@@ -69,7 +71,7 @@ func (s *ChatService) getClient(clientId string) (*Client, error) {
 
 	client, exists := s.clients[clientId]
 	if !exists {
-		return client, fmt.Errorf("there is no client with id: %s registered", clientId)
+		return client, fmt.Errorf("%w: there is no client with id: %s registered", ClientNotAvailableError, clientId)
 	}
 
 	return client, nil

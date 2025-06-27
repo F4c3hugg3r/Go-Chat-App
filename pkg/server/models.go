@@ -1,6 +1,15 @@
 package server
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+var (
+	ClientNotAvailableError error = errors.New("client is not available")
+	NoPermissionError       error = errors.New("you have no permission")
+	EmptyStringError        error = errors.New("the string is empty")
+)
 
 // Client is a communication participant who has a name, unique id and
 // channel to receive messages

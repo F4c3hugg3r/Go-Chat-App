@@ -98,7 +98,13 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 
 	res, err := handler.Plugins.FindAndExecute(&message)
 	if err != nil {
-		handler.Service.echo(clientId, res)
+		errEcho := handler.Service.echo(clientId, res)
+		if errEcho != nil {
+			http.Error(w, errEcho.Error(), http.StatusInternalServerError)
+
+			return
+		}
+
 		http.Error(w, err.Error(), http.StatusBadRequest)
 
 		return

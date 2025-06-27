@@ -72,8 +72,7 @@ func (c *Client) PostMessage(url string, cancel context.CancelFunc, input string
 	json, err := json.Marshal(message)
 
 	if err != nil {
-		fmt.Printf("wrong input: %s", json)
-		return err
+		return fmt.Errorf("%w: error parsing json", err)
 	}
 
 	if input == "/quit" {

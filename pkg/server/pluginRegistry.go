@@ -33,11 +33,12 @@ func RegisterPlugins(chatService *ChatService) *PluginRegistry {
 }
 
 func (pr *PluginRegistry) FindAndExecute(message *Message) (Response, error) {
-	if plugin, ok := pr.plugins[message.Plugin]; ok {
-		return plugin.Execute(message)
+	plugin, ok := pr.plugins[message.Plugin]
+	if !ok {
+		return Response{message.Name, fmt.Sprintf("no such plugin found: %s", message.Plugin)}, fmt.Errorf("no such plugin found: %s", message.Plugin)
 	}
 
-	return Response{message.Name, fmt.Sprintf("no such plugin found: %s", message.Plugin)}, fmt.Errorf("no such plugin found: %s", message.Plugin)
+	return plugin.Execute(message)
 }
 
 // ListPlugins lists all Plugins with correspontig commands
