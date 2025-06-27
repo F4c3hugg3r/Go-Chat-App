@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -171,7 +172,21 @@ func NewUserPlugin(s *ChatService) *UserPlugin {
 }
 
 func (u *UserPlugin) Execute(message *Message) (Response, error) {
-	jsonList, err := json.Marshal(u.chatService.ListClients())
+	u.chatService.mu.RLock()
+	defer u.chatService.mu.RUnlock()
+
+	clientsSlice := []json.RawMessage{}
+
+	for _, client := range u.chatService.clients {
+		jsonString, err := json.Marshal(client)
+		if err != nil {
+			log.Printf("error parsing client %s to json", client.Name)
+		}
+
+		clientsSlice = append(clientsSlice, jsonString)
+	}
+
+	jsonList, err := json.Marshal(clientsSlice)
 	if err != nil {
 		return Response{Name: "error parsing clients to json"}, fmt.Errorf("%w: error parsing clients to json", err)
 	}
