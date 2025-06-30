@@ -41,20 +41,20 @@ func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Re
 
 	client, err := handler.Service.getClient(clientId)
 	if err != nil {
-		http.Error(w, "Client not found ", http.StatusNotFound)
+		http.Error(w, "client not found ", http.StatusNotFound)
 		return
 	}
 
 	select {
 	case rsp, ok := <-client.clientCh:
 		if !ok {
-			http.Error(w, "client already deleted", http.StatusGone)
+			http.Error(w, "you got deleted please register again", http.StatusGone)
 			return
 		}
 
 		json, err := json.Marshal(rsp)
 		if err != nil {
-			http.Error(w, "Error formatting response to json", http.StatusInternalServerError)
+			http.Error(w, "error formatting response to json", http.StatusInternalServerError)
 			return
 		}
 
@@ -139,7 +139,8 @@ func (handler *ServerHandler) AuthMiddleware(next http.HandlerFunc) http.Handler
 			return
 		}
 
-		if client, err := handler.Service.getClient(clientId); err != nil || token != client.authToken {
+		client, err := handler.Service.getClient(clientId)
+		if err != nil || token != client.authToken {
 			http.Error(w, "client does not exist or token doesn't match", http.StatusForbidden)
 			return
 		}

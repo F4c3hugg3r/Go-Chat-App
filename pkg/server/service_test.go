@@ -31,7 +31,14 @@ func TestEcho(t *testing.T) {
 	err := service.echo(clientId, dummyResponse)
 	assert.ErrorIs(t, err, ClientNotAvailableError)
 
-	service.clients[clientId] = dummyClientInactive
+	service.clients[clientId] = &Client{
+		Name:      name,
+		ClientId:  clientId,
+		clientCh:  make(chan Response, 100),
+		Active:    false,
+		authToken: authToken,
+		lastSign:  time.Now().Add(-time.Hour),
+	}
 	err = service.echo(clientId, dummyResponse)
 	assert.Nil(t, err)
 
@@ -46,7 +53,14 @@ func TestEcho(t *testing.T) {
 
 func TestInactiveClientDeleter(t *testing.T) {
 	service := NewChatService(100)
-	service.clients[clientId] = dummyClientInactive
+	service.clients[clientId] = &Client{
+		Name:      name,
+		ClientId:  clientId,
+		clientCh:  make(chan Response, 100),
+		Active:    false,
+		authToken: authToken,
+		lastSign:  time.Now().Add(-time.Hour),
+	}
 	if len(service.clients) != 1 {
 		t.Errorf(("Setup incorrect there should be just 1 client but there is %d"), len(service.clients))
 	}
@@ -62,6 +76,15 @@ func TestGetClient(t *testing.T) {
 	_, err := service.getClient(clientId)
 	if err == nil {
 		t.Error("there should be an error but instead it's nil")
+	}
+
+	dummyClient := &Client{
+		Name:      name,
+		ClientId:  clientId,
+		clientCh:  make(chan Response, 100),
+		Active:    false,
+		authToken: authToken,
+		lastSign:  time.Now().Add(-time.Hour),
 	}
 
 	service.clients[clientId] = dummyClient
