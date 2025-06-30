@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+// ai generated file
+
 // JSONToTable converts JSON array to formatted table
 func JSONToTable(jsonStr string) (string, error) {
 	// Parse generic JSON

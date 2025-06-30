@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"slices"
 )
 
 type PluginInterface interface {
 	// if an error accures, respponse.Content is empty
 	Execute(message *Message) (*Response, error)
+	Description() string
 }
 
 type PluginRegistry struct {
@@ -43,23 +45,17 @@ func (pr *PluginRegistry) FindAndExecute(message *Message) (*Response, error) {
 
 // ListPlugins lists all Plugins with correspontig commands
 func (pr *PluginRegistry) ListPlugins() []json.RawMessage {
-	pluginSlice := []Plugin{
-		{Command: "/help", Description: "tells every plugin and their description"},
-		{Command: "/time", Description: "tells you the current time"},
-		{Command: "/users", Description: "tells you information about all the current users"},
-		{Command: "/private", Description: "lets you send a private message to someone - template: '/private {Id} {message}'"},
-		{Command: "/quit", Description: "loggs you out of the chat"},
-	}
-
 	jsonSlice := []json.RawMessage{}
 
-	for _, plugin := range pluginSlice {
-		jsonString, err := json.Marshal(plugin)
-		if err != nil {
-			log.Printf("error parsing plugin %s to json", plugin.Command)
-		}
+	for command, plugin := range pr.plugins {
+		if !slices.Contains(pr.invisible, command) {
+			jsonString, err := json.Marshal(Plugin{Command: command, Description: plugin.Description()})
+			if err != nil {
+				log.Printf("error parsing plugin %s to json", command)
+			}
 
-		jsonSlice = append(jsonSlice, jsonString)
+			jsonSlice = append(jsonSlice, jsonString)
+		}
 	}
 
 	return jsonSlice

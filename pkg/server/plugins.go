@@ -19,6 +19,10 @@ func NewPrivateMessagePlugin(s *ChatService) *PrivateMessagePlugin {
 	return &PrivateMessagePlugin{chatService: s}
 }
 
+func (pp *PrivateMessagePlugin) Description() string {
+	return "lets you send a private message to someone \n-> template: '/private {Id} {message}'"
+}
+
 func (pp *PrivateMessagePlugin) Execute(message *Message) (*Response, error) {
 	pp.chatService.mu.Lock()
 	defer pp.chatService.mu.Unlock()
@@ -54,6 +58,10 @@ func NewLogOutPlugin(s *ChatService) *LogOutPlugin {
 	return &LogOutPlugin{chatService: s}
 }
 
+func (lp *LogOutPlugin) Description() string {
+	return "loggs you out of the chat"
+}
+
 func (lp *LogOutPlugin) Execute(message *Message) (*Response, error) {
 	lp.chatService.mu.Lock()
 	defer lp.chatService.mu.Unlock()
@@ -78,6 +86,10 @@ type RegisterClientPlugin struct {
 
 func NewRegisterClientPlugin(s *ChatService) *RegisterClientPlugin {
 	return &RegisterClientPlugin{chatService: s}
+}
+
+func (rp *RegisterClientPlugin) Description() string {
+	return "registeres a client"
 }
 
 func (rp *RegisterClientPlugin) Execute(message *Message) (*Response, error) {
@@ -110,6 +122,10 @@ type BroadcastPlugin struct {
 
 func NewBroadcastPlugin(s *ChatService) *BroadcastPlugin {
 	return &BroadcastPlugin{chatService: s}
+}
+
+func (bp *BroadcastPlugin) Description() string {
+	return "distributes a message abroad all clients"
 }
 
 func (bp *BroadcastPlugin) Execute(message *Message) (*Response, error) {
@@ -153,6 +169,10 @@ func NewHelpPlugin(pr *PluginRegistry) *HelpPlugin {
 	return &HelpPlugin{pr: pr}
 }
 
+func (h *HelpPlugin) Description() string {
+	return "tells every plugin and their description"
+}
+
 func (h *HelpPlugin) Execute(message *Message) (*Response, error) {
 	jsonList, err := json.Marshal(h.pr.ListPlugins())
 	if err != nil {
@@ -169,6 +189,10 @@ type UserPlugin struct {
 
 func NewUserPlugin(s *ChatService) *UserPlugin {
 	return &UserPlugin{chatService: s}
+}
+
+func (u *UserPlugin) Description() string {
+	return "tells you information about all the current users"
 }
 
 func (u *UserPlugin) Execute(message *Message) (*Response, error) {
@@ -199,6 +223,10 @@ type TimePlugin struct{}
 
 func NewTimePlugin() *TimePlugin {
 	return &TimePlugin{}
+}
+
+func (t *TimePlugin) Description() string {
+	return "tells you the current time"
 }
 
 func (t *TimePlugin) Execute(message *Message) (*Response, error) {
