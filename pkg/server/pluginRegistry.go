@@ -8,7 +8,7 @@ import (
 
 type PluginInterface interface {
 	// if an error accures, respponse.Content is empty
-	Execute(message *Message) (Response, error)
+	Execute(message *Message) (*Response, error)
 }
 
 type PluginRegistry struct {
@@ -32,10 +32,10 @@ func RegisterPlugins(chatService *ChatService) *PluginRegistry {
 	return &pr
 }
 
-func (pr *PluginRegistry) FindAndExecute(message *Message) (Response, error) {
+func (pr *PluginRegistry) FindAndExecute(message *Message) (*Response, error) {
 	plugin, ok := pr.plugins[message.Plugin]
 	if !ok {
-		return Response{message.Name, fmt.Sprintf("no such plugin found: %s", message.Plugin)}, fmt.Errorf("no such plugin found: %s", message.Plugin)
+		return &Response{message.Name, fmt.Sprintf("no such plugin found: %s", message.Plugin)}, fmt.Errorf("no such plugin found: %s", message.Plugin)
 	}
 
 	return plugin.Execute(message)

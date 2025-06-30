@@ -80,10 +80,10 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-
-	body, err := io.ReadAll(r.Body)
+	bodyMax := http.MaxBytesReader(w, r.Body, 1<<20)
 	defer r.Body.Close()
+
+	body, err := io.ReadAll(bodyMax)
 
 	if err != nil {
 		http.Error(w, "error reading request body", http.StatusInternalServerError)

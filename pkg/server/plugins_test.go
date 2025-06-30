@@ -33,7 +33,7 @@ func TestUserPlugin(t *testing.T) {
 	service.clients[clientId] = &Client{
 		Name:      name,
 		ClientId:  clientId,
-		clientCh:  make(chan Response, 100),
+		clientCh:  make(chan *Response, 100),
 		Active:    false,
 		authToken: authToken,
 		lastSign:  time.Now(),
@@ -41,7 +41,7 @@ func TestUserPlugin(t *testing.T) {
 	service.clients[clientId2] = &Client{
 		Name:      name2,
 		ClientId:  clientId2,
-		clientCh:  make(chan Response, 100),
+		clientCh:  make(chan *Response, 100),
 		Active:    true,
 		authToken: authToken2,
 		lastSign:  time.Now(),
@@ -62,7 +62,7 @@ func TestRegisterPlugin(t *testing.T) {
 	service.clients[clientId] = &Client{
 		Name:      name,
 		ClientId:  clientId,
-		clientCh:  make(chan Response, 100),
+		clientCh:  make(chan *Response, 100),
 		Active:    false,
 		authToken: authToken,
 		lastSign:  time.Now(),
@@ -90,7 +90,7 @@ func TestQuitPlugin(t *testing.T) {
 	service.clients[clientId] = &Client{
 		Name:      name,
 		ClientId:  clientId,
-		clientCh:  make(chan Response, 100),
+		clientCh:  make(chan *Response, 100),
 		Active:    false,
 		authToken: authToken,
 		lastSign:  time.Now(),
@@ -113,7 +113,7 @@ func TestBroadcastPlugin(t *testing.T) {
 	service.clients[clientId] = &Client{
 		Name:      name,
 		ClientId:  clientId,
-		clientCh:  make(chan Response, 100),
+		clientCh:  make(chan *Response, 100),
 		Active:    false,
 		authToken: authToken,
 		lastSign:  time.Now(),
@@ -121,7 +121,7 @@ func TestBroadcastPlugin(t *testing.T) {
 	service.clients[clientId2] = &Client{
 		Name:      name2,
 		ClientId:  clientId2,
-		clientCh:  make(chan Response, 100),
+		clientCh:  make(chan *Response, 100),
 		Active:    true,
 		authToken: authToken2,
 		lastSign:  time.Now(),

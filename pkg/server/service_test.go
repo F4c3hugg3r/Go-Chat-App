@@ -28,18 +28,18 @@ func TestDecodeToMessage(t *testing.T) {
 func TestEcho(t *testing.T) {
 	service := NewChatService(100)
 
-	err := service.echo(clientId, dummyResponse)
+	err := service.echo(clientId, &dummyResponse)
 	assert.ErrorIs(t, err, ClientNotAvailableError)
 
 	service.clients[clientId] = &Client{
 		Name:      name,
 		ClientId:  clientId,
-		clientCh:  make(chan Response, 100),
+		clientCh:  make(chan *Response, 100),
 		Active:    false,
 		authToken: authToken,
 		lastSign:  time.Now().Add(-time.Hour),
 	}
-	err = service.echo(clientId, dummyResponse)
+	err = service.echo(clientId, &dummyResponse)
 	assert.Nil(t, err)
 
 	select {
@@ -56,7 +56,7 @@ func TestInactiveClientDeleter(t *testing.T) {
 	service.clients[clientId] = &Client{
 		Name:      name,
 		ClientId:  clientId,
-		clientCh:  make(chan Response, 100),
+		clientCh:  make(chan *Response, 100),
 		Active:    false,
 		authToken: authToken,
 		lastSign:  time.Now().Add(-time.Hour),
@@ -81,7 +81,7 @@ func TestGetClient(t *testing.T) {
 	dummyClient := &Client{
 		Name:      name,
 		ClientId:  clientId,
-		clientCh:  make(chan Response, 100),
+		clientCh:  make(chan *Response, 100),
 		Active:    false,
 		authToken: authToken,
 		lastSign:  time.Now().Add(-time.Hour),

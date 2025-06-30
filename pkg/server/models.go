@@ -16,7 +16,7 @@ var (
 type Client struct {
 	Name      string
 	ClientId  string
-	clientCh  chan Response
+	clientCh  chan *Response
 	Active    bool
 	authToken string
 	lastSign  time.Time

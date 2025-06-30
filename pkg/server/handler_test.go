@@ -20,7 +20,7 @@ func TestHandleMessages(t *testing.T) {
 	service.clients[clientId] = &Client{
 		Name:      name,
 		ClientId:  clientId,
-		clientCh:  make(chan Response, 100),
+		clientCh:  make(chan *Response, 100),
 		Active:    false,
 		authToken: authToken,
 		lastSign:  time.Now(),
@@ -97,14 +97,14 @@ func TestHandleGetRequest(t *testing.T) {
 	service.clients[clientId] = &Client{
 		Name:      name,
 		ClientId:  clientId,
-		clientCh:  make(chan Response, 100),
+		clientCh:  make(chan *Response, 100),
 		Active:    false,
 		authToken: authToken,
 		lastSign:  time.Now(),
 	}
 
 	for i := 0; i < 3; i++ {
-		service.clients[clientId].clientCh <- dummyResponse
+		service.clients[clientId].clientCh <- &dummyResponse
 		req := httptest.NewRequest(dummyExamples[i].method, "/users/{clientId}/chat", nil)
 		req.SetPathValue("clientId", dummyExamples[i].clientId)
 		rec := httptest.NewRecorder()
@@ -136,7 +136,7 @@ func TestHandleGetRequest(t *testing.T) {
 				}
 			}
 		}
-		service.clients[clientId].clientCh <- dummyResponse
+		service.clients[clientId].clientCh <- &dummyResponse
 		req = httptest.NewRequest("GET", "/users/{clientId}/chat", nil)
 		req.SetPathValue("clientId", clientId2)
 		rec = httptest.NewRecorder()
@@ -161,7 +161,7 @@ func TestAuthMiddleware(t *testing.T) {
 	service.clients[clientId] = &Client{
 		Name:      name,
 		ClientId:  clientId,
-		clientCh:  make(chan Response, 100),
+		clientCh:  make(chan *Response, 100),
 		Active:    false,
 		authToken: authToken,
 		lastSign:  time.Now(),

@@ -32,7 +32,7 @@ func (s *ChatService) InactiveClientDeleter(timeLimit time.Duration) {
 		if !client.Active {
 			fmt.Println("due to inactivity: deleting ", client.Name)
 			select {
-			case client.clientCh <- Response{Name: "inactive"}:
+			case client.clientCh <- &Response{Name: "inactive"}:
 			case <-time.After(500 * time.Millisecond):
 			}
 			close(client.clientCh)
@@ -42,7 +42,7 @@ func (s *ChatService) InactiveClientDeleter(timeLimit time.Duration) {
 }
 
 // echo sends a response to the request submitter
-func (s *ChatService) echo(clientId string, rsp Response) error {
+func (s *ChatService) echo(clientId string, rsp *Response) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
