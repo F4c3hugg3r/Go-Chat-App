@@ -16,7 +16,7 @@ var (
 	dummyClient   = &Client{
 		Name:      name,
 		ClientId:  clientId,
-		clientCh:  make(chan Response),
+		clientCh:  make(chan Response, 100),
 		Active:    false,
 		authToken: authToken,
 		lastSign:  time.Now(),
@@ -24,7 +24,7 @@ var (
 	dummyClient2 = &Client{
 		Name:      name2,
 		ClientId:  clientId2,
-		clientCh:  make(chan Response),
+		clientCh:  make(chan Response, 100),
 		Active:    true,
 		authToken: authToken2,
 		lastSign:  time.Now(),
@@ -32,7 +32,7 @@ var (
 	dummyClientInactive = &Client{
 		Name:      name,
 		ClientId:  clientId,
-		clientCh:  make(chan Response),
+		clientCh:  make(chan Response, 100),
 		Active:    false,
 		authToken: authToken,
 		lastSign:  time.Now().Add(-time.Hour),

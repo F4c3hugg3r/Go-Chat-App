@@ -76,26 +76,6 @@ func (s *ChatService) getClient(clientId string) (*Client, error) {
 	return client, nil
 }
 
-// // ListClients returns a string slice containing every client with name
-// // and active status
-// func (s *ChatService) ListClients() []json.RawMessage {
-// 	s.mu.RLock()
-// 	defer s.mu.RUnlock()
-
-// 	clientsSlice := []json.RawMessage{}
-
-// 	for _, client := range s.clients {
-// 		jsonString, err := json.Marshal(client)
-// 		if err != nil {
-// 			log.Printf("error parsing client %s to json", client.Name)
-// 		}
-
-// 		clientsSlice = append(clientsSlice, jsonString)
-// 	}
-
-// 	return clientsSlice
-// }
-
 // DecodeToMessage decodes a responseBody to a Message struct
 func DecodeToMessage(body []byte) (Message, error) {
 	message := Message{}

@@ -1,9 +1,48 @@
 package server
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
+
+func TestDecodeToMessage(t *testing.T) {
+	fakeBody := []byte("fake")
+	_, err := DecodeToMessage(fakeBody)
+	assert.Error(t, err)
+
+	message := Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/broadcast"}
+
+	jsonMessage, err := json.Marshal(&message)
+	if err != nil {
+		t.Errorf("%v: Message couldn't be parsed to json", err)
+	}
+
+	resultMessage, err := DecodeToMessage(jsonMessage)
+	assert.Nil(t, err)
+	assert.Equal(t, resultMessage, message)
+}
+
+func TestEcho(t *testing.T) {
+	service := NewChatService(100)
+
+	err := service.echo(clientId, dummyResponse)
+	assert.ErrorIs(t, err, ClientNotAvailableError)
+
+	service.clients[clientId] = dummyClientInactive
+	err = service.echo(clientId, dummyResponse)
+	assert.Nil(t, err)
+
+	select {
+	case <-service.clients[clientId].clientCh:
+		assert.True(t, service.clients[clientId].Active)
+	case <-time.After(500 * time.Millisecond):
+		t.Errorf("client should receive a message")
+	}
+
+}
 
 func TestInactiveClientDeleter(t *testing.T) {
 	service := NewChatService(100)
