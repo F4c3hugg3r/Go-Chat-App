@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// läuft noch nicht weil Message ohne Plugin übergeben wird
 func TestHandleMessages(t *testing.T) {
 	service := NewChatService(100)
 	plugin := RegisterPlugins(service)

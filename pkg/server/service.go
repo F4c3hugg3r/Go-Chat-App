@@ -16,7 +16,10 @@ type ChatService struct {
 }
 
 func NewChatService(maxUsers int) *ChatService {
-	return &ChatService{clients: make(map[string]*Client), maxUsers: maxUsers}
+	return &ChatService{
+		clients:  make(map[string]*Client),
+		maxUsers: maxUsers,
+	}
 }
 
 // InactiveClientDeleter searches for inactive clients and deletes them as well as closes their message-channel
@@ -50,21 +53,12 @@ func (s *ChatService) echo(clientId string, rsp *Response) error {
 	if !ok {
 		return fmt.Errorf("%w: message couldn't be echoed", ClientNotAvailableError)
 	}
-	select {
-	case client.clientCh <- rsp:
-		fmt.Println("success")
-
-		client.Active = true
-		client.lastSign = time.Now()
-	case <-time.After(500 * time.Millisecond):
-		client.Active = false
-	}
-	return nil
+	return client.Send(rsp)
 }
 
-// getClientChannel tests if there is a registered client to the given clientId and returns
+// GetClientChannel tests if there is a registered client to the given clientId and returns
 // it's channel and name
-func (s *ChatService) getClient(clientId string) (*Client, error) {
+func (s *ChatService) GetClient(clientId string) (*Client, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

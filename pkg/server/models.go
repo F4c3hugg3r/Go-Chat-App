@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"sync"
 	"time"
 )
 
@@ -9,6 +10,8 @@ var (
 	ClientNotAvailableError error = errors.New("client is not available")
 	NoPermissionError       error = errors.New("you have no permission")
 	EmptyStringError        error = errors.New("the string is empty")
+	TimeoutReachedError     error = errors.New("timeout was reached")
+	ChannelClosedError      error = errors.New("access")
 )
 
 // Client is a communication participant who has a name, unique id and
@@ -20,6 +23,8 @@ type Client struct {
 	Active    bool
 	authToken string
 	lastSign  time.Time
+	mu        sync.RWMutex
+	chClosed  bool
 }
 
 // Message contains the name of the requester and the message (content) itsself

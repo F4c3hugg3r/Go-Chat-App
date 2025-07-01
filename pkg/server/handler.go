@@ -39,34 +39,34 @@ func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	client, err := handler.Service.getClient(clientId)
+	client, err := handler.Service.GetClient(clientId)
 	if err != nil {
 		http.Error(w, "client not found ", http.StatusNotFound)
 		return
 	}
 
-	select {
-	case rsp, ok := <-client.clientCh:
-		if !ok {
-			http.Error(w, "you got deleted please register again", http.StatusGone)
-			return
-		}
+	client.updateLastSign()
 
-		json, err := json.Marshal(rsp)
-		if err != nil {
-			http.Error(w, "error formatting response to json", http.StatusInternalServerError)
-			return
-		}
-
-		_, err = w.Write(json)
-		if err != nil {
-			http.Error(w, "couldn't write response", http.StatusInternalServerError)
-		}
-
+	rsp, err := client.Receive(ctx)
+	if err == ChannelClosedError {
+		http.Error(w, err.Error(), http.StatusGone)
 		return
-	case <-ctx.Done():
+	}
+
+	if err == TimeoutReachedError {
 		fmt.Fprintf(w, "\033[1A\033[K")
 		return
+	}
+
+	json, err := json.Marshal(rsp)
+	if err != nil {
+		http.Error(w, "error formatting response to json", http.StatusInternalServerError)
+		return
+	}
+
+	_, err = w.Write(json)
+	if err != nil {
+		http.Error(w, "couldn't write response", http.StatusInternalServerError)
 	}
 }
 
@@ -98,13 +98,6 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 
 	res, err := handler.Plugins.FindAndExecute(&message)
 	if err != nil {
-		errEcho := handler.Service.echo(clientId, res)
-		if errEcho != nil {
-			http.Error(w, errEcho.Error(), http.StatusInternalServerError)
-
-			return
-		}
-
 		http.Error(w, err.Error(), http.StatusBadRequest)
 
 		return
@@ -124,7 +117,10 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	handler.Service.echo(clientId, res)
+	err = handler.Service.echo(clientId, res)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusRequestTimeout)
+	}
 }
 
 // authMiddleware checks if the authToken is fitting the token given while registry and throws
@@ -139,7 +135,7 @@ func (handler *ServerHandler) AuthMiddleware(next http.HandlerFunc) http.Handler
 			return
 		}
 
-		client, err := handler.Service.getClient(clientId)
+		client, err := handler.Service.GetClient(clientId)
 		if err != nil || token != client.authToken {
 			http.Error(w, "client does not exist or token doesn't match", http.StatusForbidden)
 			return

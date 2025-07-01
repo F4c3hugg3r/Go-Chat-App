@@ -32,21 +32,14 @@ func (pp *PrivateMessagePlugin) Execute(message *Message) (*Response, error) {
 		return nil, fmt.Errorf("%w: client with id: %s not found", ClientNotAvailableError, message.ClientId)
 	}
 
-	rsp := Response{fmt.Sprintf("[Private] - %s", message.Name), message.Content}
+	rsp := &Response{fmt.Sprintf("[Private] - %s", message.Name), message.Content}
 
-	select {
-	case client.clientCh <- &rsp:
-		fmt.Printf("successfully sent to %s ", client.Name)
-
-		client.Active = true
-		client.lastSign = time.Now()
-
-		return &rsp, nil
-
-	case <-time.After(500 * time.Millisecond):
-		client.Active = false
-		return nil, fmt.Errorf("%w: private message couldn't be delivered in time", ClientNotAvailableError)
+	err := client.Send(rsp)
+	if err != nil {
+		return nil, err
 	}
+
+	return rsp, nil
 }
 
 // LogOutPlugin logs out a client by deleting it out of the clients map
@@ -71,8 +64,8 @@ func (lp *LogOutPlugin) Execute(message *Message) (*Response, error) {
 		return nil, fmt.Errorf("%w: client (probably) already deleted", ClientNotAvailableError)
 	}
 
-	fmt.Println("logged out ", client.Name)
-	close(client.clientCh)
+	fmt.Println("\nlogged out ", client.Name)
+	client.closeCh()
 	delete(lp.chatService.clients, message.ClientId)
 
 	return &Response{Name: message.Name, Content: "logged out"}, nil
@@ -107,7 +100,15 @@ func (rp *RegisterClientPlugin) Execute(message *Message) (*Response, error) {
 
 	clientCh := make(chan *Response, 100)
 	token := shared.GenerateSecureToken(64)
-	rp.chatService.clients[message.ClientId] = &Client{message.Content, message.ClientId, clientCh, true, token, time.Now()}
+	rp.chatService.clients[message.ClientId] = &Client{
+		Name:      message.Content,
+		ClientId:  message.ClientId,
+		clientCh:  clientCh,
+		Active:    true,
+		authToken: token,
+		lastSign:  time.Now(),
+		chClosed:  false,
+	}
 
 	fmt.Printf("\nNew client '%s' registered.\n", message.Content)
 
@@ -144,15 +145,9 @@ func (bp *BroadcastPlugin) Execute(message *Message) (*Response, error) {
 
 	for _, client := range bp.chatService.clients {
 		if client.ClientId != message.ClientId {
-			select {
-			case client.clientCh <- rsp:
-				fmt.Println("success")
-
-				client.Active = true
-				client.lastSign = time.Now()
-
-			case <-time.After(500 * time.Millisecond):
-				client.Active = false
+			err := client.Send(rsp)
+			if err != nil {
+				log.Printf("\n%v: %s -> %s", err, message.Name, client.Name)
 			}
 		}
 	}
