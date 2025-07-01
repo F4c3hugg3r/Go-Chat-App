@@ -31,7 +31,7 @@ func (s *ChatService) InactiveClientDeleter(timeLimit time.Duration) {
 
 		if client.IsIdle(timeLimit) {
 			client.closeCh()
-			s.deleteClient(clientId)
+			delete(s.clients, clientId)
 		}
 	}
 }
@@ -73,12 +73,4 @@ func DecodeToMessage(body []byte) (Message, error) {
 	}
 
 	return message, nil
-}
-
-// deleteClient safely deletes a client from the clients map
-func (s *ChatService) deleteClient(clientId string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	delete(s.clients, clientId)
 }
