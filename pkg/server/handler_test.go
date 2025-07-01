@@ -22,7 +22,7 @@ func TestHandleMessages(t *testing.T) {
 		clientCh:  make(chan *Response, 100),
 		Active:    false,
 		authToken: authToken,
-		lastSign:  time.Now(),
+		lastSign:  time.Now().UTC(),
 	}
 
 	for i := 1; i < 6; i++ {
@@ -99,7 +99,7 @@ func TestHandleGetRequest(t *testing.T) {
 		clientCh:  make(chan *Response, 100),
 		Active:    false,
 		authToken: authToken,
-		lastSign:  time.Now(),
+		lastSign:  time.Now().UTC(),
 	}
 
 	for i := 0; i < 3; i++ {
@@ -163,7 +163,7 @@ func TestAuthMiddleware(t *testing.T) {
 		clientCh:  make(chan *Response, 100),
 		Active:    false,
 		authToken: authToken,
-		lastSign:  time.Now(),
+		lastSign:  time.Now().UTC(),
 	}
 
 	for i := 2; i < 9; i++ {

@@ -24,22 +24,14 @@ func NewChatService(maxUsers int) *ChatService {
 
 // InactiveClientDeleter searches for inactive clients and deletes them as well as closes their message-channel
 func (s *ChatService) InactiveClientDeleter(timeLimit time.Duration) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	for clientId, client := range s.clients {
-		if time.Since(client.lastSign) >= timeLimit {
-			client.Active = false
-		}
 
-		if !client.Active {
-			fmt.Println("due to inactivity: deleting ", client.Name)
-			select {
-			case client.clientCh <- &Response{Name: "inactive"}:
-			case <-time.After(500 * time.Millisecond):
-			}
-			close(client.clientCh)
-			delete(s.clients, clientId)
+		if client.IsIdle(timeLimit) {
+			client.closeCh()
+			s.deleteClient(clientId)
 		}
 	}
 }
@@ -81,4 +73,12 @@ func DecodeToMessage(body []byte) (Message, error) {
 	}
 
 	return message, nil
+}
+
+// deleteClient safely deletes a client from the clients map
+func (s *ChatService) deleteClient(clientId string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.clients, clientId)
 }

@@ -106,7 +106,7 @@ func (rp *RegisterClientPlugin) Execute(message *Message) (*Response, error) {
 		clientCh:  clientCh,
 		Active:    true,
 		authToken: token,
-		lastSign:  time.Now(),
+		lastSign:  time.Now().UTC(),
 		chClosed:  false,
 	}
 
@@ -225,5 +225,5 @@ func (t *TimePlugin) Description() string {
 }
 
 func (t *TimePlugin) Execute(message *Message) (*Response, error) {
-	return &Response{"Time", time.Now().String()}, nil
+	return &Response{"Time", time.Now().UTC().String()}, nil
 }

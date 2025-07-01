@@ -25,31 +25,30 @@ func TestDecodeToMessage(t *testing.T) {
 	assert.Equal(t, resultMessage, message)
 }
 
-// func TestEcho(t *testing.T) {
-// 	service := NewChatService(100)
+func TestEcho(t *testing.T) {
+	service := NewChatService(100)
 
-// 	err := service.echo(clientId, &dummyResponse)
-// 	assert.ErrorIs(t, err, ClientNotAvailableError)
+	err := service.echo(clientId, &dummyResponse)
+	assert.ErrorIs(t, err, ClientNotAvailableError)
 
-// 	service.clients[clientId] = &Client{
-// 		Name:      name,
-// 		ClientId:  clientId,
-// 		clientCh:  make(chan *Response, 100),
-// 		Active:    false,
-// 		authToken: authToken,
-// 		lastSign:  time.Now().Add(-time.Hour),
-// 	}
-// 	err = service.echo(clientId, &dummyResponse)
-// 	assert.Nil(t, err)
+	service.clients[clientId] = &Client{
+		Name:      name,
+		ClientId:  clientId,
+		clientCh:  make(chan *Response, 100),
+		Active:    false,
+		authToken: authToken,
+		lastSign:  time.Now().UTC().Add(-time.Hour),
+	}
+	err = service.echo(clientId, &dummyResponse)
+	assert.Nil(t, err)
 
-// 	select {
-// 	case <-service.clients[clientId].clientCh:
-// 		assert.True(t, service.clients[clientId].Active)
-// 	case <-time.After(500 * time.Millisecond):
-// 		t.Errorf("client should receive a message")
-// 	}
+	select {
+	case <-service.clients[clientId].clientCh:
+	default:
+		t.Errorf("client should receive a message")
+	}
 
-// }
+}
 
 func TestInactiveClientDeleter(t *testing.T) {
 	service := NewChatService(100)
@@ -59,7 +58,7 @@ func TestInactiveClientDeleter(t *testing.T) {
 		clientCh:  make(chan *Response, 100),
 		Active:    false,
 		authToken: authToken,
-		lastSign:  time.Now().Add(-time.Hour),
+		lastSign:  time.Now().UTC().Add(-time.Hour),
 	}
 	if len(service.clients) != 1 {
 		t.Errorf(("Setup incorrect there should be just 1 client but there is %d"), len(service.clients))
@@ -84,7 +83,7 @@ func TestGetClient(t *testing.T) {
 		clientCh:  make(chan *Response, 100),
 		Active:    false,
 		authToken: authToken,
-		lastSign:  time.Now().Add(-time.Hour),
+		lastSign:  time.Now().UTC().Add(-time.Hour),
 	}
 
 	service.clients[clientId] = dummyClient

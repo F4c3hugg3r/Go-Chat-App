@@ -31,7 +31,7 @@ func TestUserPlugin(t *testing.T) {
 		clientCh:  make(chan *Response, 100),
 		Active:    false,
 		authToken: authToken,
-		lastSign:  time.Now(),
+		lastSign:  time.Now().UTC(),
 	}
 	service.clients[clientId2] = &Client{
 		Name:      name2,
@@ -39,7 +39,7 @@ func TestUserPlugin(t *testing.T) {
 		clientCh:  make(chan *Response, 100),
 		Active:    true,
 		authToken: authToken2,
-		lastSign:  time.Now(),
+		lastSign:  time.Now().UTC(),
 	}
 
 	rsp, err = registry.FindAndExecute(message)
@@ -60,7 +60,7 @@ func TestRegisterPlugin(t *testing.T) {
 		clientCh:  make(chan *Response, 100),
 		Active:    false,
 		authToken: authToken,
-		lastSign:  time.Now(),
+		lastSign:  time.Now().UTC(),
 	}
 
 	_, err := registry.FindAndExecute(message)
@@ -88,7 +88,7 @@ func TestQuitPlugin(t *testing.T) {
 		clientCh:  make(chan *Response, 100),
 		Active:    false,
 		authToken: authToken,
-		lastSign:  time.Now(),
+		lastSign:  time.Now().UTC(),
 	}
 
 	rsp, err := registry.FindAndExecute(message)
@@ -111,7 +111,7 @@ func TestBroadcastPlugin(t *testing.T) {
 		clientCh:  make(chan *Response, 100),
 		Active:    false,
 		authToken: authToken,
-		lastSign:  time.Now(),
+		lastSign:  time.Now().UTC(),
 	}
 	service.clients[clientId2] = &Client{
 		Name:      name2,
@@ -119,7 +119,7 @@ func TestBroadcastPlugin(t *testing.T) {
 		clientCh:  make(chan *Response, 100),
 		Active:    true,
 		authToken: authToken2,
-		lastSign:  time.Now(),
+		lastSign:  time.Now().UTC(),
 	}
 
 	go registry.FindAndExecute(message)

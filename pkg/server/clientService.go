@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// Receive receives responses from the clientCh
 func (c *Client) Receive(ctx context.Context) (*Response, error) {
 	c.setActive(true)
 	defer c.setActive(false)
@@ -25,6 +26,7 @@ func (c *Client) Receive(ctx context.Context) (*Response, error) {
 	}
 }
 
+// Send sends a response to the clientCh
 func (c *Client) Send(rsp *Response) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -62,4 +64,15 @@ func (c *Client) closeCh() {
 
 	c.chClosed = true
 	close(c.clientCh)
+}
+
+// IsIdle checks if the client is inactive
+func (c *Client) IsIdle(timeLimit time.Duration) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if !c.Active && time.Since(c.lastSign) >= timeLimit {
+		return true
+	}
+	return false
 }
