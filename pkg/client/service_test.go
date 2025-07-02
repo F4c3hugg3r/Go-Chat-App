@@ -224,27 +224,55 @@ func TestClient_extractInputToMessage(t *testing.T) {
 	}
 
 	type args struct {
-		input  *Message
-		output *Message
+		input        string
+		outputPlugin string
+		specialParam string
 	}
 	tests := []struct {
 		name string
 		args args
 	}{
 		{
-			name: "fine",
+			name: "/broadcast",
 			args: args{
-				//TODO
+				input:        "Hi",
+				outputPlugin: "/broadcast",
+			},
+		},
+		{
+			name: "any other plugin",
+			args: args{
+				input:        "/help\n",
+				outputPlugin: "/help",
+			},
+		},
+		{
+			name: "with spaces",
+			args: args{
+				input:        "/users     ",
+				outputPlugin: "/users",
+			},
+		},
+		{
+			name: "private",
+			args: args{
+				input:        "/private ABCDEFGHIJ",
+				outputPlugin: "/private",
+				specialParam: "ABCDEFGHIJ",
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			input, err := json.Marshal(tt.args.input)
-			assert.Nil(t, err)
 
-			message := c.extractInputToMessage(string(input))
-			assert.Equal(t, tt.args.output, message)
+			message := c.extractInputToMessage(tt.args.input)
+			assert.Equal(t, tt.args.outputPlugin, message.Plugin)
+
+			switch tt.args.outputPlugin {
+			case "/private":
+				assert.Equal(t, tt.args.specialParam, message.ClientId)
+			default:
+			}
 		})
 	}
 }
