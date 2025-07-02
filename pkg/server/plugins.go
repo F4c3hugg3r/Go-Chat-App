@@ -29,7 +29,7 @@ func (pp *PrivateMessagePlugin) Execute(message *Message) (*Response, error) {
 
 	client, ok := pp.chatService.clients[message.ClientId]
 	if !ok {
-		return nil, fmt.Errorf("%w: client with id: %s not found", ClientNotAvailableError, message.ClientId)
+		return nil, fmt.Errorf("%w: client with id: %s not found", ErrClientNotAvailable, message.ClientId)
 	}
 
 	rsp := &Response{fmt.Sprintf("[Private] - %s", message.Name), message.Content}
@@ -61,7 +61,7 @@ func (lp *LogOutPlugin) Execute(message *Message) (*Response, error) {
 
 	client, ok := lp.chatService.clients[message.ClientId]
 	if !ok {
-		return nil, fmt.Errorf("%w: client (probably) already deleted", ClientNotAvailableError)
+		return nil, fmt.Errorf("%w: client (probably) already deleted", ErrClientNotAvailable)
 	}
 
 	fmt.Println("\nlogged out ", client.Name)
@@ -91,11 +91,11 @@ func (rp *RegisterClientPlugin) Execute(message *Message) (*Response, error) {
 
 	if len(rp.chatService.clients) >= rp.chatService.maxUsers {
 		return nil,
-			fmt.Errorf("%w: usercap %d reached, try again later. users:%d", NoPermissionError, rp.chatService.maxUsers, len(rp.chatService.clients))
+			fmt.Errorf("%w: usercap %d reached, try again later. users:%d", ErrNoPermission, rp.chatService.maxUsers, len(rp.chatService.clients))
 	}
 
 	if _, exists := rp.chatService.clients[message.ClientId]; exists {
-		return nil, fmt.Errorf("%w: client already defined", NoPermissionError)
+		return nil, fmt.Errorf("%w: client already defined", ErrNoPermission)
 	}
 
 	clientCh := make(chan *Response, 100)
@@ -134,11 +134,11 @@ func (bp *BroadcastPlugin) Execute(message *Message) (*Response, error) {
 	defer bp.chatService.mu.Unlock()
 
 	if strings.TrimSpace(message.Content) == "" {
-		return nil, fmt.Errorf("%w: no empty messages allowed", EmptyStringError)
+		return nil, fmt.Errorf("%w: no empty messages allowed", ErrEmptyString)
 	}
 
 	if len(bp.chatService.clients) <= 0 {
-		return nil, fmt.Errorf("%w: There are no clients registered", ClientNotAvailableError)
+		return nil, fmt.Errorf("%w: There are no clients registered", ErrClientNotAvailable)
 	}
 
 	rsp := &Response{Name: message.Name, Content: message.Content}

@@ -19,6 +19,7 @@ func (c *Client) GetRequest(url string) (*http.Response, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: Fehler beim senden der GET request: ", err)
 	}
+
 	return res, nil
 }
 
@@ -30,7 +31,6 @@ func (c *Client) DeleteRequest(url string, body []byte) (*http.Response, error) 
 	req, err := http.NewRequest("DELETE", parameteredUrl, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("%w: Fehler beim Erstellen der DELETE req", err)
-
 	}
 
 	req.Header.Add("Authorization", c.authToken)
@@ -58,7 +58,6 @@ func (c *Client) PostRequest(url string, body []byte) (*http.Response, error) {
 	res, err := c.HttpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("%w: Fehler beim Absenden der Nachricht", err)
-
 	}
 
 	return res, nil

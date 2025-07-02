@@ -16,13 +16,13 @@ func (c *Client) Receive(ctx context.Context) (*Response, error) {
 	select {
 	case rsp, ok := <-c.clientCh:
 		if !ok {
-			return nil, fmt.Errorf("%w: your channel was deleted, please register again", ChannelClosedError)
+			return nil, fmt.Errorf("%w: your channel was deleted, please register again", ErrChannelClosed)
 		}
 
 		return rsp, nil
 
 	case <-ctx.Done():
-		return nil, fmt.Errorf("%w: get request timed out", TimeoutReachedError)
+		return nil, fmt.Errorf("%w: get request timed out", ErrTimeoutReached)
 	}
 }
 
@@ -32,7 +32,7 @@ func (c *Client) Send(rsp *Response) error {
 	defer c.mu.Unlock()
 
 	if c.chClosed {
-		return fmt.Errorf("%w: your channel was deleted, please register again", ChannelClosedError)
+		return fmt.Errorf("%w: your channel was deleted, please register again", ErrChannelClosed)
 	}
 
 	select {
@@ -40,7 +40,7 @@ func (c *Client) Send(rsp *Response) error {
 		fmt.Printf("\n%s -> %s", rsp.Name, c.Name)
 		return nil
 	default:
-		return fmt.Errorf("%w: response couldn't be sent, try again", TimeoutReachedError)
+		return fmt.Errorf("%w: response couldn't be sent, try again", ErrTimeoutReached)
 	}
 }
 
@@ -74,5 +74,6 @@ func (c *Client) IsIdle(timeLimit time.Duration) bool {
 	if !c.Active && time.Since(c.lastSign) >= timeLimit {
 		return true
 	}
+
 	return false
 }

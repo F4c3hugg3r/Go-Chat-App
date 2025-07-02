@@ -38,7 +38,7 @@ func TestReceive(t *testing.T) {
 	cancel()
 	wg.Wait()
 	assert.Nil(t, rsp)
-	assert.ErrorIs(t, err, TimeoutReachedError)
+	assert.ErrorIs(t, err, ErrTimeoutReached)
 }
 
 func TestSend(t *testing.T) {
@@ -53,7 +53,7 @@ func TestSend(t *testing.T) {
 	}
 
 	err := clientInactive.Send(&dummyResponse)
-	assert.ErrorIs(t, err, ChannelClosedError)
+	assert.ErrorIs(t, err, ErrChannelClosed)
 
 	clientActive := Client{
 		Name:      name,

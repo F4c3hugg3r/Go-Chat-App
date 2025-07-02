@@ -7,11 +7,11 @@ import (
 )
 
 var (
-	ClientNotAvailableError error = errors.New("client is not available")
-	NoPermissionError       error = errors.New("you have no permission")
-	EmptyStringError        error = errors.New("the string is empty")
-	TimeoutReachedError     error = errors.New("timeout was reached")
-	ChannelClosedError      error = errors.New("access")
+	ErrClientNotAvailable error = errors.New("client is not available")
+	ErrNoPermission       error = errors.New("you have no permission")
+	ErrEmptyString        error = errors.New("the string is empty")
+	ErrTimeoutReached     error = errors.New("timeout was reached")
+	ErrChannelClosed      error = errors.New("access")
 )
 
 // Client is a communication participant who has a name, unique id and

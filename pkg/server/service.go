@@ -28,7 +28,6 @@ func (s *ChatService) InactiveClientDeleter(timeLimit time.Duration) {
 	defer s.mu.RUnlock()
 
 	for clientId, client := range s.clients {
-
 		if client.IsIdle(timeLimit) {
 			client.closeCh()
 			delete(s.clients, clientId)
@@ -43,8 +42,9 @@ func (s *ChatService) echo(clientId string, rsp *Response) error {
 
 	client, ok := s.clients[clientId]
 	if !ok {
-		return fmt.Errorf("%w: message couldn't be echoed", ClientNotAvailableError)
+		return fmt.Errorf("%w: message couldn't be echoed", ErrClientNotAvailable)
 	}
+
 	return client.Send(rsp)
 }
 
@@ -56,7 +56,7 @@ func (s *ChatService) GetClient(clientId string) (*Client, error) {
 
 	client, exists := s.clients[clientId]
 	if !exists {
-		return client, fmt.Errorf("%w: there is no client with id: %s registered", ClientNotAvailableError, clientId)
+		return client, fmt.Errorf("%w: there is no client with id: %s registered", ErrClientNotAvailable, clientId)
 	}
 
 	return client, nil

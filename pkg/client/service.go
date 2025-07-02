@@ -120,6 +120,7 @@ func (c *Client) ReceiveMessages(url string, cancel context.CancelFunc) {
 	if strings.TrimSpace(rsp.Content) == "" {
 		return
 	}
+
 	if err != nil {
 		log.Printf("%v: Fehler beim decodieren der response aufgetreten", err)
 		return
@@ -175,13 +176,11 @@ func (c *Client) Register(url string) error {
 	resp, err := c.HttpClient.Post(parameteredUrl, "application/json", bytes.NewReader(json))
 	if err != nil {
 		return fmt.Errorf("%w: Die Registrierung hat nicht funktioniert, versuch es nochmal mit anderen Daten", err)
-
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("%w: Fehler beim Lesen des Bodies ist aufgetreten: ", err)
-
 	}
 	defer resp.Body.Close()
 

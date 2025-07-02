@@ -64,7 +64,7 @@ func TestRegisterPlugin(t *testing.T) {
 	}
 
 	_, err := registry.FindAndExecute(message)
-	assert.Error(t, err, NoPermissionError)
+	assert.Error(t, err, ErrNoPermission)
 
 	delete(service.clients, clientId)
 
@@ -80,7 +80,7 @@ func TestQuitPlugin(t *testing.T) {
 	registry := RegisterPlugins(service)
 
 	_, err := registry.FindAndExecute(message)
-	assert.Error(t, err, ClientNotAvailableError)
+	assert.Error(t, err, ErrClientNotAvailable)
 
 	service.clients[clientId] = &Client{
 		Name:      name,
@@ -103,7 +103,7 @@ func TestBroadcastPlugin(t *testing.T) {
 	message := &Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/broadcast"}
 
 	_, err := registry.FindAndExecute(message)
-	assert.ErrorIs(t, err, ClientNotAvailableError)
+	assert.ErrorIs(t, err, ErrClientNotAvailable)
 
 	service.clients[clientId] = &Client{
 		Name:      name,
@@ -135,5 +135,5 @@ func TestBroadcastPlugin(t *testing.T) {
 	}
 
 	_, err = registry.FindAndExecute(&Message{Name: "Arndt", Content: "", Plugin: "/broadcast"})
-	assert.ErrorIs(t, err, EmptyStringError)
+	assert.ErrorIs(t, err, ErrEmptyString)
 }

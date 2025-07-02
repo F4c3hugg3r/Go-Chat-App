@@ -3,11 +3,14 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 )
+
+const authTokenString = "authToken"
 
 type ServerHandler struct {
 	Service *ChatService
@@ -48,12 +51,12 @@ func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Re
 	client.updateLastSign()
 
 	rsp, err := client.Receive(ctx)
-	if err == ChannelClosedError {
+	if errors.Is(err, ErrChannelClosed) {
 		http.Error(w, err.Error(), http.StatusGone)
 		return
 	}
 
-	if err == TimeoutReachedError {
+	if errors.Is(err, ErrTimeoutReached) {
 		fmt.Fprintf(w, "\033[1A\033[K")
 		return
 	}
@@ -103,7 +106,7 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if res.Name == "authToken" {
+	if res.Name == authTokenString {
 		body, err = json.Marshal(res)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)

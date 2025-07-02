@@ -29,7 +29,7 @@ func TestEcho(t *testing.T) {
 	service := NewChatService(100)
 
 	err := service.echo(clientId, &dummyResponse)
-	assert.ErrorIs(t, err, ClientNotAvailableError)
+	assert.ErrorIs(t, err, ErrClientNotAvailable)
 
 	service.clients[clientId] = &Client{
 		Name:      name,
