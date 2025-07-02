@@ -1,15 +1,18 @@
 package client
 
 import (
-	"bufio"
 	"io"
 	"net/http"
 )
 
+type Reader interface {
+	ReadString(delim byte) (string, error)
+}
+
 type Client struct {
 	clientName string
 	clientId   string
-	reader     *bufio.Reader
+	reader     Reader
 	writer     io.Writer
 	authToken  string
 	HttpClient *http.Client

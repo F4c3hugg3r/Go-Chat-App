@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -54,52 +56,228 @@ func TestRegister(t *testing.T) {
 	assert.Equal(t, clientService.authToken, authToken)
 }
 
-func TestGetMessages(t *testing.T) {
-	clientService := &Client{
-		clientId:   clientId,
-		authToken:  authToken,
-		reader:     bufio.NewReader(os.Stdin),
-		writer:     io.Writer(os.Stdout),
-		HttpClient: &http.Client{},
+func TestClient_ReceiveMessages(t *testing.T) {
+	type fields struct {
+		clientName string
+		clientId   string
+		reader     *bufio.Reader
+		writer     io.Writer
+		authToken  string
+		HttpClient *http.Client
 	}
+	type args struct {
+		rsp    *Response
+		log    string
+		stdOut string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+	}{
+		{
+			name: "fine",
+			fields: fields{
+				clientName: name,
+				clientId:   clientId,
+				authToken:  authToken,
+				reader:     bufio.NewReader(os.Stdin),
+				writer:     &bytes.Buffer{},
+				HttpClient: &http.Client{},
+			},
+			args: args{
+				rsp:    &Response{Name: "Max", Content: "wubbalubbadubdub"},
+				stdOut: "Max: wubbalubbadubdub\n",
+				log:    "",
+			},
+		},
+		{
+			name: "inactive",
+			fields: fields{
+				clientName: name,
+				clientId:   clientId,
+				authToken:  authToken,
+				reader:     bufio.NewReader(os.Stdin),
+				writer:     &bytes.Buffer{},
+				HttpClient: &http.Client{},
+			},
+			args: args{
+				rsp:    &Response{Name: "inactive", Content: "wubbalubbadubdub"},
+				stdOut: "",
+				log:    "inactivity",
+			},
+		},
+		{
+			name: "content empty",
+			fields: fields{
+				clientName: name,
+				clientId:   clientId,
+				authToken:  authToken,
+				reader:     bufio.NewReader(os.Stdin),
+				writer:     &bytes.Buffer{},
+				HttpClient: &http.Client{},
+			},
+			args: args{
+				rsp:    &Response{Name: "Max", Content: ""},
+				stdOut: "",
+				log:    "",
+			},
+		},
+		{
+			name: "table",
+			fields: fields{
+				clientName: name,
+				clientId:   clientId,
+				authToken:  authToken,
+				reader:     bufio.NewReader(os.Stdin),
+				writer:     &bytes.Buffer{},
+				HttpClient: &http.Client{},
+			},
+			args: args{
+				rsp:    &Response{Name: "Max", Content: "[{}]"},
+				stdOut: "|\n+\n|\n",
+				log:    "",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Client{
+				clientName: tt.fields.clientName,
+				clientId:   tt.fields.clientId,
+				reader:     tt.fields.reader,
+				writer:     tt.fields.writer,
+				authToken:  tt.fields.authToken,
+				HttpClient: tt.fields.HttpClient,
+			}
 
-	_, cancel := context.WithCancel(context.Background())
+			var output bytes.Buffer
+			c.writer = &output
 
-	rsp := Response{Name: "Max", Content: "wubbalubbadubdub"}
-	jsonRsp, _ := json.Marshal(rsp)
+			var logOutput bytes.Buffer
+			log.SetOutput(&logOutput)
+			defer log.SetOutput(os.Stderr)
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(time.Second)
-		w.Write(jsonRsp)
-	}))
-	defer ts.Close()
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				jsonRsp, _ := json.Marshal(tt.args.rsp)
+				w.Write(jsonRsp)
+			}))
 
-	var output bytes.Buffer
-	clientService.writer = &output
+			_, cancel := context.WithCancel(context.Background())
+			c.ReceiveMessages(ts.URL, cancel)
 
-	ts.URL = fmt.Sprintf("%s/users/%s/chat", ts.URL, clientId)
-
-	clientService.ReceiveMessages(ts.URL, cancel)
-	assert.Equal(t, "Max: wubbalubbadubdub\n", output.String())
-
-	go clientService.ReceiveMessages(ts.URL, cancel)
-	cancel()
-
-	//TODO
+			assert.Equal(t, tt.args.stdOut, output.String())
+			assert.Contains(t, logOutput.String(), tt.args.log)
+		})
+	}
 }
 
-// func TestPostMessages(t *testing.T) {
-// 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-// 		w.Write([]byte("Max: wubbalubbadubdub"))
-// 	}))
-// 	defer ts.Close()
-// 	ts.URL = fmt.Sprintf("%s/users/%s/message", ts.URL, clientId)
+func TestClient_SendMessages(t *testing.T) {
+	type fields struct {
+		clientName string
+		clientId   string
+		reader     *bufio.Reader
+		writer     io.Writer
+		authToken  string
+		HttpClient *http.Client
+	}
+	type args struct {
+		rsp   *Response
+		input string
+		err   error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+	}{
+		{
+			name: "fine",
+			fields: fields{
+				clientName: name,
+				clientId:   clientId,
+				authToken:  authToken,
+				reader:     bufio.NewReader(os.Stdin),
+				writer:     bufio.NewWriter(os.Stdout),
+				HttpClient: &http.Client{},
+			},
+			args: args{
+				input: "Hallo\n",
+				rsp:   &Response{Name: "Max", Content: "Hallo"},
+				err:   nil,
+			},
+		},
+		{
+			name: "canceled",
+			fields: fields{
+				clientName: name,
+				clientId:   clientId,
+				authToken:  authToken,
+				reader:     bufio.NewReader(os.Stdin),
+				writer:     bufio.NewWriter(os.Stdout),
+				HttpClient: &http.Client{},
+			},
+			args: args{
+				input: "",
+				rsp:   nil,
+				err:   nil,
+			},
+		},
+		{
+			name: "canceled",
+			fields: fields{
+				clientName: name,
+				clientId:   clientId,
+				authToken:  authToken,
+				reader:     bufio.NewReader(os.Stdin),
+				writer:     bufio.NewWriter(os.Stdout),
+				HttpClient: &http.Client{},
+			},
+			args: args{
+				input: "",
+				rsp:   nil,
+				err:   nil,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Client{
+				clientName: tt.fields.clientName,
+				clientId:   tt.fields.clientId,
+				reader:     tt.fields.reader,
+				writer:     tt.fields.writer,
+				authToken:  tt.fields.authToken,
+				HttpClient: tt.fields.HttpClient,
+			}
 
-// 	clientService.reader = bufio.NewReader(strings.NewReader("Max: wubbalubbadubdub" + "\n"))
-// 	err := clientService.PostMessage(ts.URL)
-// 	assert.Nil(t, err)
+			wg := &sync.WaitGroup{}
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				jsonRsp, _ := json.Marshal(tt.args.rsp)
+				w.Write(jsonRsp)
+			}))
 
-// 	clientService.reader = bufio.NewReader(strings.NewReader("quit" + "\n"))
-// 	err = clientService.PostMessage(ts.URL)
-// 	assert.Error(t, err)
-// }
+			ctx, cancel := context.WithCancel(context.Background())
+			if tt.args.input == "" {
+				c.reader = &DelayReader{delay: time.Second}
+				go func() {
+					time.Sleep(500 * time.Millisecond)
+					cancel()
+				}()
+			}
+			err := c.SendMessage(ts.URL, cancel, tt.args.input, wg, ctx)
+
+			assert.ErrorIs(t, tt.args.err, err)
+
+		})
+	}
+}
+
+type DelayReader struct {
+	delay time.Duration
+}
+
+func (d *DelayReader) ReadString(delim byte) (string, error) {
+	time.Sleep(d.delay)
+	return "you should not read this", fmt.Errorf("you should not read this")
+}
