@@ -82,7 +82,7 @@ var (
 			token: "",
 		},
 		{
-			//register command
+			//register plugin
 			method:   "POST",
 			clientId: clientId2,
 			message:  Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/register", ClientId: clientId2},
@@ -91,7 +91,7 @@ var (
 		{
 			method:   "POST",
 			clientId: clientId,
-			//invalid command
+			//invalid plugin
 			message: Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/skdalskjd", ClientId: clientId},
 			token:   authToken2,
 		},

@@ -26,8 +26,8 @@ func (c *Client) GetRequest(url string) (*http.Response, error) {
 // including the authorization token
 func (c *Client) DeleteRequest(url string, body []byte) (*http.Response, error) {
 	parameteredUrl := fmt.Sprintf("%s/users/%s", url, c.clientId)
-	req, err := http.NewRequest("DELETE", parameteredUrl, bytes.NewReader(body))
 
+	req, err := http.NewRequest("DELETE", parameteredUrl, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("%w: Fehler beim Erstellen der DELETE req", err)
 

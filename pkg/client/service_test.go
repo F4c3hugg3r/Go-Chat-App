@@ -57,6 +57,14 @@ func TestRegister(t *testing.T) {
 }
 
 func TestClient_ReceiveMessages(t *testing.T) {
+	c := &Client{
+		clientId:   clientId,
+		authToken:  authToken,
+		reader:     bufio.NewReader(os.Stdin),
+		writer:     io.Writer(os.Stdout),
+		HttpClient: &http.Client{},
+	}
+
 	type fields struct {
 		clientName string
 		clientId   string
@@ -71,20 +79,11 @@ func TestClient_ReceiveMessages(t *testing.T) {
 		stdOut string
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
+		name string
+		args args
 	}{
 		{
 			name: "fine",
-			fields: fields{
-				clientName: name,
-				clientId:   clientId,
-				authToken:  authToken,
-				reader:     bufio.NewReader(os.Stdin),
-				writer:     &bytes.Buffer{},
-				HttpClient: &http.Client{},
-			},
 			args: args{
 				rsp:    &Response{Name: "Max", Content: "wubbalubbadubdub"},
 				stdOut: "Max: wubbalubbadubdub\n",
@@ -93,14 +92,6 @@ func TestClient_ReceiveMessages(t *testing.T) {
 		},
 		{
 			name: "inactive",
-			fields: fields{
-				clientName: name,
-				clientId:   clientId,
-				authToken:  authToken,
-				reader:     bufio.NewReader(os.Stdin),
-				writer:     &bytes.Buffer{},
-				HttpClient: &http.Client{},
-			},
 			args: args{
 				rsp:    &Response{Name: "inactive", Content: "wubbalubbadubdub"},
 				stdOut: "",
@@ -109,14 +100,6 @@ func TestClient_ReceiveMessages(t *testing.T) {
 		},
 		{
 			name: "content empty",
-			fields: fields{
-				clientName: name,
-				clientId:   clientId,
-				authToken:  authToken,
-				reader:     bufio.NewReader(os.Stdin),
-				writer:     &bytes.Buffer{},
-				HttpClient: &http.Client{},
-			},
 			args: args{
 				rsp:    &Response{Name: "Max", Content: ""},
 				stdOut: "",
@@ -124,15 +107,6 @@ func TestClient_ReceiveMessages(t *testing.T) {
 			},
 		},
 		{
-			name: "table",
-			fields: fields{
-				clientName: name,
-				clientId:   clientId,
-				authToken:  authToken,
-				reader:     bufio.NewReader(os.Stdin),
-				writer:     &bytes.Buffer{},
-				HttpClient: &http.Client{},
-			},
 			args: args{
 				rsp:    &Response{Name: "Max", Content: "[{}]"},
 				stdOut: "|\n+\n|\n",
@@ -142,15 +116,6 @@ func TestClient_ReceiveMessages(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &Client{
-				clientName: tt.fields.clientName,
-				clientId:   tt.fields.clientId,
-				reader:     tt.fields.reader,
-				writer:     tt.fields.writer,
-				authToken:  tt.fields.authToken,
-				HttpClient: tt.fields.HttpClient,
-			}
-
 			var output bytes.Buffer
 			c.writer = &output
 
@@ -173,34 +138,25 @@ func TestClient_ReceiveMessages(t *testing.T) {
 }
 
 func TestClient_SendMessages(t *testing.T) {
-	type fields struct {
-		clientName string
-		clientId   string
-		reader     *bufio.Reader
-		writer     io.Writer
-		authToken  string
-		HttpClient *http.Client
+	c := &Client{
+		clientId:   clientId,
+		authToken:  authToken,
+		reader:     bufio.NewReader(os.Stdin),
+		writer:     io.Writer(os.Stdout),
+		HttpClient: &http.Client{},
 	}
+
 	type args struct {
 		rsp   *Response
 		input string
 		err   error
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
+		name string
+		args args
 	}{
 		{
 			name: "fine",
-			fields: fields{
-				clientName: name,
-				clientId:   clientId,
-				authToken:  authToken,
-				reader:     bufio.NewReader(os.Stdin),
-				writer:     bufio.NewWriter(os.Stdout),
-				HttpClient: &http.Client{},
-			},
 			args: args{
 				input: "Hallo\n",
 				rsp:   &Response{Name: "Max", Content: "Hallo"},
@@ -209,14 +165,6 @@ func TestClient_SendMessages(t *testing.T) {
 		},
 		{
 			name: "canceled",
-			fields: fields{
-				clientName: name,
-				clientId:   clientId,
-				authToken:  authToken,
-				reader:     bufio.NewReader(os.Stdin),
-				writer:     bufio.NewWriter(os.Stdout),
-				HttpClient: &http.Client{},
-			},
 			args: args{
 				input: "",
 				rsp:   nil,
@@ -225,14 +173,6 @@ func TestClient_SendMessages(t *testing.T) {
 		},
 		{
 			name: "canceled",
-			fields: fields{
-				clientName: name,
-				clientId:   clientId,
-				authToken:  authToken,
-				reader:     bufio.NewReader(os.Stdin),
-				writer:     bufio.NewWriter(os.Stdout),
-				HttpClient: &http.Client{},
-			},
 			args: args{
 				input: "",
 				rsp:   nil,
@@ -242,14 +182,6 @@ func TestClient_SendMessages(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &Client{
-				clientName: tt.fields.clientName,
-				clientId:   tt.fields.clientId,
-				reader:     tt.fields.reader,
-				writer:     tt.fields.writer,
-				authToken:  tt.fields.authToken,
-				HttpClient: tt.fields.HttpClient,
-			}
 
 			wg := &sync.WaitGroup{}
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -280,4 +212,39 @@ type DelayReader struct {
 func (d *DelayReader) ReadString(delim byte) (string, error) {
 	time.Sleep(d.delay)
 	return "you should not read this", fmt.Errorf("you should not read this")
+}
+
+func TestClient_extractInputToMessage(t *testing.T) {
+	c := &Client{
+		clientId:   clientId,
+		authToken:  authToken,
+		reader:     bufio.NewReader(os.Stdin),
+		writer:     io.Writer(os.Stdout),
+		HttpClient: &http.Client{},
+	}
+
+	type args struct {
+		input  *Message
+		output *Message
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "fine",
+			args: args{
+				//TODO
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input, err := json.Marshal(tt.args.input)
+			assert.Nil(t, err)
+
+			message := c.extractInputToMessage(string(input))
+			assert.Equal(t, tt.args.output, message)
+		})
+	}
 }

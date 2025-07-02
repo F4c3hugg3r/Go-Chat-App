@@ -37,7 +37,7 @@ func RegisterPlugins(chatService *ChatService) *PluginRegistry {
 func (pr *PluginRegistry) FindAndExecute(message *Message) (*Response, error) {
 	plugin, ok := pr.plugins[message.Plugin]
 	if !ok {
-		return &Response{message.Name, fmt.Sprintf("no such plugin found: %s", message.Plugin)}, fmt.Errorf("no such plugin found: %s", message.Plugin)
+		return &Response{"Server", fmt.Sprintf("no such plugin found: %s", message.Plugin)}, nil
 	}
 
 	return plugin.Execute(message)

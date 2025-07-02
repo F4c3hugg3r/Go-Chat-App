@@ -78,6 +78,20 @@ func TestHandleMessages(t *testing.T) {
 					t.Errorf("response should contain authtoken")
 				}
 			}
+		case 8:
+			{
+				select {
+				case rsp = <-service.clients[clientId].clientCh:
+					for rsp.Name != "Server" {
+						rsp = <-service.clients[clientId].clientCh
+					}
+					if rsp.Name != "Server" {
+						t.Errorf("there should be a server response")
+					}
+				default:
+					t.Errorf("there should be a response")
+				}
+			}
 		default:
 			{
 				if res.StatusCode != http.StatusBadRequest {
