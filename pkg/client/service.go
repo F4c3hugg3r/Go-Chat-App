@@ -25,19 +25,10 @@ func NewClient() *Client {
 	}
 }
 
-// PostMessage sends a POST request to the endpoint, containing a message, read from the stdin
-func (c *Client) PostMessage(url string, cancel context.CancelFunc, input string, wg *sync.WaitGroup, ctx context.Context) error {
-	parameteredUrl := fmt.Sprintf("%s/users/%s/run", url, c.clientId)
-
+// SendMessage sends a POST request to the endpoint, containing a message, read from the stdin
+func (c *Client) SendMessage(url string, cancel context.CancelFunc, input string, wg *sync.WaitGroup, ctx context.Context) error {
 	if input == "" {
-		// tried to close ReadString with pipe after server crashes
-		// r, w, _ := os.Pipe()
-		// oldStdin := os.Stdin
-		// defer func() {
-		// 	os.Stdin = oldStdin
-		// }()
-		// os.Stdin = r
-
+		//designed like this to react on context cancel
 		inputChan := make(chan string, 1)
 		errorChan := make(chan error, 1)
 
@@ -59,87 +50,53 @@ func (c *Client) PostMessage(url string, cancel context.CancelFunc, input string
 		case err := <-errorChan:
 			return fmt.Errorf("%w: wrong input", err)
 		case <-ctx.Done():
-			// w.Close()
 			return nil
 		}
 	}
 
 	fmt.Printf("\033[1A\033[K")
 
-	input = strings.TrimSuffix(input, "\n")
-	message := extractInputToMessageFields(input, c.clientId)
-	message.Name = c.clientName
-	json, err := json.Marshal(message)
+	message := c.extractInputToMessage(input)
+	body, err := json.Marshal(&message)
 
 	if err != nil {
 		return fmt.Errorf("%w: error parsing json", err)
 	}
 
-	if input == "/quit" {
-		err = c.DeleteClient(url, json)
+	if input == "/quit\n" {
+		res, err := c.DeleteRequest(url, body)
 		if err != nil {
-			return fmt.Errorf("%w: client could't be deleted", err)
+			return fmt.Errorf("%w: client couldn't be deleted", err)
 		}
+
+		defer res.Body.Close()
 
 		cancel()
 
 		return nil
 	}
 
-	req, err := http.NewRequest("POST", parameteredUrl, bytes.NewReader(json))
-	if err != nil {
-		return fmt.Errorf("%w: Fehler beim Erstellen der POST req", err)
-	}
-
-	req.Header.Add("Authorization", c.authToken)
-	req.Header.Add("Content-Type", "application/json")
-
-	res, err := c.HttpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("%w: Fehler beim Absenden der Nachricht", err)
-
-	}
-	defer res.Body.Close()
-
-	return nil
-}
-
-// DeleteClient sends a DELETE Request to delete the client out of the server
-func (c *Client) DeleteClient(url string, json []byte) error {
-	parameteredUrl := fmt.Sprintf("%s/users/%s", url, c.clientId)
-	req, err := http.NewRequest("DELETE", parameteredUrl, bytes.NewReader(json))
+	parameteredUrl := fmt.Sprintf("%s/users/%s/run", url, c.clientId)
+	res, err := c.PostRequest(parameteredUrl, body)
 
 	if err != nil {
-		return fmt.Errorf("%w: Fehler beim Erstellen der DELETE req", err)
-
-	}
-
-	req.Header.Add("Authorization", c.authToken)
-	req.Header.Add("Content-Type", "application/json")
-
-	res, err := c.HttpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("%w: Fehler beim Absenden des Deletes", err)
+		return fmt.Errorf("%w: message couldn't be send", err)
 	}
 
 	defer res.Body.Close()
 
-	return nil
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("%s: message couldn't be send", res.Status)
+	}
+
+	return err
 }
 
-// GetMessages sends a GET request to the endpoint, displaying incoming messages
-func (c *Client) GetMessages(url string, cancel context.CancelFunc) {
+// ReceiveMessages sends a GET request to the endpoint, displaying incoming messages
+func (c *Client) ReceiveMessages(url string, cancel context.CancelFunc) {
 	parameteredUrl := fmt.Sprintf("%s/users/%s/chat", url, c.clientId)
 
-	req, err := http.NewRequest("GET", parameteredUrl, nil)
-	if err != nil {
-		log.Printf("%v: Fehler beim erstellen der GET request: ", err)
-		return
-	}
-
-	req.Header.Add("Authorization", c.authToken)
-
-	resp, err := c.HttpClient.Do(req)
+	res, err := c.GetRequest(parameteredUrl)
 	if err != nil {
 		log.Printf("%v: Fehler beim Abrufen ist aufgetreten: ", err)
 		cancel()
@@ -147,8 +104,13 @@ func (c *Client) GetMessages(url string, cancel context.CancelFunc) {
 		return
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		log.Printf("%v: message couldn't be send", res.Status)
+		return
+	}
+
+	body, err := io.ReadAll(res.Body)
+	defer res.Body.Close()
 
 	if err != nil {
 		return
@@ -160,6 +122,10 @@ func (c *Client) GetMessages(url string, cancel context.CancelFunc) {
 	}
 	if err != nil {
 		log.Printf("%v: Fehler beim decodieren der response aufgetreten", err)
+		return
+	}
+
+	if rsp.Content == "" {
 		return
 	}
 
@@ -183,10 +149,8 @@ func (c *Client) GetMessages(url string, cancel context.CancelFunc) {
 		return
 	}
 
-	responseString := rsp.Name + ": " + rsp.Content + "\n"
-	if rsp.Content != "" {
-		fmt.Fprint(c.writer, responseString)
-	}
+	responseString := fmt.Sprintf("%s: %s\n", rsp.Name, rsp.Content)
+	fmt.Fprint(c.writer, responseString)
 }
 
 // Register reads a self given name from the stdin and sends a POST request to the endpoint
@@ -199,14 +163,14 @@ func (c *Client) Register(url string) error {
 	}
 
 	clientName = strings.ReplaceAll(clientName, "\n", "")
-	parameteredUrl := fmt.Sprintf("%s/users/%s", url, c.clientId)
-
 	message := Message{Content: clientName, ClientId: c.clientId, Plugin: "/register"}
-	json, err := json.Marshal(message)
 
+	json, err := json.Marshal(message)
 	if err != nil {
 		return fmt.Errorf("wrong input: %s", json)
 	}
+
+	parameteredUrl := fmt.Sprintf("%s/users/%s", url, c.clientId)
 
 	resp, err := c.HttpClient.Post(parameteredUrl, "application/json", bytes.NewReader(json))
 	if err != nil {
@@ -234,18 +198,19 @@ func (c *Client) Register(url string) error {
 	return nil
 }
 
-// extractInputToMessageFields creates a Message type message out of the given
+// extractInputToJson creates a Message type message out of the given
 // input string. If the string starts with "/text", "/text" will be the plugin
-func extractInputToMessageFields(input string, clientId string) Message {
+func (c *Client) extractInputToMessage(input string) *Message {
+	input = strings.TrimSuffix(input, "\n")
 	if !strings.HasPrefix(input, "/") {
-		return Message{Plugin: "/broadcast", Content: input, ClientId: clientId}
+		return &Message{Name: c.clientName, Plugin: "/broadcast", Content: input, ClientId: c.clientId}
 	}
 
 	if strings.HasPrefix(input, "/private") {
 		opposingClientId := strings.Fields(input)[1]
 		message, _ := strings.CutPrefix(input, fmt.Sprintf("/private %s ", opposingClientId))
 
-		return Message{Plugin: "/private", ClientId: opposingClientId, Content: message}
+		return &Message{Name: c.clientName, Plugin: "/private", ClientId: opposingClientId, Content: message}
 	}
 
 	plugin := strings.Fields(input)[0]
@@ -253,7 +218,7 @@ func extractInputToMessageFields(input string, clientId string) Message {
 	content := strings.ReplaceAll(input, plugin, "")
 	content, _ = strings.CutPrefix(content, " ")
 
-	return Message{Plugin: plugin, Content: content, ClientId: clientId}
+	return &Message{Name: c.clientName, Plugin: plugin, Content: content, ClientId: c.clientId}
 }
 
 // DecodeToResponse decodes a responseBody to a Response struct

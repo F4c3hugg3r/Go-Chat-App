@@ -79,10 +79,10 @@ func TestGetMessages(t *testing.T) {
 
 	ts.URL = fmt.Sprintf("%s/users/%s/chat", ts.URL, clientId)
 
-	clientService.GetMessages(ts.URL, cancel)
+	clientService.ReceiveMessages(ts.URL, cancel)
 	assert.Equal(t, "Max: wubbalubbadubdub\n", output.String())
 
-	go clientService.GetMessages(ts.URL, cancel)
+	go clientService.ReceiveMessages(ts.URL, cancel)
 	cancel()
 
 	//TODO

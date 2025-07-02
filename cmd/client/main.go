@@ -50,7 +50,7 @@ func interruptListener(interChan chan os.Signal, cancel context.CancelFunc, wg *
 
 	select {
 	case <-interChan:
-		err := client.PostMessage(url, cancel, "/quit", wg, ctx)
+		err := client.SendMessage(url, cancel, "/quit\n", wg, ctx)
 		if err != nil {
 			log.Print(err)
 		}
@@ -62,6 +62,7 @@ func interruptListener(interChan chan os.Signal, cancel context.CancelFunc, wg *
 	client.HttpClient.CloseIdleConnections()
 
 	log.Println("Client logged out")
+	os.Stdin.Close()
 }
 
 // startChat starts two go-routines for the sending and receiving of messages/responses
@@ -76,7 +77,7 @@ func startChat(wg *sync.WaitGroup, ctx context.Context, client *client.Client, u
 			case <-ctx.Done():
 				return
 			default:
-				client.GetMessages(url, cancel)
+				client.ReceiveMessages(url, cancel)
 			}
 		}
 	}()
@@ -91,7 +92,7 @@ func startChat(wg *sync.WaitGroup, ctx context.Context, client *client.Client, u
 			case <-ctx.Done():
 				return
 			default:
-				err := client.PostMessage(url, cancel, "", wg, ctx)
+				err := client.SendMessage(url, cancel, "", wg, ctx)
 				if err != nil {
 					log.Println("Fehler beim Absenden der Nachricht: ", err)
 				}
