@@ -24,8 +24,8 @@ func (pp *PrivateMessagePlugin) Description() string {
 }
 
 func (pp *PrivateMessagePlugin) Execute(message *Message) (*Response, error) {
-	pp.chatService.mu.Lock()
-	defer pp.chatService.mu.Unlock()
+	pp.chatService.mu.RLock()
+	defer pp.chatService.mu.RUnlock()
 
 	client, ok := pp.chatService.clients[message.ClientId]
 	if !ok {
@@ -65,7 +65,7 @@ func (lp *LogOutPlugin) Execute(message *Message) (*Response, error) {
 	}
 
 	fmt.Println("\nlogged out ", client.Name)
-	client.closeCh()
+	client.Close()
 	delete(lp.chatService.clients, message.ClientId)
 
 	return &Response{Name: message.Name, Content: "logged out"}, nil
@@ -130,8 +130,8 @@ func (bp *BroadcastPlugin) Description() string {
 }
 
 func (bp *BroadcastPlugin) Execute(message *Message) (*Response, error) {
-	bp.chatService.mu.Lock()
-	defer bp.chatService.mu.Unlock()
+	bp.chatService.mu.RLock()
+	defer bp.chatService.mu.RUnlock()
 
 	if strings.TrimSpace(message.Content) == "" {
 		return nil, fmt.Errorf("%w: no empty messages allowed", ErrEmptyString)

@@ -6,6 +6,15 @@ import (
 	"time"
 )
 
+func (c *Client) Execute(handler *PluginRegistry, msg *Message) (*Response, error) {
+	c.setActive(true)
+	defer c.setActive(false)
+
+	defer c.updateLastSign()
+
+	return handler.FindAndExecute(msg)
+}
+
 // Receive receives responses from the clientCh
 func (c *Client) Receive(ctx context.Context) (*Response, error) {
 	c.setActive(true)
@@ -58,22 +67,29 @@ func (c *Client) updateLastSign() {
 	c.lastSign = time.Now().UTC()
 }
 
-func (c *Client) closeCh() {
+func (c *Client) Close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.chClosed = true
-	close(c.clientCh)
+	c.closeChannelRequireLock()
 }
 
 // IsIdle checks if the client is inactive
-func (c *Client) IsIdle(timeLimit time.Duration) bool {
+func (c *Client) Idle(timeLimit time.Duration) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if !c.Active && time.Since(c.lastSign) >= timeLimit {
+		c.closeChannelRequireLock()
 		return true
 	}
 
 	return false
+}
+
+func (c *Client) closeChannelRequireLock() {
+	if !c.chClosed {
+		c.chClosed = true
+		close(c.clientCh)
+	}
 }

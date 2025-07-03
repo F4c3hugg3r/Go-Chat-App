@@ -48,8 +48,6 @@ func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	client.updateLastSign()
-
 	rsp, err := client.Receive(ctx)
 	if errors.Is(err, ErrChannelClosed) {
 		http.Error(w, err.Error(), http.StatusGone)
@@ -68,6 +66,47 @@ func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Re
 	}
 
 	_, err = w.Write(json)
+	if err != nil {
+		http.Error(w, "couldn't write response", http.StatusInternalServerError)
+	}
+}
+
+func (handler *ServerHandler) HandleRegistry(w http.ResponseWriter, r *http.Request) {
+	clientId := r.PathValue("clientId")
+	if clientId == "" {
+		http.Error(w, "missing path parameter clientId", http.StatusBadRequest)
+		return
+	}
+
+	bodyMax := http.MaxBytesReader(w, r.Body, 1<<20)
+	defer r.Body.Close()
+
+	body, err := io.ReadAll(bodyMax)
+
+	if err != nil {
+		http.Error(w, "error reading request body", http.StatusInternalServerError)
+		return
+	}
+
+	message, err := DecodeToMessage(body)
+	if err != nil {
+		http.Error(w, "error decoding request body", http.StatusInternalServerError)
+		return
+	}
+
+	res, err := handler.Plugins.FindAndExecute(&message)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	body, err = json.Marshal(res)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	_, err = w.Write(body)
 	if err != nil {
 		http.Error(w, "couldn't write response", http.StatusInternalServerError)
 	}
@@ -99,23 +138,15 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	res, err := handler.Plugins.FindAndExecute(&message)
+	client, err := handler.Service.GetClient(clientId)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-
+		http.Error(w, "client not found ", http.StatusNotFound)
 		return
 	}
 
-	if res.Name == authTokenString {
-		body, err = json.Marshal(res)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-		}
-
-		_, err = w.Write(body)
-		if err != nil {
-			http.Error(w, "couldn't write response", http.StatusInternalServerError)
-		}
+	res, err := client.Execute(handler.Plugins, &message)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 
 		return
 	}

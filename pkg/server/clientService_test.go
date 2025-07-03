@@ -80,7 +80,7 @@ func TestIsIdle(t *testing.T) {
 		chClosed:  true,
 	}
 
-	result := clientInactive.IsIdle(time.Minute * 30)
+	result := clientInactive.Idle(time.Minute * 30)
 	assert.True(t, result)
 
 	clientActive := Client{
@@ -93,6 +93,6 @@ func TestIsIdle(t *testing.T) {
 		chClosed:  false,
 	}
 
-	result = clientActive.IsIdle(time.Minute * 30)
+	result = clientActive.Idle(time.Minute * 30)
 	assert.False(t, result)
 }

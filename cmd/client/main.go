@@ -105,6 +105,7 @@ func startChat(wg *sync.WaitGroup, ctx context.Context, client *client.Client, u
 func NewConfig() Config {
 	var cfg Config
 
+	//url statt port
 	flag.IntVar(&cfg.port, "port", 8080, "HTTP Server Port")
 	flag.Parse()
 

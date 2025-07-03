@@ -12,6 +12,38 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestHandleRegistry(t *testing.T) {
+	service := NewChatService(100)
+	plugin := RegisterPlugins(service)
+	handler := NewServerHandler(service, plugin)
+	service.clients[clientId] = &Client{
+		Name:      name,
+		ClientId:  clientId,
+		clientCh:  make(chan *Response, 100),
+		Active:    false,
+		authToken: authToken,
+		lastSign:  time.Now().UTC(),
+	}
+
+	jsonMessage, _ := json.Marshal(dummyExamples[7].message)
+	req := httptest.NewRequest(dummyExamples[7].method, "/users/{clientId}", bytes.NewReader(jsonMessage))
+	req.SetPathValue("clientId", dummyExamples[7].clientId)
+	rec := httptest.NewRecorder()
+
+	handler.HandleRegistry(rec, req)
+	res := rec.Result()
+	body, _ := io.ReadAll(res.Body)
+	defer res.Body.Close()
+
+	var rsp *Response
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.Decode(&rsp)
+
+	if rsp.Name != "authToken" || rsp.Content == "" {
+		t.Errorf("response should contain authtoken")
+	}
+}
+
 func TestHandleMessages(t *testing.T) {
 	service := NewChatService(100)
 	plugin := RegisterPlugins(service)
@@ -56,7 +88,10 @@ func TestHandleMessages(t *testing.T) {
 			}
 		}
 	}
-	for i := 7; i < 9; i++ {
+	for i := 6; i < 9; i++ {
+		if i == 7 {
+			i = 8
+		}
 		jsonMessage, _ := json.Marshal(dummyExamples[i].message)
 		req := httptest.NewRequest(dummyExamples[i].method, "/users/{clientId}", bytes.NewReader(jsonMessage))
 		req.SetPathValue("clientId", dummyExamples[i].clientId)
@@ -72,12 +107,6 @@ func TestHandleMessages(t *testing.T) {
 		dec.Decode(&rsp)
 
 		switch i {
-		case 7:
-			{
-				if rsp.Name != "authToken" || rsp.Content == "" {
-					t.Errorf("response should contain authtoken")
-				}
-			}
 		case 8:
 			{
 				select {
@@ -94,7 +123,7 @@ func TestHandleMessages(t *testing.T) {
 			}
 		default:
 			{
-				if res.StatusCode != http.StatusBadRequest {
+				if res.StatusCode != http.StatusOK {
 					t.Errorf("Status should be %v but was %v instead", http.StatusBadRequest, res.StatusCode)
 				}
 			}

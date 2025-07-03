@@ -24,12 +24,11 @@ func NewChatService(maxUsers int) *ChatService {
 
 // InactiveClientDeleter searches for inactive clients and deletes them as well as closes their message-channel
 func (s *ChatService) InactiveClientDeleter(timeLimit time.Duration) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	for clientId, client := range s.clients {
-		if client.IsIdle(timeLimit) {
-			client.closeCh()
+		if client.Idle(timeLimit) {
 			delete(s.clients, clientId)
 		}
 	}
@@ -37,8 +36,8 @@ func (s *ChatService) InactiveClientDeleter(timeLimit time.Duration) {
 
 // echo sends a response to the request submitter
 func (s *ChatService) echo(clientId string, rsp *Response) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	client, ok := s.clients[clientId]
 	if !ok {
