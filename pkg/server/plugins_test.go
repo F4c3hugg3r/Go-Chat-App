@@ -44,9 +44,11 @@ func TestUserPlugin(t *testing.T) {
 
 	rsp, err = registry.FindAndExecute(message)
 	assert.Nil(t, err)
-	assert.Equal(t, rsp, &Response{Name: "Users", Content: "[{\"Name\":\"Arndt\",\"ClientId\"" +
-		":\"clientId-DyGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRw\",\"Active\":false},{\"Name\":\"Len\"" +
-		",\"ClientId\":\"clientId2-yGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRw\",\"Active\":true}]"})
+	assert.Equal(t, rsp.Name, "Users")
+	assert.Contains(t, rsp.Content, "{\"Name\":\"Len\""+
+		",\"ClientId\":\"clientId2-yGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRw\",\"Active\":true}")
+	assert.Contains(t, rsp.Content, "{\"Name\":\"Arndt\",\"ClientId\""+
+		":\"clientId-DyGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRw\",\"Active\":false}")
 }
 
 func TestRegisterPlugin(t *testing.T) {

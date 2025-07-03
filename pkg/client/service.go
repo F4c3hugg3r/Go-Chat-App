@@ -16,6 +16,8 @@ import (
 	"github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
+const inactive = "inactive"
+
 func NewClient() *Client {
 	return &Client{
 		clientId:   shared.GenerateSecureToken(32),
@@ -28,7 +30,6 @@ func NewClient() *Client {
 // SendMessage sends a POST request to the endpoint, containing a message, read from the stdin
 func (c *Client) SendMessage(url string, cancel context.CancelFunc, input string, wg *sync.WaitGroup, ctx context.Context) error {
 	if input == "" {
-		//designed like this to react on context cancel
 		inputChan := make(chan string, 1)
 		errorChan := make(chan error, 1)
 
@@ -104,6 +105,8 @@ func (c *Client) ReceiveMessages(url string, cancel context.CancelFunc) {
 		return
 	}
 
+	defer res.Body.Close()
+
 	if res.StatusCode != http.StatusOK {
 		log.Printf("%v: message couldn't be send", res.Status)
 		return
@@ -130,7 +133,7 @@ func (c *Client) ReceiveMessages(url string, cancel context.CancelFunc) {
 		return
 	}
 
-	if rsp.Name == "inactive" {
+	if rsp.Name == inactive {
 		log.Println("You got kicked out due to inactivity")
 		cancel()
 
