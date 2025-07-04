@@ -19,13 +19,13 @@ func NewClient(server string) *ChatClient {
 	chatClient := &ChatClient{
 		clientId:   shared.GenerateSecureToken(32),
 		Output:     make(chan *Response, 10000),
-		Input:      make(chan *Message, 1000),
 		HttpClient: &http.Client{},
 		Registered: false,
 		mu:         &sync.Mutex{},
 		url:        server,
 	}
 
+	chatClient.plugins = RegisterPlugins(chatClient)
 	chatClient.Cond = sync.NewCond(chatClient.mu)
 
 	go chatClient.receiveMessages(server)
@@ -33,55 +33,63 @@ func NewClient(server string) *ChatClient {
 	return chatClient
 }
 
+// done
 func (c *ChatClient) receiveMessages(url string) {
-	// TODO loopen
+	for {
+		c.checkRegistered()
 
-	c.checkRegistered()
+		res, err := c.GetRequest(url)
+		if err != nil {
+			log.Printf("%v: Fehler beim Abrufen ist aufgetreten: ", err)
+			c.unregister()
 
-	res, err := c.GetRequest(url)
-	if err != nil {
-		log.Printf("%v: Fehler beim Abrufen ist aufgetreten: ", err)
-		c.unregister()
+			return
+		}
 
-		return
+		defer res.Body.Close()
+
+		if res.StatusCode != http.StatusOK {
+			log.Printf("%v: message couldn't be send", res.Status)
+			return
+		}
+
+		body, err := io.ReadAll(res.Body)
+		defer res.Body.Close()
+
+		if err != nil {
+			return
+		}
+
+		rsp, err := DecodeToResponse(body)
+		if strings.TrimSpace(rsp.Content) == "" {
+			return
+		}
+
+		if err != nil {
+			log.Printf("%v: Fehler beim decodieren der response aufgetreten", err)
+			return
+		}
+
+		valid := c.checkResponse(&rsp)
+		if valid {
+			c.Output <- &rsp
+		}
 	}
+}
 
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		log.Printf("%v: message couldn't be send", res.Status)
-		return
-	}
-
-	body, err := io.ReadAll(res.Body)
-	defer res.Body.Close()
-
-	if err != nil {
-		return
-	}
-
-	rsp, err := DecodeToResponse(body)
-	if strings.TrimSpace(rsp.Content) == "" {
-		return
-	}
-
-	if err != nil {
-		log.Printf("%v: Fehler beim decodieren der response aufgetreten", err)
-		return
-	}
-
+func (c *ChatClient) checkResponse(rsp *Response) bool {
 	if rsp.Content == "" {
-		return
+		return false
 	}
 
 	if rsp.Name == inactiveFlag {
 		log.Println("You got kicked out due to inactivity")
 		c.unregister()
 
-		return
+		return false
 	}
 
-	c.Output <- &rsp
+	return true
 }
 
 func (c *ChatClient) checkRegistered() {
@@ -108,48 +116,61 @@ func (c *ChatClient) unregister() {
 	c.Registered = false
 }
 
-// TODO send message in go routine und aus channel lesen?
+//PLUGINS
+// body, err := json.Marshal(&msg)
+// if err != nil {
+// 	log.Printf("%v: error parsing json", err)
+// 	return
+// }
+
+//das von unter dem switch case hier einfügen
+// switch msg.Plugin {
+// case "/quit":
+// 	{
+// 		res, err := c.DeleteRequest(c.url, body)
+// 		if err != nil {
+// 			log.Printf("%v: client couldn't be deleted", err)
+// 			return
+// 		}
+
+// 		defer res.Body.Close()
+
+// 		return
+// 	}
+// case "/broadcast":
+// 	{
+// 		parameteredUrl := fmt.Sprintf("%s/users/%s/run", c.url, c.clientId)
+// 		res, err := c.PostRequest(parameteredUrl, body)
+// 		if err != nil {
+// 			log.Printf("%v: message couldn't be send", err)
+// 			return
+// 		}
+
+// 		defer res.Body.Close()
+
+// 		if res.StatusCode != http.StatusOK {
+// 			log.Printf("%s: message couldn't be send", res.Status)
+// 			return
+// 		}
+// 	}
+// case "/register":
+// 	{
+// 		if c.Registered == true {
+// 			log.Printf("you are already registered")
+// 			return
+// 		}
+
+// 		//Registrierungslogik
+
+// 		c.register()
+// 	}
+// }
+
 func (c *ChatClient) sendMessage(msg *Message) {
-	body, err := json.Marshal(&msg)
+
+	err := c.plugins.FindAndExecute(msg)
 	if err != nil {
-		log.Printf("%v: error parsing json", err)
-		return
-	}
-
-	//das von unter dem switch case hier einfügen
-	switch msg.Plugin {
-	case "/quit":
-	case "/broadcast":
-	case "/register":
-		//checkregister
-		//register
-		//...
-	}
-
-	if msg.Plugin == "/quit" {
-		res, err := c.DeleteRequest(c.url, body)
-		if err != nil {
-			log.Printf("%v: client couldn't be deleted", err)
-			return
-		}
-
-		defer res.Body.Close()
-
-		return
-	}
-
-	res, err := c.PostRequest(c.url, body)
-
-	if err != nil {
-		log.Printf("%v: message couldn't be send", err)
-		return
-	}
-
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		log.Printf("%s: message couldn't be send", res.Status)
-		return
+		log.Printf("%v: error sending message", err)
 	}
 }
 

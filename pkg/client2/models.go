@@ -18,8 +18,8 @@ type ChatClient struct {
 	mu         *sync.Mutex
 	Cond       *sync.Cond
 	Output     chan *Response
-	Input      chan *Message
 	url        string
+	plugins    *PluginRegistry
 }
 
 // Message contains the name of the requester and the message (content) itsself
@@ -34,4 +34,9 @@ type Message struct {
 type Response struct {
 	Name    string `json:"name"`
 	Content string `json:"content"`
+}
+
+type Plugin struct {
+	Command     string
+	Description string
 }
