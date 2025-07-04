@@ -19,7 +19,7 @@ type ChatClient struct {
 	Cond       *sync.Cond
 	Output     chan *Response
 	url        string
-	plugins    *PluginRegistry
+	// plugins    *PluginRegistry
 }
 
 // Message contains the name of the requester and the message (content) itsself

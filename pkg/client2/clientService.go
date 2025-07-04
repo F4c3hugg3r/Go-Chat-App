@@ -25,7 +25,7 @@ func NewClient(server string) *ChatClient {
 		url:        server,
 	}
 
-	chatClient.plugins = RegisterPlugins(chatClient)
+	// chatClient.plugins = RegisterPlugins(chatClient)
 	chatClient.Cond = sync.NewCond(chatClient.mu)
 
 	go chatClient.receiveMessages(server)
@@ -101,9 +101,18 @@ func (c *ChatClient) checkRegistered() {
 	}
 }
 
-func (c *ChatClient) register() {
+func (c *ChatClient) register(body []byte) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	rsp, err := DecodeToResponse(body)
+	if err != nil {
+		log.Printf("%v: Fehler beim Lesen des Bodies ist aufgetreten: ", err)
+		return
+	}
+
+	c.clientName = rsp.Name
+	c.authToken = rsp.Content
 
 	c.Registered = true
 	c.Cond.Signal()
@@ -113,88 +122,121 @@ func (c *ChatClient) unregister() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	//clientName/authToken löschen
+
 	c.Registered = false
 }
 
-//PLUGINS
-// body, err := json.Marshal(&msg)
-// if err != nil {
-// 	log.Printf("%v: error parsing json", err)
-// 	return
-// }
-
-//das von unter dem switch case hier einfügen
-// switch msg.Plugin {
-// case "/quit":
-// 	{
-// 		res, err := c.DeleteRequest(c.url, body)
-// 		if err != nil {
-// 			log.Printf("%v: client couldn't be deleted", err)
-// 			return
-// 		}
-
-// 		defer res.Body.Close()
-
-// 		return
-// 	}
-// case "/broadcast":
-// 	{
-// 		parameteredUrl := fmt.Sprintf("%s/users/%s/run", c.url, c.clientId)
-// 		res, err := c.PostRequest(parameteredUrl, body)
-// 		if err != nil {
-// 			log.Printf("%v: message couldn't be send", err)
-// 			return
-// 		}
-
-// 		defer res.Body.Close()
-
-// 		if res.StatusCode != http.StatusOK {
-// 			log.Printf("%s: message couldn't be send", res.Status)
-// 			return
-// 		}
-// 	}
-// case "/register":
-// 	{
-// 		if c.Registered == true {
-// 			log.Printf("you are already registered")
-// 			return
-// 		}
-
-// 		//Registrierungslogik
-
-// 		c.register()
-// 	}
-// }
-
 func (c *ChatClient) sendMessage(msg *Message) {
-
-	err := c.plugins.FindAndExecute(msg)
+	body, err := json.Marshal(&msg)
 	if err != nil {
-		log.Printf("%v: error sending message", err)
+		log.Printf("%v: error parsing json", err)
+		return
+	}
+
+	switch msg.Plugin {
+	case "/quit":
+		{
+			res, err := c.DeleteRequest(c.url, body)
+			if err != nil {
+				log.Printf("%v: client couldn't be deleted", err)
+				return
+			}
+
+			defer res.Body.Close()
+
+			return
+		}
+	case "/register":
+		{
+			if c.Registered == true {
+				log.Printf("you are already registered")
+				return
+			}
+
+			parameteredUrl := fmt.Sprintf("%s/users/%s", c.url, c.clientId)
+			res, err := c.PostRequest(parameteredUrl, body)
+			if err != nil {
+				log.Printf("%v: message couldn't be send", err)
+				return
+			}
+
+			body, err := io.ReadAll(res.Body)
+			if err != nil {
+				log.Printf("%v: error reading response body ", err)
+				return
+			}
+			defer res.Body.Close()
+
+			c.register(body)
+
+			return
+		}
+	default:
+		{
+			parameteredUrl := fmt.Sprintf("%s/users/%s/run", c.url, c.clientId)
+			res, err := c.PostRequest(parameteredUrl, body)
+			if err != nil {
+				log.Printf("%v: message couldn't be send", err)
+				return
+			}
+
+			defer res.Body.Close()
+
+			if res.StatusCode != http.StatusOK {
+				log.Printf("%s: message couldn't be send", res.Status)
+				return
+			}
+		}
 	}
 }
 
 func (c *ChatClient) Executor(input string) {
 	input = strings.TrimSuffix(input, "\n")
-	if !strings.HasPrefix(input, "/") {
-		c.sendMessage(&Message{Name: c.clientName, Plugin: "/broadcast", Content: input, ClientId: c.clientId})
-		return
+
+	switch {
+	case strings.HasPrefix(input, "/register"):
+		{
+			clientName, _ := strings.CutPrefix(input, "/register ")
+			c.sendMessage(&Message{Name: clientName, Plugin: "/register", ClientId: c.clientId})
+			return
+		}
+	//nil pointer reference wenn noch nicht registriert
+	case !strings.HasPrefix(input, "/"):
+		{
+			if c.Registered == false {
+				log.Printf("you are not registered yet")
+				return
+			}
+			c.sendMessage(&Message{Name: c.clientName, Plugin: "/broadcast", Content: input, ClientId: c.clientId})
+			return
+		}
+	case strings.HasPrefix(input, "/private"):
+		{
+			if c.Registered == false {
+				log.Printf("you are not registered yet")
+				return
+			}
+			opposingClientId := strings.Fields(input)[1]
+			message, _ := strings.CutPrefix(input, fmt.Sprintf("/private %s ", opposingClientId))
+
+			c.sendMessage(&Message{Name: c.clientName, Plugin: "/private", ClientId: opposingClientId, Content: message})
+			return
+		}
+	default:
+		{
+			if c.Registered == false {
+				log.Printf("you are not registered yet")
+				return
+			}
+			plugin := strings.Fields(input)[0]
+
+			content := strings.ReplaceAll(input, plugin, "")
+			content, _ = strings.CutPrefix(content, " ")
+
+			c.sendMessage(&Message{Name: c.clientName, Plugin: plugin, Content: content, ClientId: c.clientId})
+		}
 	}
-
-	if strings.HasPrefix(input, "/private") {
-		opposingClientId := strings.Fields(input)[1]
-		message, _ := strings.CutPrefix(input, fmt.Sprintf("/private %s ", opposingClientId))
-
-		c.sendMessage(&Message{Name: c.clientName, Plugin: "/private", ClientId: opposingClientId, Content: message})
-		return
-	}
-
-	plugin := strings.Fields(input)[0]
-
-	content := strings.ReplaceAll(input, plugin, "")
-	content, _ = strings.CutPrefix(content, " ")
-
-	c.sendMessage(&Message{Name: c.clientName, Plugin: plugin, Content: content, ClientId: c.clientId})
 }
 
 func (c *ChatClient) Completer(d prompt.Document) []prompt.Suggest {
@@ -204,6 +246,7 @@ func (c *ChatClient) Completer(d prompt.Document) []prompt.Suggest {
 		{Text: "/private", Description: "Sendet eine private message"},
 		{Text: "/users", Description: "Listet alle User"},
 		{Text: "/time", Description: "Zeigt die aktuelle Zeit an"},
+		{Text: "/register", Description: "Registriert dich beim Server"},
 	}
 
 	//TODO bei private weiteren vorschlag für clientids
