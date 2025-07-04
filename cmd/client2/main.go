@@ -2,7 +2,6 @@ package client2
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -12,23 +11,24 @@ import (
 	"github.com/c-bata/go-prompt"
 )
 
+// globale var für cfg
 type Config struct {
 	url string
 }
 
 func main() {
 	cfg := NewConfig()
-	url := fmt.Sprintf("http://localhost:%d", cfg.url)
-	c := client.NewClient(url)
+	c := client.NewClient(cfg.url)
+	u := client.NewUserService(c)
 
 	interChan := make(chan os.Signal, 2)
 	signal.Notify(interChan, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
 
-	go interruptListener(interChan, c, url)
+	go interruptListener(interChan, c, cfg.url)
 
 	p := prompt.New(
-		c.Executor,
-		c.Completer,
+		u.Executor,
+		u.Completer,
 		//maybe schauen ob es was anderes praktisches gibt
 		prompt.OptionPrefix(">> "),
 	)
@@ -47,7 +47,7 @@ func interruptListener(interChan chan os.Signal, client *client.ChatClient, url 
 	client.HttpClient.CloseIdleConnections()
 
 	log.Println("Client logged out")
-	os.Exit(69)
+	os.Exit(0)
 }
 
 // NewConfig() parses the serverport
@@ -55,7 +55,9 @@ func NewConfig() Config {
 	var cfg Config
 
 	//url statt port
+	// in init fnc
 	flag.StringVar(&cfg.url, "url", "http://localhost:8080", "HTTP Server URL")
+
 	flag.Parse()
 
 	return cfg

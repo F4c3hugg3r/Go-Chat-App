@@ -1,8 +1,13 @@
 package client2
 
 import (
+	"errors"
 	"net/http"
 	"sync"
+)
+
+var (
+	ErrNotRegistered error = errors.New("you have no permission because you are not registered yet")
 )
 
 type Reader interface {
@@ -19,7 +24,11 @@ type ChatClient struct {
 	Cond       *sync.Cond
 	Output     chan *Response
 	url        string
-	// plugins    *PluginRegistry
+}
+
+type UserService struct {
+	c       *ChatClient
+	plugins *PluginRegistry
 }
 
 // Message contains the name of the requester and the message (content) itsself

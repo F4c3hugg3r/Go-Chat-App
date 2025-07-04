@@ -1,61 +1,50 @@
 package client2
 
-// import (
-// 	"encoding/json"
-// 	"log"
-// 	"slices"
-// )
+type PluginInterface interface {
+	// if an error accures, response.Content is empty
+	Execute(message *Message) func() error
+	Description() string
+}
 
-// type PluginInterface interface {
-// 	// if an error accures, response.Content is empty
-// 	Execute(message *Message) error
-// 	Description() string
-// }
+type PluginRegistry struct {
+	plugins   map[string]PluginInterface
+	invisible []string
+}
 
-// type PluginRegistry struct {
-// 	plugins   map[string]PluginInterface
-// 	invisible []string
-// }
+// RegisterPlugins sets up all the plugins
+func RegisterPlugins(chatService *ChatClient) *PluginRegistry {
+	pr := PluginRegistry{plugins: make(map[string]PluginInterface)}
+	pr.plugins["/help"] = NewHelpPlugin(chatService)
+	pr.plugins["/time"] = NewTimePlugin(chatService)
+	pr.plugins["/users"] = NewUserPlugin(chatService)
+	pr.plugins["/register"] = NewRegisterClientPlugin(chatService)
+	pr.plugins["/broadcast"] = NewBroadcastPlugin(chatService)
+	pr.plugins["/quit"] = NewLogOutPlugin(chatService)
+	pr.plugins["/private"] = NewPrivateMessagePlugin(chatService)
 
-// // RegisterPlugins sets up all the plugins
-// func RegisterPlugins(client *ChatClient) *PluginRegistry {
-// 	pr := PluginRegistry{plugins: make(map[string]PluginInterface)}
-// 	pr.plugins["/help"] = NewHelpPlugin(&pr)
-// 	pr.plugins["/time"] = NewTimePlugin()
-// 	pr.plugins["/users"] = NewUserPlugin(client)
-// 	pr.plugins["/register"] = NewRegisterClientPlugin(client)
-// 	pr.plugins["/broadcast"] = NewBroadcastPlugin(client)
-// 	pr.plugins["/quit"] = NewLogOutPlugin(client)
-// 	pr.plugins["/private"] = NewPrivateMessagePlugin(client)
+	pr.invisible = append(pr.invisible, "/broadcast")
 
-// 	pr.invisible = append(pr.invisible, "/broadcast")
+	return &pr
+}
 
-// 	return &pr
-// }
+func (pr *PluginRegistry) FindAndExecute(message *Message) func() error {
+	plugin, ok := pr.plugins[message.Plugin]
+	if !ok {
+		return nil
+	}
 
-// func (pr *PluginRegistry) FindAndExecute(message *Message) error {
-// 	plugin, ok := pr.plugins[message.Plugin]
-// 	if !ok {
-// 		return nil
-// 	}
-
-// 	return plugin.Execute(message)
-// }
+	return plugin.Execute(message)
+}
 
 // // ListPlugins lists all Plugins with correspontig commands
-// func (pr *PluginRegistry) ListPlugins() []json.RawMessage {
-// 	jsonSlice := []json.RawMessage{}
+// func (pr *PluginRegistry) ListPlugins() []PluginInterface {
+// 	plugins := []PluginInterface{}
 
 // 	for command, plugin := range pr.plugins {
 // 		if !slices.Contains(pr.invisible, command) {
-// 			jsonString, err := json.Marshal(Plugin{Command: command, Description: plugin.Description()})
-// 			if err != nil {
-// 				log.Printf("error parsing plugin %s to json", command)
-// 			}
-
-// 			jsonSlice = append(jsonSlice, jsonString)
+// 			plugins = append(plugins, plugin)
 // 		}
 // 	}
 
-// 	return jsonSlice
+// 	return plugins
 // }
