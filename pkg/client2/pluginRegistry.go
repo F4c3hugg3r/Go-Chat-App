@@ -9,7 +9,6 @@ const (
 )
 
 type PluginInterface interface {
-	// if an error accures, response.Content is empty
 	Execute(message *Message) func() error
 	Description() string
 	CheckScope() int

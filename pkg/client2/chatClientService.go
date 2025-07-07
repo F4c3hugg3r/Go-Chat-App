@@ -116,7 +116,7 @@ func (c *ChatClient) register(body []byte) error {
 	c.Registered = true
 	c.Cond.Signal()
 
-	fmt.Println("- Du wurdest registriert. -\n-> Gebe '/quit' ein, um den Chat zu verlassen\n-> Oder /help um Commands auzuführen")
+	fmt.Println("- Du wurdest registriert -\n-> Gebe '/quit' ein, um den Chat zu verlassen\n-> Oder '/help' um Commands auzuführen\n-> Oder ctrl+C um das Programm zu schließen")
 
 	return nil
 }
@@ -129,7 +129,7 @@ func (c *ChatClient) unregister() {
 	c.clientName = ""
 	c.Registered = false
 
-	fmt.Println("- Du bist nun vom Server getrennt.")
+	fmt.Println("- Du bist nun vom Server getrennt -")
 }
 
 func MessageToJson(msg *Message) ([]byte, error) {

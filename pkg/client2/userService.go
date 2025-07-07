@@ -69,8 +69,6 @@ func (u *UserService) parseInputToMessage(input string) (*Message, error) {
 }
 
 func (u *UserService) Executor(input string) {
-	// TODO bei ^C stoppen
-
 	msg, err := u.parseInputToMessage(input)
 	if err != nil {
 		log.Printf("%v: wrong input", err)

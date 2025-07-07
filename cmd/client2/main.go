@@ -11,26 +11,31 @@ import (
 	"github.com/c-bata/go-prompt"
 )
 
-// globale var für cfg
-type Config struct {
-	url string
+var (
+	url = flag.String("url", "http://localhost:8080", "HTTP Server URL")
+)
+
+func init() {
+	flag.Parse()
 }
 
 func main() {
-	cfg := NewConfig()
-	c := client.NewClient(cfg.url)
+	c := client.NewClient(*url)
 	u := client.NewUserService(c)
-
 	interChan := make(chan os.Signal, 2)
-	signal.Notify(interChan, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
 
-	// doesn't interrupt properly nimmt wahrscheinlich ^C nicht richtig
-	go interruptListener(interChan, c, cfg.url)
+	ctrlCBinding := prompt.KeyBind{
+		Key: prompt.ControlC,
+		Fn:  func(b *prompt.Buffer) { interChan <- os.Interrupt },
+	}
+
+	signal.Notify(interChan, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
+	go interruptListener(interChan, c)
 
 	p := prompt.New(
 		u.Executor,
 		u.Completer,
-		//maybe schauen ob es was anderes praktisches gibt
+		prompt.OptionAddKeyBind(ctrlCBinding),
 		prompt.OptionPrefix(">> "),
 	)
 	p.Run()
@@ -38,29 +43,16 @@ func main() {
 
 // interruptListener sends a cancel() signal and closes all connections and requests if a interruption like
 // os.Interrupt or syscall.SIGTERM is being triggered
-func interruptListener(interChan chan os.Signal, client *client.ChatClient, url string) {
+func interruptListener(interChan chan os.Signal, c *client.ChatClient) {
 	<-interChan
-	//TODO sendDelete
-	// err := client.SendDelete(nil)
-	// if err != nil {
-	// 	log.Print(err)
-	// }
 
-	client.HttpClient.CloseIdleConnections()
+	err := c.SendDelete(c.CreateMessage("", "/quit", "", ""))
+	if err != nil {
+		log.Print(err)
+	}
+
+	c.HttpClient.CloseIdleConnections()
 
 	log.Println("Client logged out")
 	os.Exit(0)
-}
-
-// NewConfig() parses the serverport
-func NewConfig() Config {
-	var cfg Config
-
-	//url statt port
-	// in init fnc
-	flag.StringVar(&cfg.url, "url", "http://localhost:8080", "HTTP Server URL")
-
-	flag.Parse()
-
-	return cfg
 }

@@ -42,7 +42,7 @@ func main() {
 	setUp(server, handler, cfg.TimeLimit, wg, ctx)
 
 	interChan := make(chan os.Signal, 2)
-	signal.Notify(interChan, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(interChan, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
 	wg.Add(1)
 
