@@ -14,17 +14,21 @@ func NewPrivateMessagePlugin(chatClient *ChatClient) *PrivateMessagePlugin {
 	return &PrivateMessagePlugin{c: chatClient}
 }
 
+func (pp *PrivateMessagePlugin) CheckScope() int {
+	return RegisteredOnly
+}
+
 func (pp *PrivateMessagePlugin) Description() string {
-	return "lets you send a private message to someone \n-> template: '/private {Id} {message}'"
+	return "lets you send a private message to someone"
 }
 
 func (pp *PrivateMessagePlugin) Execute(message *Message) func() error {
 	return func() error {
-		opposingClientId := strings.Fields(message.Content)[1]
+		opposingClientId := strings.Fields(message.Content)[0]
 
-		content, ok := strings.CutPrefix(message.Content, fmt.Sprintf("/private %s ", opposingClientId))
+		content, ok := strings.CutPrefix(message.Content, fmt.Sprintf("%s ", opposingClientId))
 		if !ok {
-			return fmt.Errorf("%w: prefix '/private %s ' not found", ErrParsing, opposingClientId)
+			return fmt.Errorf("%w: prefix '%s ' not found", ErrParsing, opposingClientId)
 		}
 
 		return pp.c.SendPlugin(pp.c.CreateMessage(message.Name, message.Plugin, content, opposingClientId))
@@ -38,6 +42,10 @@ type LogOutPlugin struct {
 
 func NewLogOutPlugin(chatClient *ChatClient) *LogOutPlugin {
 	return &LogOutPlugin{c: chatClient}
+}
+
+func (lp *LogOutPlugin) CheckScope() int {
+	return RegisteredOnly
 }
 
 func (lp *LogOutPlugin) Description() string {
@@ -60,23 +68,22 @@ func NewRegisterClientPlugin(chatClient *ChatClient) *RegisterClientPlugin {
 	return &RegisterClientPlugin{c: chatClient}
 }
 
+func (rp *RegisterClientPlugin) CheckScope() int {
+	return UnregisteredOnly
+}
+
 func (rp *RegisterClientPlugin) Description() string {
 	return "registeres a client"
 }
 
 func (rp *RegisterClientPlugin) Execute(message *Message) func() error {
 	return func() error {
-
-		clientName, ok := strings.CutPrefix(message.Content, "/register ")
-		if !ok {
-			return fmt.Errorf("%w: prefix '/register ' not found", ErrParsing)
+		clientName := message.Content
+		if len(clientName) > 50 || len(clientName) < 3 {
+			return fmt.Errorf("%w: your name has to be between 3 and 50 chars long", ErrParsing)
 		}
 
-		if len(clientName) > 50 {
-			return fmt.Errorf("%w: name %s is too long", ErrParsing, clientName)
-		}
-
-		return rp.c.SendRegister(rp.c.CreateMessage(clientName, message.Plugin, clientName, message.ClientId))
+		return rp.c.SendRegister(rp.c.CreateMessage(clientName, message.Plugin, message.Content, message.ClientId))
 	}
 }
 
@@ -88,6 +95,10 @@ type BroadcastPlugin struct {
 
 func NewBroadcastPlugin(chatClient *ChatClient) *BroadcastPlugin {
 	return &BroadcastPlugin{c: chatClient}
+}
+
+func (bp *BroadcastPlugin) CheckScope() int {
+	return RegisteredOnly
 }
 
 func (bp *BroadcastPlugin) Description() string {
@@ -109,6 +120,10 @@ func NewHelpPlugin(chatClient *ChatClient) *HelpPlugin {
 	return &HelpPlugin{c: chatClient}
 }
 
+func (hp *HelpPlugin) CheckScope() int {
+	return RegisteredOnly
+}
+
 func (h *HelpPlugin) Description() string {
 	return "tells every plugin and their description"
 }
@@ -128,6 +143,10 @@ func NewUserPlugin(chatClient *ChatClient) *UserPlugin {
 	return &UserPlugin{c: chatClient}
 }
 
+func (up *UserPlugin) CheckScope() int {
+	return RegisteredOnly
+}
+
 func (u *UserPlugin) Description() string {
 	return "tells you information about all the current users"
 }
@@ -145,6 +164,10 @@ type TimePlugin struct {
 
 func NewTimePlugin(chatClient *ChatClient) *TimePlugin {
 	return &TimePlugin{c: chatClient}
+}
+
+func (tp *TimePlugin) CheckScope() int {
+	return RegisteredOnly
 }
 
 func (t *TimePlugin) Description() string {

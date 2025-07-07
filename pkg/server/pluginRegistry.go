@@ -4,18 +4,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"slices"
 )
 
 type PluginInterface interface {
 	// if an error accures, respponse.Content is empty
 	Execute(message *Message) (*Response, error)
+	// should display the regex/template in which the command should be typed in
 	Description() string
 }
 
 type PluginRegistry struct {
 	plugins   map[string]PluginInterface
-	invisible []string
 }
 
 // RegisterPlugins sets up all the plugins
@@ -28,8 +27,6 @@ func RegisterPlugins(chatService *ChatService) *PluginRegistry {
 	pr.plugins["/broadcast"] = NewBroadcastPlugin(chatService)
 	pr.plugins["/quit"] = NewLogOutPlugin(chatService)
 	pr.plugins["/private"] = NewPrivateMessagePlugin(chatService)
-
-	pr.invisible = append(pr.invisible, "/register", "/broadcast")
 
 	return &pr
 }
@@ -48,14 +45,12 @@ func (pr *PluginRegistry) ListPlugins() []json.RawMessage {
 	jsonSlice := []json.RawMessage{}
 
 	for command, plugin := range pr.plugins {
-		if !slices.Contains(pr.invisible, command) {
 			jsonString, err := json.Marshal(Plugin{Command: command, Description: plugin.Description()})
 			if err != nil {
 				log.Printf("error parsing plugin %s to json", command)
 			}
 
 			jsonSlice = append(jsonSlice, jsonString)
-		}
 	}
 
 	return jsonSlice

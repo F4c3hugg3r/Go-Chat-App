@@ -20,7 +20,7 @@ func NewPrivateMessagePlugin(s *ChatService) *PrivateMessagePlugin {
 }
 
 func (pp *PrivateMessagePlugin) Description() string {
-	return "lets you send a private message to someone \n-> template: '/private {Id} {message}'"
+	return "'/private {Id} {message}'"
 }
 
 func (pp *PrivateMessagePlugin) Execute(message *Message) (*Response, error) {
@@ -52,7 +52,7 @@ func NewLogOutPlugin(s *ChatService) *LogOutPlugin {
 }
 
 func (lp *LogOutPlugin) Description() string {
-	return "loggs you out of the chat"
+	return "'/quit'"
 }
 
 func (lp *LogOutPlugin) Execute(message *Message) (*Response, error) {
@@ -82,7 +82,7 @@ func NewRegisterClientPlugin(s *ChatService) *RegisterClientPlugin {
 }
 
 func (rp *RegisterClientPlugin) Description() string {
-	return "registeres a client"
+	return "'/register {name}'"
 }
 
 func (rp *RegisterClientPlugin) Execute(message *Message) (*Response, error) {
@@ -101,7 +101,7 @@ func (rp *RegisterClientPlugin) Execute(message *Message) (*Response, error) {
 	clientCh := make(chan *Response, 100)
 	token := shared.GenerateSecureToken(64)
 	rp.chatService.clients[message.ClientId] = &Client{
-		Name:      message.Content,
+		Name:      message.Name,
 		ClientId:  message.ClientId,
 		clientCh:  clientCh,
 		Active:    true,
@@ -112,7 +112,7 @@ func (rp *RegisterClientPlugin) Execute(message *Message) (*Response, error) {
 
 	fmt.Printf("\nNew client '%s' registered.\n", message.Content)
 
-	return &Response{Name: "authToken", Content: token}, nil
+	return &Response{Name: message.Name, Content: token}, nil
 }
 
 // BroadcaastPlugin distributes an incomming message abroad all client channels if
@@ -126,7 +126,7 @@ func NewBroadcastPlugin(s *ChatService) *BroadcastPlugin {
 }
 
 func (bp *BroadcastPlugin) Description() string {
-	return "distributes a message abroad all clients"
+	return "'{message}' or '/broadcast {message}"
 }
 
 func (bp *BroadcastPlugin) Execute(message *Message) (*Response, error) {
@@ -165,7 +165,7 @@ func NewHelpPlugin(pr *PluginRegistry) *HelpPlugin {
 }
 
 func (h *HelpPlugin) Description() string {
-	return "tells every plugin and their description"
+	return "'/help'"
 }
 
 func (h *HelpPlugin) Execute(message *Message) (*Response, error) {
@@ -187,7 +187,7 @@ func NewUserPlugin(s *ChatService) *UserPlugin {
 }
 
 func (u *UserPlugin) Description() string {
-	return "tells you information about all the current users"
+	return "'/users'"
 }
 
 func (u *UserPlugin) Execute(message *Message) (*Response, error) {
@@ -221,7 +221,7 @@ func NewTimePlugin() *TimePlugin {
 }
 
 func (t *TimePlugin) Description() string {
-	return "tells you the current time"
+	return "'/time'"
 }
 
 func (t *TimePlugin) Execute(message *Message) (*Response, error) {

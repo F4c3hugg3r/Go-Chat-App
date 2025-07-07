@@ -1,5 +1,7 @@
 package client2
 
+import "fmt"
+
 const (
 	UnregisteredOnly = iota
 	RegisteredOnly
@@ -10,12 +12,12 @@ type PluginInterface interface {
 	// if an error accures, response.Content is empty
 	Execute(message *Message) func() error
 	Description() string
+	CheckScope() int
 }
 
 type PluginRegistry struct {
 	plugins           map[string]PluginInterface
 	registrationScope map[string]int
-	invisible         []string
 	chatClient        *ChatClient
 }
 
@@ -30,55 +32,30 @@ func RegisterPlugins(chatClient *ChatClient) *PluginRegistry {
 	pr.plugins["/quit"] = NewLogOutPlugin(chatClient)
 	pr.plugins["/private"] = NewPrivateMessagePlugin(chatClient)
 
-	pr.registrationScope = make(map[string]int)
-	pr.registrationScope["/help"] = Always
-	pr.registrationScope["/time"] = Always
-	pr.registrationScope["/register"] = UnregisteredOnly
-	pr.registrationScope["/users"] = RegisteredOnly
-	pr.registrationScope["/broadcast"] = RegisteredOnly
-	pr.registrationScope["/quit"] = RegisteredOnly
-	pr.registrationScope["/private"] = RegisteredOnly
-
-	pr.invisible = append(pr.invisible, "/broadcast")
 	pr.chatClient = chatClient
 
 	return &pr
 }
 
 func (pr *PluginRegistry) FindAndExecute(message *Message) func() error {
-	plugin, ok := pr.plugins[message.Plugin]
-	if !ok {
-		return nil
-	}
-
-	scope, ok := pr.registrationScope[message.Plugin]
-	if !ok {
-		return nil
-	}
-
-	switch scope {
-	case UnregisteredOnly:
-		if pr.chatClient.Registered {
-			return nil
+	return func() error {
+		plugin, ok := pr.plugins[message.Plugin]
+		if !ok {
+			return fmt.Errorf("%w: plugin not found", ErrNoPermission)
 		}
-	case RegisteredOnly:
-		if !pr.chatClient.Registered {
-			return nil
-		}
-	}
 
-	return plugin.Execute(message)
+		scope := pr.plugins[message.Plugin].CheckScope()
+
+		switch scope {
+		case UnregisteredOnly:
+			if pr.chatClient.Registered {
+				return fmt.Errorf("%w: you are already registered", ErrNoPermission)
+			}
+		case RegisteredOnly:
+			if !pr.chatClient.Registered {
+				return fmt.Errorf("%w: you are not registered yet", ErrNoPermission)
+			}
+		}
+		return plugin.Execute(message)()
+	}
 }
-
-// // ListPlugins lists all Plugins with correspontig commands
-// func (pr *PluginRegistry) ListPlugins() []PluginInterface {
-// 	plugins := []PluginInterface{}
-
-// 	for command, plugin := range pr.plugins {
-// 		if !slices.Contains(pr.invisible, command) {
-// 			plugins = append(plugins, plugin)
-// 		}
-// 	}
-
-// 	return plugins
-// }

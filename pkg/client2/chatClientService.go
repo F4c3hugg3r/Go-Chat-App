@@ -37,17 +37,12 @@ func (c *ChatClient) MessageReceiver(url string) {
 
 		body, err := c.getMessages(url)
 		if err != nil {
-			return
+			continue
 		}
 
 		rsp, err := DecodeToResponse(body)
 		if err != nil {
-			log.Printf("%v: Fehler beim decodieren der response aufgetreten", err)
-			return
-		}
-
-		if strings.TrimSpace(rsp.Content) == "" {
-			return
+			continue
 		}
 
 		valid := c.checkResponse(&rsp)
@@ -74,6 +69,7 @@ func (c *ChatClient) getMessages(url string) ([]byte, error) {
 	}
 
 	body, err := io.ReadAll(res.Body)
+
 	if err != nil {
 		return nil, fmt.Errorf("%s: message body couldn't be read", res.Status)
 	}
@@ -120,7 +116,7 @@ func (c *ChatClient) register(body []byte) error {
 	c.Registered = true
 	c.Cond.Signal()
 
-	fmt.Println("you registered yourself")
+	fmt.Println("- Du wurdest registriert. -\n-> Gebe '/quit' ein, um den Chat zu verlassen\n-> Oder /help um Commands auzuführen")
 
 	return nil
 }
@@ -133,7 +129,7 @@ func (c *ChatClient) unregister() {
 	c.clientName = ""
 	c.Registered = false
 
-	fmt.Println("you got unregistered")
+	fmt.Println("- Du bist nun vom Server getrennt.")
 }
 
 func MessageToJson(msg *Message) ([]byte, error) {
@@ -210,8 +206,8 @@ func (c *ChatClient) SendPlugin(msg *Message) error {
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-
-		return fmt.Errorf("%s: message couldn't be send", res.Status)
+		//tolerated because it triggeres message poll
+		return nil //fmt.Errorf("%s: message couldn't be send", res.Status)
 	}
 
 	return nil
@@ -219,7 +215,6 @@ func (c *ChatClient) SendPlugin(msg *Message) error {
 
 func (c *ChatClient) PollMessages() []*Response {
 	result := []*Response{}
-
 	for {
 		select {
 		case msg, ok := <-c.Output:
@@ -258,7 +253,7 @@ func (c *ChatClient) CreateMessage(clientName string, plugin string, content str
 	if clientId == "" {
 		msg.ClientId = c.clientId
 	} else {
-		msg.Name = clientId
+		msg.ClientId = clientId
 	}
 
 	msg.Content = content

@@ -8,7 +8,7 @@ import (
 
 // GetRequest sends a GET Request to the server including the authorization token
 func (c *ChatClient) GetRequest(url string) (*http.Response, error) {
-	parameteredUrl := fmt.Sprintf("%s/users/%s", url, c.clientId)
+	parameteredUrl := fmt.Sprintf("%s/users/%s/chat", url, c.clientId)
 	req, err := http.NewRequest("GET", parameteredUrl, nil)
 	if err != nil {
 		return nil, fmt.Errorf("%w: Fehler beim erstellen der GET request: ", err)
