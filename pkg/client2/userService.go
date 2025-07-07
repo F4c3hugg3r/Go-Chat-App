@@ -10,7 +10,10 @@ import (
 )
 
 func NewUserService(c *ChatClient) *UserService {
-	return &UserService{c: c}
+	return &UserService{
+		chatClient: c,
+		plugins:    RegisterPlugins(c),
+	}
 }
 
 func displayResponse(rsp *Response) error {
@@ -25,9 +28,12 @@ func displayResponse(rsp *Response) error {
 	}
 
 	responseString := fmt.Sprintf("%s: %s\n", rsp.Name, rsp.Content)
+	//displayed nicht richtig, liegt evtl an prompt package
 	fmt.Println(responseString)
 	return nil
 }
+
+//TODO public create Message Funktion, die parameter falls nicht empty überschreibt und ansonsten default nimmt
 
 func (u *UserService) parseInputToMessage(input string) (*Message, error) {
 	//TODO string - einheitlich - mit fmt regex einlesen und message zurück geben
@@ -35,18 +41,18 @@ func (u *UserService) parseInputToMessage(input string) (*Message, error) {
 
 	if strings.HasPrefix(input, "/register") {
 		clientName := strings.Fields(input)[1]
-		return &Message{Name: clientName, Plugin: "/register", Content: clientName, ClientId: u.c.clientId}, nil
+		return &Message{Name: clientName, Plugin: "/register", Content: clientName, ClientId: u.chatClient.clientId}, nil
 	}
 
 	if !strings.HasPrefix(input, "/") {
-		return &Message{Name: u.c.clientName, Plugin: "/broadcast", Content: input, ClientId: u.c.clientId}, nil
+		return &Message{Name: u.chatClient.clientName, Plugin: "/broadcast", Content: input, ClientId: u.chatClient.clientId}, nil
 	}
 
 	if strings.HasPrefix(input, "/private") {
 		opposingClientId := strings.Fields(input)[1]
 		message, _ := strings.CutPrefix(input, fmt.Sprintf("/private %s ", opposingClientId))
 
-		return &Message{Name: u.c.clientName, Plugin: "/private", ClientId: opposingClientId, Content: message}, nil
+		return &Message{Name: u.chatClient.clientName, Plugin: "/private", ClientId: opposingClientId, Content: message}, nil
 	}
 
 	plugin := strings.Fields(input)[0]
@@ -54,7 +60,7 @@ func (u *UserService) parseInputToMessage(input string) (*Message, error) {
 	content := strings.ReplaceAll(input, plugin, "")
 	content, _ = strings.CutPrefix(content, " ")
 
-	return &Message{Name: u.c.clientName, Plugin: plugin, Content: content, ClientId: u.c.clientId}, nil
+	return &Message{Name: u.chatClient.clientName, Plugin: plugin, Content: content, ClientId: u.chatClient.clientId}, nil
 
 	// switch {
 	// case strings.HasPrefix(input, "/register"):
@@ -107,7 +113,7 @@ func (u *UserService) parseInputToMessage(input string) (*Message, error) {
 	// 		u.c.SendMessage(&Message{Name: u.c.clientName, Plugin: plugin, Content: content, ClientId: u.c.clientId})
 	// 	}
 	// }
-	return nil, nil
+	//return nil, nil
 }
 
 func (u *UserService) Executor(input string) {
@@ -117,7 +123,7 @@ func (u *UserService) Executor(input string) {
 		log.Printf("%v: wrong input", err)
 	}
 
-	responses := u.c.PollMessages()
+	responses := u.chatClient.PollMessages()
 	for _, rsp := range responses {
 		err = displayResponse(rsp)
 		if err != nil {

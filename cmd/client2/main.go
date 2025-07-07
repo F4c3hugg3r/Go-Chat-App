@@ -1,4 +1,4 @@
-package client2
+package main
 
 import (
 	"flag"
@@ -24,6 +24,7 @@ func main() {
 	interChan := make(chan os.Signal, 2)
 	signal.Notify(interChan, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
 
+	// doesn't interrupt properly nimmt wahrscheinlich ^C nicht richtig
 	go interruptListener(interChan, c, cfg.url)
 
 	p := prompt.New(
@@ -39,7 +40,8 @@ func main() {
 // os.Interrupt or syscall.SIGTERM is being triggered
 func interruptListener(interChan chan os.Signal, client *client.ChatClient, url string) {
 	<-interChan
-	//err := client.SendMessage(url, cancel, "/quit\n", wg, ctx)
+	//TODO sendDelete
+	// err := client.SendDelete(nil)
 	// if err != nil {
 	// 	log.Print(err)
 	// }

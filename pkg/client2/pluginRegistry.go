@@ -37,6 +37,9 @@ func (pr *PluginRegistry) FindAndExecute(message *Message) func() error {
 		return nil
 	}
 
+	// Todo slice mit basic options, die als einzige durchgeführt werden können, wenn
+	// noch nicht registriert ist oder map mit [command]int und die durchiterieren
+	// 0 only not registered, 1 only registered, 2 both
 	registered := pr.chatClient.Registered
 	if message.Plugin != "/register" && !registered {
 		return func() error {

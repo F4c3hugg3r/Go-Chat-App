@@ -27,8 +27,8 @@ type ChatClient struct {
 }
 
 type UserService struct {
-	c       *ChatClient
-	plugins *PluginRegistry
+	chatClient *ChatClient
+	plugins    *PluginRegistry
 }
 
 // Message contains the name of the requester and the message (content) itsself

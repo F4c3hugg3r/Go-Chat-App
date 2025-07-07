@@ -152,10 +152,11 @@ func (c *ChatClient) SendRegister(msg *Message) error {
 		return fmt.Errorf("%w: error parsing json", err)
 	}
 
-	res, err := c.DeleteRequest(c.url, body)
+	parameteredUrl := fmt.Sprintf("%s/users/%s", c.url, c.clientId)
+	res, err := c.PostRequest(parameteredUrl, body)
 	if err != nil {
 
-		return fmt.Errorf("%w: client couldn't be deleted", err)
+		return fmt.Errorf("%w: message couldn't be send", err)
 	}
 
 	resBody, err := io.ReadAll(res.Body)
