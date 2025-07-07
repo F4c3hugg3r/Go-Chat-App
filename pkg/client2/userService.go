@@ -3,6 +3,7 @@ package client2
 import (
 	"fmt"
 	"log"
+	"slices"
 	"strings"
 
 	"github.com/c-bata/go-prompt"
@@ -12,29 +13,48 @@ func NewUserService(c *ChatClient) *UserService {
 	return &UserService{c: c}
 }
 
-func displayMessage(rsp *Response) {
+func displayResponse(rsp *Response) error {
 	if strings.HasPrefix(rsp.Content, "[") {
 		output, err := JSONToTable(rsp.Content)
 		if err != nil {
-			log.Printf("%v: Fehler beim Abrufen ist aufgetreten", err)
-
-			return
+			return fmt.Errorf("%v: error formatting json to table", err)
 		}
 
 		fmt.Println(output)
-		return
+		return nil
 	}
 
 	responseString := fmt.Sprintf("%s: %s\n", rsp.Name, rsp.Content)
 	fmt.Println(responseString)
+	return nil
 }
 
 func (u *UserService) parseInputToMessage(input string) (*Message, error) {
+	//TODO string - einheitlich - mit fmt regex einlesen und message zurück geben
+	input = strings.TrimSuffix(input, "\n")
 
-	//TODO string mit regex einlesen und message zurück geben
-	if u.c.Registered == false {
-		return nil, fmt.Errorf("%w: you are not registered yet", ErrNotRegistered)
+	if strings.HasPrefix(input, "/register") {
+		clientName := strings.Fields(input)[1]
+		return &Message{Name: clientName, Plugin: "/register", Content: clientName, ClientId: u.c.clientId}, nil
 	}
+
+	if !strings.HasPrefix(input, "/") {
+		return &Message{Name: u.c.clientName, Plugin: "/broadcast", Content: input, ClientId: u.c.clientId}, nil
+	}
+
+	if strings.HasPrefix(input, "/private") {
+		opposingClientId := strings.Fields(input)[1]
+		message, _ := strings.CutPrefix(input, fmt.Sprintf("/private %s ", opposingClientId))
+
+		return &Message{Name: u.c.clientName, Plugin: "/private", ClientId: opposingClientId, Content: message}, nil
+	}
+
+	plugin := strings.Fields(input)[0]
+
+	content := strings.ReplaceAll(input, plugin, "")
+	content, _ = strings.CutPrefix(content, " ")
+
+	return &Message{Name: u.c.clientName, Plugin: plugin, Content: content, ClientId: u.c.clientId}, nil
 
 	// switch {
 	// case strings.HasPrefix(input, "/register"):
@@ -91,12 +111,18 @@ func (u *UserService) parseInputToMessage(input string) (*Message, error) {
 }
 
 func (u *UserService) Executor(input string) {
-	input = strings.TrimSuffix(input, "\n")
 
-	// parsing function fmt regex
 	msg, err := u.parseInputToMessage(input)
 	if err != nil {
 		log.Printf("%v: wrong input", err)
+	}
+
+	responses := u.c.PollMessages()
+	for _, rsp := range responses {
+		err = displayResponse(rsp)
+		if err != nil {
+			log.Printf("%v: response from %s couldn't be displayed", err, rsp.Name)
+		}
 	}
 
 	err = u.plugins.FindAndExecute(msg)()
@@ -106,15 +132,12 @@ func (u *UserService) Executor(input string) {
 }
 
 func (u *UserService) Completer(d prompt.Document) []prompt.Suggest {
-	//durch list plugins iterieren
+	s := []prompt.Suggest{}
 
-	s := []prompt.Suggest{
-		{Text: "/help", Description: "Zeigt die Hilfe an"},
-		{Text: "/quit", Description: "Beendet das Programm"},
-		{Text: "/private", Description: "Sendet eine private message"},
-		{Text: "/users", Description: "Listet alle User"},
-		{Text: "/time", Description: "Zeigt die aktuelle Zeit an"},
-		{Text: "/register", Description: "Registriert dich beim Server"},
+	for command, plugin := range u.plugins.plugins {
+		if !slices.Contains(u.plugins.invisible, command) {
+			s = append(s, prompt.Suggest{Text: command, Description: plugin.Description()})
+		}
 	}
 
 	//TODO bei private weiteren vorschlag für clientids

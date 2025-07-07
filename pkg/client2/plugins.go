@@ -15,6 +15,7 @@ func (pp *PrivateMessagePlugin) Description() string {
 
 func (pp *PrivateMessagePlugin) Execute(message *Message) func() error {
 	return func() error {
+
 		//TODO aus messsage clientid extracten
 		return pp.c.SendPlugin(message)
 	}
@@ -55,6 +56,7 @@ func (rp *RegisterClientPlugin) Description() string {
 
 func (rp *RegisterClientPlugin) Execute(message *Message) func() error {
 	return func() error {
+
 		//TODO aus content namen extracten
 		return rp.c.SendRegister(message)
 	}

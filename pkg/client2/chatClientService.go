@@ -27,32 +27,16 @@ func NewClient(server string) *ChatClient {
 	// chatClient.plugins = RegisterPlugins(chatClient)
 	chatClient.Cond = sync.NewCond(chatClient.mu)
 
-	go chatClient.receiveMessages(server)
+	go chatClient.MessageReceiver(server)
 
 	return chatClient
 }
 
-func (c *ChatClient) receiveMessages(url string) {
+func (c *ChatClient) MessageReceiver(url string) {
 	for {
 		c.CheckRegistered()
 
-		// funktion
-		res, err := c.GetRequest(url)
-		if err != nil {
-			log.Printf("%v: Fehler beim Abrufen ist aufgetreten: ", err)
-			c.unregister()
-
-			return
-		}
-
-		defer res.Body.Close()
-
-		if res.StatusCode != http.StatusOK {
-			log.Printf("%v: message couldn't be send", res.Status)
-			return
-		}
-
-		body, err := io.ReadAll(res.Body)
+		body, err := c.getMessages(url)
 		if err != nil {
 			return
 		}
@@ -74,13 +58,37 @@ func (c *ChatClient) receiveMessages(url string) {
 	}
 }
 
+func (c *ChatClient) getMessages(url string) ([]byte, error) {
+	res, err := c.GetRequest(url)
+	if err != nil {
+		c.unregister()
+		log.Printf("%v: the connection to the server couldn't be established", err)
+
+		return nil, fmt.Errorf("%w: Fehler beim Abrufen ist aufgetreten: ", err)
+
+	}
+
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%s: message couldn't be received", res.Status)
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("%s: message body couldn't be read", res.Status)
+	}
+
+	return body, nil
+}
+
 func (c *ChatClient) checkResponse(rsp *Response) bool {
 	if rsp.Content == "" {
 		return false
 	}
 
 	if rsp.Name == inactiveFlag {
-		log.Println("You got kicked out due to inactivity")
+		log.Println("you got kicked out due to inactivity")
 		c.unregister()
 
 		return false
@@ -113,6 +121,8 @@ func (c *ChatClient) register(body []byte) error {
 	c.Registered = true
 	c.Cond.Signal()
 
+	fmt.Println("you registered yourself")
+
 	return nil
 }
 
@@ -120,9 +130,11 @@ func (c *ChatClient) unregister() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	//clientName/authToken löschen
-
+	c.authToken = ""
+	c.clientName = ""
 	c.Registered = false
+
+	fmt.Println("you got unregistered")
 }
 
 func MessageToJson(msg *Message) ([]byte, error) {
@@ -177,7 +189,7 @@ func (c *ChatClient) SendDelete(msg *Message) error {
 
 	defer res.Body.Close()
 
-	//delete chatclient daten funktion
+	c.unregister()
 
 	return nil
 }

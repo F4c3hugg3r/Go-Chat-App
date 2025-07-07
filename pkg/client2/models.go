@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	ErrNotRegistered error = errors.New("you have no permission because you are not registered yet")
+	ErrNoPermission error = errors.New("you have no permission")
 )
 
 type Reader interface {
