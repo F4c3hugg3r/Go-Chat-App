@@ -33,87 +33,22 @@ func displayResponse(rsp *Response) error {
 	return nil
 }
 
-//TODO public create Message Funktion, die parameter falls nicht empty überschreibt und ansonsten default nimmt
-
 func (u *UserService) parseInputToMessage(input string) (*Message, error) {
-	//TODO string - einheitlich - mit fmt regex einlesen und message zurück geben
 	input = strings.TrimSuffix(input, "\n")
+	var plugin string
 
-	if strings.HasPrefix(input, "/register") {
-		clientName := strings.Fields(input)[1]
-		return &Message{Name: clientName, Plugin: "/register", Content: clientName, ClientId: u.chatClient.clientId}, nil
+	ok := strings.HasPrefix(input, "/")
+	switch ok {
+	case true:
+		plugin = strings.Fields(input)[0]
+	case false:
+		plugin = "/broadcast"
 	}
-
-	if !strings.HasPrefix(input, "/") {
-		return &Message{Name: u.chatClient.clientName, Plugin: "/broadcast", Content: input, ClientId: u.chatClient.clientId}, nil
-	}
-
-	if strings.HasPrefix(input, "/private") {
-		opposingClientId := strings.Fields(input)[1]
-		message, _ := strings.CutPrefix(input, fmt.Sprintf("/private %s ", opposingClientId))
-
-		return &Message{Name: u.chatClient.clientName, Plugin: "/private", ClientId: opposingClientId, Content: message}, nil
-	}
-
-	plugin := strings.Fields(input)[0]
 
 	content := strings.ReplaceAll(input, plugin, "")
 	content, _ = strings.CutPrefix(content, " ")
 
-	return &Message{Name: u.chatClient.clientName, Plugin: plugin, Content: content, ClientId: u.chatClient.clientId}, nil
-
-	// switch {
-	// case strings.HasPrefix(input, "/register"):
-	// 	{
-	// 		clientName, _ := strings.CutPrefix(input, "/register ")
-	// 		u.c.PollMessages()
-	// 		//printen
-	// 		u.c.SendMessage(&Message{Name: clientName, Plugin: "/register", ClientId: u.c.clientId})
-	// 		return
-	// 	}
-	// //nil pointer reference wenn noch nicht registriert
-	// case !strings.HasPrefix(input, "/"):
-	// 	{
-	// 		if u.c.Registered == false {
-	// 			log.Printf("you are not registered yet")
-	// 			return
-	// 		}
-	// 		u.c.PollMessages()
-	// 		//printen
-	// 		u.c.SendMessage(&Message{Name: u.c.clientName, Plugin: "/broadcast", Content: input, ClientId: u.c.clientId})
-	// 		return
-	// 	}
-	// case strings.HasPrefix(input, "/private"):
-	// 	{
-	// 		if u.c.Registered == false {
-	// 			log.Printf("you are not registered yet")
-	// 			return
-	// 		}
-	// 		opposingClientId := strings.Fields(input)[1]
-	// 		message, _ := strings.CutPrefix(input, fmt.Sprintf("/private %s ", opposingClientId))
-
-	// 		u.c.PollMessages()
-	// 		//printen
-	// 		u.c.SendMessage(&Message{Name: u.c.clientName, Plugin: "/private", ClientId: opposingClientId, Content: message})
-	// 		return
-	// 	}
-	// default:
-	// 	{
-	// 		if u.c.Registered == false {
-	// 			log.Printf("you are not registered yet")
-	// 			return
-	// 		}
-	// 		plugin := strings.Fields(input)[0]
-
-	// 		content := strings.ReplaceAll(input, plugin, "")
-	// 		content, _ = strings.CutPrefix(content, " ")
-
-	// 		u.c.PollMessages()
-	// 		//printen
-	// 		u.c.SendMessage(&Message{Name: u.c.clientName, Plugin: plugin, Content: content, ClientId: u.c.clientId})
-	// 	}
-	// }
-	//return nil, nil
+	return u.chatClient.CreateMessage("", plugin, content, ""), nil
 }
 
 func (u *UserService) Executor(input string) {
@@ -146,7 +81,7 @@ func (u *UserService) Completer(d prompt.Document) []prompt.Suggest {
 		}
 	}
 
-	//TODO bei private weiteren vorschlag für clientids
+	//TODO nur Vorschläge beim ersten Wort
 
 	return prompt.FilterHasPrefix(s, d.GetWordBeforeCursor(), true)
 }

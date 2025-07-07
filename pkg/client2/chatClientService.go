@@ -24,7 +24,6 @@ func NewClient(server string) *ChatClient {
 		url:        server,
 	}
 
-	// chatClient.plugins = RegisterPlugins(chatClient)
 	chatClient.Cond = sync.NewCond(chatClient.mu)
 
 	go chatClient.MessageReceiver(server)
@@ -42,12 +41,12 @@ func (c *ChatClient) MessageReceiver(url string) {
 		}
 
 		rsp, err := DecodeToResponse(body)
-		if strings.TrimSpace(rsp.Content) == "" {
+		if err != nil {
+			log.Printf("%v: Fehler beim decodieren der response aufgetreten", err)
 			return
 		}
 
-		if err != nil {
-			log.Printf("%v: Fehler beim decodieren der response aufgetreten", err)
+		if strings.TrimSpace(rsp.Content) == "" {
 			return
 		}
 
@@ -245,4 +244,25 @@ func DecodeToResponse(body []byte) (Response, error) {
 	}
 
 	return response, nil
+}
+
+func (c *ChatClient) CreateMessage(clientName string, plugin string, content string, clientId string) *Message {
+	msg := &Message{}
+
+	if clientName == "" && c.Registered {
+		msg.Name = c.clientName
+	} else {
+		msg.Name = clientName
+	}
+
+	if clientId == "" {
+		msg.ClientId = c.clientId
+	} else {
+		msg.Name = clientId
+	}
+
+	msg.Content = content
+	msg.Plugin = plugin
+
+	return msg
 }

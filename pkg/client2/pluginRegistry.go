@@ -1,6 +1,10 @@
 package client2
 
-import "fmt"
+const (
+	UnregisteredOnly = iota
+	RegisteredOnly
+	Always
+)
 
 type PluginInterface interface {
 	// if an error accures, response.Content is empty
@@ -9,9 +13,10 @@ type PluginInterface interface {
 }
 
 type PluginRegistry struct {
-	plugins    map[string]PluginInterface
-	invisible  []string
-	chatClient *ChatClient
+	plugins           map[string]PluginInterface
+	registrationScope map[string]int
+	invisible         []string
+	chatClient        *ChatClient
 }
 
 // RegisterPlugins sets up all the plugins
@@ -25,6 +30,15 @@ func RegisterPlugins(chatClient *ChatClient) *PluginRegistry {
 	pr.plugins["/quit"] = NewLogOutPlugin(chatClient)
 	pr.plugins["/private"] = NewPrivateMessagePlugin(chatClient)
 
+	pr.registrationScope = make(map[string]int)
+	pr.registrationScope["/help"] = Always
+	pr.registrationScope["/time"] = Always
+	pr.registrationScope["/register"] = UnregisteredOnly
+	pr.registrationScope["/users"] = RegisteredOnly
+	pr.registrationScope["/broadcast"] = RegisteredOnly
+	pr.registrationScope["/quit"] = RegisteredOnly
+	pr.registrationScope["/private"] = RegisteredOnly
+
 	pr.invisible = append(pr.invisible, "/broadcast")
 	pr.chatClient = chatClient
 
@@ -37,18 +51,19 @@ func (pr *PluginRegistry) FindAndExecute(message *Message) func() error {
 		return nil
 	}
 
-	// Todo slice mit basic options, die als einzige durchgeführt werden können, wenn
-	// noch nicht registriert ist oder map mit [command]int und die durchiterieren
-	// 0 only not registered, 1 only registered, 2 both
-	registered := pr.chatClient.Registered
-	if message.Plugin != "/register" && !registered {
-		return func() error {
-			return fmt.Errorf("%w: you are not registered yet", ErrNoPermission)
-		}
+	scope, ok := pr.registrationScope[message.Plugin]
+	if !ok {
+		return nil
 	}
-	if message.Plugin == "/register" && registered {
-		return func() error {
-			return fmt.Errorf("%w: you are already registered", ErrNoPermission)
+
+	switch scope {
+	case UnregisteredOnly:
+		if pr.chatClient.Registered {
+			return nil
+		}
+	case RegisteredOnly:
+		if !pr.chatClient.Registered {
+			return nil
 		}
 	}
 

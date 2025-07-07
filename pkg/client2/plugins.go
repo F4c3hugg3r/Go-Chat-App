@@ -1,5 +1,10 @@
 package client2
 
+import (
+	"fmt"
+	"strings"
+)
+
 // PrivateMessage Plugin lets a client send a private message to another client identified by it's clientId
 type PrivateMessagePlugin struct {
 	c *ChatClient
@@ -15,9 +20,14 @@ func (pp *PrivateMessagePlugin) Description() string {
 
 func (pp *PrivateMessagePlugin) Execute(message *Message) func() error {
 	return func() error {
+		opposingClientId := strings.Fields(message.Content)[1]
 
-		//TODO aus messsage clientid extracten
-		return pp.c.SendPlugin(message)
+		content, ok := strings.CutPrefix(message.Content, fmt.Sprintf("/private %s ", opposingClientId))
+		if !ok {
+			return fmt.Errorf("%w: prefix '/private %s ' not found", ErrParsing, opposingClientId)
+		}
+
+		return pp.c.SendPlugin(pp.c.CreateMessage(message.Name, message.Plugin, content, opposingClientId))
 	}
 }
 
@@ -57,8 +67,16 @@ func (rp *RegisterClientPlugin) Description() string {
 func (rp *RegisterClientPlugin) Execute(message *Message) func() error {
 	return func() error {
 
-		//TODO aus content namen extracten
-		return rp.c.SendRegister(message)
+		clientName, ok := strings.CutPrefix(message.Content, "/register ")
+		if !ok {
+			return fmt.Errorf("%w: prefix '/register ' not found", ErrParsing)
+		}
+
+		if len(clientName) > 50 {
+			return fmt.Errorf("%w: name %s is too long", ErrParsing, clientName)
+		}
+
+		return rp.c.SendRegister(rp.c.CreateMessage(clientName, message.Plugin, clientName, message.ClientId))
 	}
 }
 

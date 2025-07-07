@@ -8,6 +8,7 @@ import (
 
 var (
 	ErrNoPermission error = errors.New("you have no permission")
+	ErrParsing      error = errors.New("there was an errror while parsing your input")
 )
 
 type Reader interface {
