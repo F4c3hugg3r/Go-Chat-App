@@ -1,21 +1,37 @@
-package client
+package client2
 
 import (
-	"io"
+	"errors"
 	"net/http"
+	"sync"
 )
 
-type Reader interface {
-	ReadString(delim byte) (string, error)
-}
+var (
+	ErrNoPermission error = errors.New("you have no permission")
+	ErrParsing      error = errors.New("there was an errror while parsing your input")
+)
 
-type Client struct {
+// ChatClient handles all network tasks
+type ChatClient struct {
 	clientName string
 	clientId   string
-	reader     Reader
-	writer     io.Writer
 	authToken  string
 	HttpClient *http.Client
+	Registered bool
+	mu         *sync.Mutex
+	Cond       *sync.Cond
+	Output     chan *Response
+	url        string
+}
+
+// UserService handles user inputs and outputs
+type UserService struct {
+	chatClient *ChatClient
+	plugins    *PluginRegistry
+	poll       bool
+	typing     bool
+	mu         *sync.Mutex
+	Cond       *sync.Cond
 }
 
 // Message contains the name of the requester and the message (content) itsself

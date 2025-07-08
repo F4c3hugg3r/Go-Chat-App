@@ -110,8 +110,6 @@ func (u *UserService) ParseInputToMessage(input string) (*Message, error) {
 // Executor takes the parsed input message, executes the corresponding
 // plugin and polls for a Response
 func (u *UserService) Executor(input string) {
-	fmt.Print("\033[1A\033[K")
-
 	msg, err := u.ParseInputToMessage(input)
 	if err != nil {
 		log.Printf("%v: wrong input", err)

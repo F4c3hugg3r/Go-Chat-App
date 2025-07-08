@@ -1,113 +1,65 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 
-	"github.com/F4c3hugg3r/Go-Chat-Server/pkg/client"
+	client "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client"
+	"github.com/c-bata/go-prompt"
 )
 
-type Config struct {
-	port int
+var (
+	url = flag.String("url", "http://localhost:8080", "HTTP Server URL")
+)
+
+func init() {
+	flag.Parse()
 }
 
 func main() {
-	cfg := NewConfig()
-	wg := &sync.WaitGroup{}
-	url := fmt.Sprintf("http://localhost:%d", cfg.port)
-	client := client.NewClient()
+	c := client.NewClient(*url)
+	u := client.NewUserService(c)
+	interChan := make(chan os.Signal, 3)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	interChan := make(chan os.Signal, 2)
-	signal.Notify(interChan, os.Interrupt, syscall.SIGTERM)
-
-	wg.Add(1)
-
-	go interruptListener(interChan, cancel, wg, client, url, ctx)
-
-	err := client.Register(url)
-	if err != nil {
-		log.Fatal(err)
+	ctrlCBinding := prompt.KeyBind{
+		Key: prompt.ControlC,
+		Fn:  func(b *prompt.Buffer) { interChan <- os.Interrupt },
 	}
 
-	startChat(wg, ctx, client, url, cancel)
+	deleteInput := func(*prompt.Document) { fmt.Print("\033[1A\033[K") }
 
-	wg.Wait()
+	signal.Notify(interChan, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
+	go interruptListener(interChan, c)
+
+	p := prompt.New(
+		u.Executor,
+		u.Completer,
+		prompt.OptionAddKeyBind(ctrlCBinding),
+		prompt.OptionPrefix(""),
+		prompt.OptionBreakLineCallback(deleteInput),
+	)
+	fmt.Println("- registriere dich mit '/register {name}' -")
+	p.Run()
 }
 
 // interruptListener sends a cancel() signal and closes all connections and requests if a interruption like
 // os.Interrupt or syscall.SIGTERM is being triggered
-func interruptListener(interChan chan os.Signal, cancel context.CancelFunc, wg *sync.WaitGroup, client *client.Client, url string, ctx context.Context) {
-	defer wg.Done()
+func interruptListener(interChan chan os.Signal, c *client.ChatClient) {
+	<-interChan
 
-	select {
-	case <-interChan:
-		err := client.SendMessage(url, cancel, "/quit\n", wg, ctx)
+	if c.Registered {
+		err := c.SendDelete(c.CreateMessage("", "/quit", "", ""))
 		if err != nil {
 			log.Print(err)
 		}
-
-		cancel()
-	case <-ctx.Done():
 	}
 
-	client.HttpClient.CloseIdleConnections()
+	c.HttpClient.CloseIdleConnections()
 
-	log.Println("Client logged out")
-	os.Stdin.Close()
-}
-
-// startChat starts two go-routines for the sending and receiving of messages/responses
-func startChat(wg *sync.WaitGroup, ctx context.Context, client *client.Client, url string, cancel context.CancelFunc) {
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				client.ReceiveMessages(url, cancel)
-			}
-		}
-	}()
-
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				err := client.SendMessage(url, cancel, "", wg, ctx)
-				if err != nil {
-					log.Println("Fehler beim Absenden der Nachricht: ", err)
-				}
-			}
-		}
-	}()
-}
-
-// NewConfig() parses the serverport
-func NewConfig() Config {
-	var cfg Config
-
-	//url statt port
-	flag.IntVar(&cfg.port, "port", 8080, "HTTP Server Port")
-	flag.Parse()
-
-	return cfg
+	log.Println("exiting programm")
+	os.Exit(0)
 }
