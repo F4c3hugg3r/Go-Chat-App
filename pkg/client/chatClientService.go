@@ -38,7 +38,7 @@ func (c *ChatClient) ResponseReceiver(url string) {
 	for {
 		c.CheckRegistered()
 
-		body, err := c.GetResponses(url)
+		body, err := c.GetJsonResponses(url)
 		if err != nil {
 			continue
 		}
@@ -48,9 +48,9 @@ func (c *ChatClient) ResponseReceiver(url string) {
 			continue
 		}
 
-		valid := c.CheckResponse(&rsp)
+		valid := c.CheckResponse(rsp)
 		if valid {
-			c.Output <- &rsp
+			c.Output <- rsp
 		}
 	}
 }
@@ -84,14 +84,9 @@ func (c *ChatClient) CheckRegistered() {
 
 // register puts values into the client flields and sends a signal
 // to unblock CheckRegister
-func (c *ChatClient) register(body []byte) error {
+func (c *ChatClient) register(rsp *Response) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
-	rsp, err := DecodeToResponse(body)
-	if err != nil {
-		return fmt.Errorf("%w: Fehler beim Lesen des Bodies ist aufgetreten: ", err)
-	}
 
 	c.clientName = rsp.Name
 	c.authToken = rsp.Content
@@ -139,7 +134,12 @@ func (c *ChatClient) SendRegister(msg *Message) error {
 
 	defer res.Body.Close()
 
-	err = c.register(resBody)
+	rsp, err := DecodeToResponse(resBody)
+	if err != nil {
+		return fmt.Errorf("%w: error decoding body to Response", err)
+	}
+
+	err = c.register(rsp)
 	if err != nil {
 
 		return fmt.Errorf("%w: error registering client", err)
@@ -196,13 +196,13 @@ func (c *ChatClient) SendPlugin(msg *Message) error {
 
 // getResponse sends a GET Request to the server, checks the http Response
 // and returns the body
-func (c *ChatClient) GetResponses(url string) ([]byte, error) {
+func (c *ChatClient) GetJsonResponses(url string) ([]byte, error) {
 	res, err := c.GetRequest(url)
 	if err != nil {
 		c.unregister()
 		log.Printf("%v: the connection to the server couldn't be established", err)
 
-		return nil, fmt.Errorf("%w: Fehler beim Abrufen ist aufgetreten: ", err)
+		return nil, fmt.Errorf("%w: server not available", err)
 
 	}
 
@@ -220,22 +220,6 @@ func (c *ChatClient) GetResponses(url string) ([]byte, error) {
 
 	return body, nil
 }
-
-// // PollResponses returns a Response slice from the output channel of the client
-// func (c *ChatClient) PollResponses() []*Response {
-// 	result := []*Response{}
-// 	for {
-// 		select {
-// 		case msg, ok := <-c.Output:
-// 			if !ok {
-// 				return result
-// 			}
-// 			result = append(result, msg)
-// 		default:
-// 			return result
-// 		}
-// 	}
-// }
 
 // CreateMessage creates a Message with the given parameters or
 // if clientName/clientId are empty fills them with the global values of the client
@@ -261,8 +245,8 @@ func (c *ChatClient) CreateMessage(clientName string, plugin string, content str
 }
 
 // DecodeToResponse decodes a responseBody to a Response struct
-func DecodeToResponse(body []byte) (Response, error) {
-	response := Response{}
+func DecodeToResponse(body []byte) (*Response, error) {
+	response := &Response{}
 	dec := json.NewDecoder(strings.NewReader(string(body)))
 
 	err := dec.Decode(&response)

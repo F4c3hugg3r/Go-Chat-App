@@ -21,12 +21,13 @@ func NewUserService(c *ChatClient) *UserService {
 
 	u.Cond = sync.NewCond(u.mu)
 
-	go u.MessagePoller()
+	go u.ResponsePoller()
 
 	return u
 }
 
-func (u *UserService) MessagePoller() {
+// ResponsePoller gets and displays messages if the client is not typing
+func (u *UserService) ResponsePoller() {
 	var rsp *Response
 	for {
 		u.CheckPolling()
@@ -38,11 +39,14 @@ func (u *UserService) MessagePoller() {
 				log.Printf("%v: response from %s couldn't be displayed", err, rsp.Name)
 			}
 		default:
+			// bei <-time.After() würde es zu potenziellen synchronisations-Problemen
+			// kommen, wenn das polling gestoppt wird
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
 }
 
+// stopPoll stopps the polling
 func (u *UserService) stopPoll() {
 	u.mu.Lock()
 	defer u.mu.Unlock()
@@ -50,6 +54,7 @@ func (u *UserService) stopPoll() {
 	u.poll = false
 }
 
+// startPoll starts the polling
 func (u *UserService) startPoll() {
 	u.mu.Lock()
 	defer u.mu.Unlock()
@@ -58,6 +63,7 @@ func (u *UserService) startPoll() {
 	u.Cond.Signal()
 }
 
+// CheckPolling blocks until polling is started
 func (u *UserService) CheckPolling() {
 	u.mu.Lock()
 	defer u.mu.Unlock()
@@ -107,8 +113,7 @@ func (u *UserService) ParseInputToMessage(input string) (*Message, error) {
 	return u.chatClient.CreateMessage("", plugin, content, ""), nil
 }
 
-// Executor takes the parsed input message, executes the corresponding
-// plugin and polls for a Response
+// Executor takes the parsed input message, executes the corresponding plugin
 func (u *UserService) Executor(input string) {
 	msg, err := u.ParseInputToMessage(input)
 	if err != nil {
@@ -121,6 +126,8 @@ func (u *UserService) Executor(input string) {
 	}
 }
 
+// IsTyping receives the length of the userinput, checks if the client
+// is typing and sets the typing parameter
 func (u *UserService) isTyping(sliceLength int) bool {
 	switch sliceLength {
 	case 0:
