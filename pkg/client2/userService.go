@@ -9,6 +9,7 @@ import (
 	"github.com/c-bata/go-prompt"
 )
 
+// NewUserService creates a UserService
 func NewUserService(c *ChatClient) *UserService {
 	u := &UserService{
 		chatClient: c,
@@ -23,14 +24,15 @@ func NewUserService(c *ChatClient) *UserService {
 // func (u *UserService) MessagePoller() {
 // 	for {
 // 		rsp := <-u.chatClient.Output
-// 		err := displayResponse(rsp)
+// 		err := DisplayResponse(rsp)
 // 		if err != nil {
 // 			log.Printf("%v: response from %s couldn't be displayed", err, rsp.Name)
 // 		}
 // 	}
 // }
 
-func (u *UserService) displayResponse(rsp *Response) error {
+// DisplayResponse prints out a Response in the proper way
+func (u *UserService) DisplayResponse(rsp *Response) error {
 	if rsp.Content == "" || rsp.Name == u.chatClient.clientName {
 		return nil
 	}
@@ -50,7 +52,8 @@ func (u *UserService) displayResponse(rsp *Response) error {
 	return nil
 }
 
-func (u *UserService) parseInputToMessage(input string) (*Message, error) {
+// ParseInputToMessage parses the user input into a Message
+func (u *UserService) ParseInputToMessage(input string) (*Message, error) {
 	input = strings.TrimSuffix(input, "\n")
 	var plugin string
 
@@ -68,8 +71,10 @@ func (u *UserService) parseInputToMessage(input string) (*Message, error) {
 	return u.chatClient.CreateMessage("", plugin, content, ""), nil
 }
 
+// Executor takes the parsed input message, executes the corresponding
+// plugin and polls for a Response
 func (u *UserService) Executor(input string) {
-	msg, err := u.parseInputToMessage(input)
+	msg, err := u.ParseInputToMessage(input)
 	if err != nil {
 		log.Printf("%v: wrong input", err)
 	}
@@ -80,15 +85,16 @@ func (u *UserService) Executor(input string) {
 	}
 
 	time.Sleep(100 * time.Millisecond)
-	responses := u.chatClient.PollMessages()
+	responses := u.chatClient.PollResponses()
 	for _, rsp := range responses {
-		err := u.displayResponse(rsp)
+		err := u.DisplayResponse(rsp)
 		if err != nil {
 			log.Printf("%v: response from %s couldn't be displayed", err, rsp.Name)
 		}
 	}
 }
 
+// Completer suggests plugins and their descriptions in the stdIn
 func (u *UserService) Completer(d prompt.Document) []prompt.Suggest {
 	s := []prompt.Suggest{}
 

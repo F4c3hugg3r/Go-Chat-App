@@ -11,10 +11,7 @@ var (
 	ErrParsing      error = errors.New("there was an errror while parsing your input")
 )
 
-type Reader interface {
-	ReadString(delim byte) (string, error)
-}
-
+// ChatClient handles all network tasks
 type ChatClient struct {
 	clientName string
 	clientId   string
@@ -27,6 +24,7 @@ type ChatClient struct {
 	url        string
 }
 
+// UserService handles user inputs and outputs
 type UserService struct {
 	chatClient *ChatClient
 	plugins    *PluginRegistry
@@ -44,9 +42,4 @@ type Message struct {
 type Response struct {
 	Name    string `json:"name"`
 	Content string `json:"content"`
-}
-
-type Plugin struct {
-	Command     string
-	Description string
 }

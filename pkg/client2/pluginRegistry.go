@@ -8,12 +8,14 @@ const (
 	Always
 )
 
+// PluginInterface describes the plugin methods
 type PluginInterface interface {
 	Execute(message *Message) func() error
 	Description() string
 	CheckScope() int
 }
 
+// PluginRegistry contains the plugins and their methods
 type PluginRegistry struct {
 	plugins           map[string]PluginInterface
 	registrationScope map[string]int
@@ -36,6 +38,7 @@ func RegisterPlugins(chatClient *ChatClient) *PluginRegistry {
 	return &pr
 }
 
+// FindAndExecute executes the plugins Execute method if the scope is fitting
 func (pr *PluginRegistry) FindAndExecute(message *Message) func() error {
 	return func() error {
 		plugin, ok := pr.plugins[message.Plugin]

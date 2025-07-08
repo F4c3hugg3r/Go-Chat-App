@@ -22,7 +22,7 @@ func init() {
 func main() {
 	c := client.NewClient(*url)
 	u := client.NewUserService(c)
-	interChan := make(chan os.Signal, 2)
+	interChan := make(chan os.Signal, 3)
 
 	ctrlCBinding := prompt.KeyBind{
 		Key: prompt.ControlC,
