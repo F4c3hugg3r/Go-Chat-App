@@ -28,6 +28,10 @@ type ChatClient struct {
 type UserService struct {
 	chatClient *ChatClient
 	plugins    *PluginRegistry
+	poll       bool
+	typing     bool
+	mu         *sync.Mutex
+	Cond       *sync.Cond
 }
 
 // Message contains the name of the requester and the message (content) itsself

@@ -221,21 +221,21 @@ func (c *ChatClient) GetResponses(url string) ([]byte, error) {
 	return body, nil
 }
 
-// PollResponses returns a Response slice from the output channel of the client
-func (c *ChatClient) PollResponses() []*Response {
-	result := []*Response{}
-	for {
-		select {
-		case msg, ok := <-c.Output:
-			if !ok {
-				return result
-			}
-			result = append(result, msg)
-		default:
-			return result
-		}
-	}
-}
+// // PollResponses returns a Response slice from the output channel of the client
+// func (c *ChatClient) PollResponses() []*Response {
+// 	result := []*Response{}
+// 	for {
+// 		select {
+// 		case msg, ok := <-c.Output:
+// 			if !ok {
+// 				return result
+// 			}
+// 			result = append(result, msg)
+// 		default:
+// 			return result
+// 		}
+// 	}
+// }
 
 // CreateMessage creates a Message with the given parameters or
 // if clientName/clientId are empty fills them with the global values of the client

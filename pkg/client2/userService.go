@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/c-bata/go-prompt"
@@ -14,26 +15,61 @@ func NewUserService(c *ChatClient) *UserService {
 	u := &UserService{
 		chatClient: c,
 		plugins:    RegisterPlugins(c),
+		poll:       false,
+		mu:         &sync.Mutex{},
 	}
 
-	// go u.MessagePoller()
+	u.Cond = sync.NewCond(u.mu)
+
+	go u.MessagePoller()
 
 	return u
 }
 
-// func (u *UserService) MessagePoller() {
-// 	for {
-// 		rsp := <-u.chatClient.Output
-// 		err := DisplayResponse(rsp)
-// 		if err != nil {
-// 			log.Printf("%v: response from %s couldn't be displayed", err, rsp.Name)
-// 		}
-// 	}
-// }
+func (u *UserService) MessagePoller() {
+	var rsp *Response
+	for {
+		u.CheckPolling()
+
+		select {
+		case rsp = <-u.chatClient.Output:
+			err := u.DisplayResponse(rsp)
+			if err != nil {
+				log.Printf("%v: response from %s couldn't be displayed", err, rsp.Name)
+			}
+		default:
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+}
+
+func (u *UserService) stopPoll() {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	u.poll = false
+}
+
+func (u *UserService) startPoll() {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	u.poll = true
+	u.Cond.Signal()
+}
+
+func (u *UserService) CheckPolling() {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	for !u.poll {
+		u.Cond.Wait()
+	}
+}
 
 // DisplayResponse prints out a Response in the proper way
 func (u *UserService) DisplayResponse(rsp *Response) error {
-	if rsp.Content == "" || rsp.Name == u.chatClient.clientName {
+	if rsp.Content == "" {
 		return nil
 	}
 
@@ -74,6 +110,8 @@ func (u *UserService) ParseInputToMessage(input string) (*Message, error) {
 // Executor takes the parsed input message, executes the corresponding
 // plugin and polls for a Response
 func (u *UserService) Executor(input string) {
+	fmt.Print("\033[1A\033[K")
+
 	msg, err := u.ParseInputToMessage(input)
 	if err != nil {
 		log.Printf("%v: wrong input", err)
@@ -83,26 +121,37 @@ func (u *UserService) Executor(input string) {
 	if err != nil {
 		log.Printf("%v: couldn't send message", err)
 	}
+}
 
-	time.Sleep(100 * time.Millisecond)
-	responses := u.chatClient.PollResponses()
-	for _, rsp := range responses {
-		err := u.DisplayResponse(rsp)
-		if err != nil {
-			log.Printf("%v: response from %s couldn't be displayed", err, rsp.Name)
-		}
+func (u *UserService) isTyping(sliceLength int) bool {
+	switch sliceLength {
+	case 0:
+		u.typing = false
+		return false
+	default:
+		u.typing = true
+		return true
 	}
 }
 
 // Completer suggests plugins and their descriptions in the stdIn
 func (u *UserService) Completer(d prompt.Document) []prompt.Suggest {
-	s := []prompt.Suggest{}
+	u.stopPoll()
 
-	for command, plugin := range u.plugins.plugins {
-		s = append(s, prompt.Suggest{Text: command, Description: plugin.Description()})
+	s := []prompt.Suggest{}
+	textBeforeCursor := d.TextBeforeCursor()
+	words := strings.Fields(textBeforeCursor)
+
+	if !u.isTyping(len(words)) {
+		u.startPoll()
 	}
 
-	//TODO nur Vorschläge beim ersten Wort
+	if len(words) == 1 && d.GetWordBeforeCursor() != "" {
+		for command, plugin := range u.plugins.plugins {
+			s = append(s, prompt.Suggest{Text: command, Description: plugin.Description()})
+		}
+		return prompt.FilterHasPrefix(s, d.GetWordBeforeCursor(), true)
 
-	return prompt.FilterHasPrefix(s, d.GetWordBeforeCursor(), true)
+	}
+	return s
 }

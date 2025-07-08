@@ -36,8 +36,9 @@ func main() {
 		u.Executor,
 		u.Completer,
 		prompt.OptionAddKeyBind(ctrlCBinding),
-		prompt.OptionPrefix(">> "),
+		prompt.OptionPrefix(""),
 	)
+
 	p.Run()
 }
 
@@ -46,13 +47,15 @@ func main() {
 func interruptListener(interChan chan os.Signal, c *client.ChatClient) {
 	<-interChan
 
-	err := c.SendDelete(c.CreateMessage("", "/quit", "", ""))
-	if err != nil {
-		log.Print(err)
+	if c.Registered {
+		err := c.SendDelete(c.CreateMessage("", "/quit", "", ""))
+		if err != nil {
+			log.Print(err)
+		}
 	}
 
 	c.HttpClient.CloseIdleConnections()
 
-	log.Println("Client logged out")
+	log.Println("exiting programm")
 	os.Exit(0)
 }
