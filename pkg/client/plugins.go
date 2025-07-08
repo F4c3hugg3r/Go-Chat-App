@@ -31,7 +31,9 @@ func (pp *PrivateMessagePlugin) Execute(message *Message) func() error {
 			return fmt.Errorf("%w: prefix '%s ' not found", ErrParsing, opposingClientId)
 		}
 
-		return pp.c.SendPlugin(pp.c.CreateMessage(message.Name, message.Plugin, content, opposingClientId))
+		_, err := pp.c.PostMessage(pp.c.CreateMessage(message.Name, message.Plugin, content, opposingClientId), postPlugin)
+
+		return err
 	}
 }
 
@@ -83,7 +85,13 @@ func (rp *RegisterClientPlugin) Execute(message *Message) func() error {
 			return fmt.Errorf("%w: your name has to be between 3 and 50 chars long", ErrParsing)
 		}
 
-		return rp.c.SendRegister(rp.c.CreateMessage(clientName, message.Plugin, message.Content, message.ClientId))
+		rsp, err := rp.c.PostMessage(rp.c.CreateMessage(clientName, message.Plugin, message.Content, message.ClientId), postRegister)
+		err = rp.c.register(rsp)
+		if err != nil {
+			return fmt.Errorf("%w: error registering client", err)
+		}
+
+		return err
 	}
 }
 
@@ -107,7 +115,8 @@ func (bp *BroadcastPlugin) Description() string {
 
 func (bp *BroadcastPlugin) Execute(message *Message) func() error {
 	return func() error {
-		return bp.c.SendPlugin(message)
+		_, err := bp.c.PostMessage(message, postPlugin)
+		return err
 	}
 }
 
@@ -130,7 +139,8 @@ func (h *HelpPlugin) Description() string {
 
 func (h *HelpPlugin) Execute(message *Message) func() error {
 	return func() error {
-		return h.c.SendPlugin(message)
+		_, err := h.c.PostMessage(message, postPlugin)
+		return err
 	}
 }
 
@@ -153,7 +163,8 @@ func (u *UserPlugin) Description() string {
 
 func (u *UserPlugin) Execute(message *Message) func() error {
 	return func() error {
-		return u.c.SendPlugin(message)
+		_, err := u.c.PostMessage(message, postPlugin)
+		return err
 	}
 }
 
@@ -176,6 +187,7 @@ func (t *TimePlugin) Description() string {
 
 func (t *TimePlugin) Execute(message *Message) func() error {
 	return func() error {
-		return t.c.SendPlugin(message)
+		_, err := t.c.PostMessage(message, postPlugin)
+		return err
 	}
 }

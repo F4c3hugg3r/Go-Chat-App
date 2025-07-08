@@ -8,8 +8,7 @@ import (
 
 // GetRequest sends a GET Request to the server including the authorization token
 func (c *ChatClient) GetRequest(url string) (*http.Response, error) {
-	parameteredUrl := fmt.Sprintf("%s/users/%s/chat", url, c.clientId)
-	req, err := http.NewRequest("GET", parameteredUrl, nil)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("%w: Fehler beim erstellen der GET request: ", err)
 	}
@@ -27,9 +26,7 @@ func (c *ChatClient) GetRequest(url string) (*http.Response, error) {
 // DeleteRequest sends a DELETE Request to delete the client out of the server
 // including the authorization token
 func (c *ChatClient) DeleteRequest(url string, body []byte) (*http.Response, error) {
-	parameteredUrl := fmt.Sprintf("%s/users/%s", url, c.clientId)
-
-	req, err := http.NewRequest("DELETE", parameteredUrl, bytes.NewReader(body))
+	req, err := http.NewRequest("DELETE", url, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("%w: Fehler beim Erstellen der DELETE req", err)
 	}

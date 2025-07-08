@@ -11,6 +11,13 @@ var (
 	ErrParsing      error = errors.New("there was an errror while parsing your input")
 )
 
+const (
+	postPlugin = iota
+	postRegister
+	delete
+	get
+)
+
 // ChatClient handles all network tasks
 type ChatClient struct {
 	clientName string
@@ -22,6 +29,7 @@ type ChatClient struct {
 	Cond       *sync.Cond
 	Output     chan *Response
 	url        string
+	Endpoints  map[int]string
 }
 
 // UserService handles user inputs and outputs

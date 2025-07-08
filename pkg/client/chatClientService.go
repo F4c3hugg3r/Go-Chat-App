@@ -25,11 +25,22 @@ func NewClient(server string) *ChatClient {
 		url:        server,
 	}
 
+	chatClient.Endpoints = chatClient.RegisterEndpoints(chatClient.url)
 	chatClient.Cond = sync.NewCond(chatClient.mu)
 
 	go chatClient.ResponseReceiver(server)
 
 	return chatClient
+}
+
+func (c *ChatClient) RegisterEndpoints(url string) map[int]string {
+	endpoints := make(map[int]string)
+	endpoints[postRegister] = fmt.Sprintf("%s/users/%s", url, c.clientId)
+	endpoints[postPlugin] = fmt.Sprintf("%s/users/%s/run", url, c.clientId)
+	endpoints[delete] = fmt.Sprintf("%s/users/%s", url, c.clientId)
+	endpoints[get] = fmt.Sprintf("%s/users/%s/chat", url, c.clientId)
+
+	return endpoints
 }
 
 // ResponseReceiver gets responses if client is registered
@@ -38,12 +49,7 @@ func (c *ChatClient) ResponseReceiver(url string) {
 	for {
 		c.CheckRegistered()
 
-		body, err := c.GetJsonResponses(url)
-		if err != nil {
-			continue
-		}
-
-		rsp, err := DecodeToResponse(body)
+		rsp, err := c.GetResponse(url)
 		if err != nil {
 			continue
 		}
@@ -111,41 +117,33 @@ func (c *ChatClient) unregister() {
 	fmt.Println("- Du bist nun vom Server getrennt -")
 }
 
-// SendRegister sends a POST Request to the register endpoint and
-// registeres the ChatClient
-func (c *ChatClient) SendRegister(msg *Message) error {
+func (c *ChatClient) PostMessage(msg *Message, endpoint int) (*Response, error) {
 	body, err := json.Marshal(&msg)
 	if err != nil {
-		return fmt.Errorf("%w: error parsing json", err)
+		return nil, fmt.Errorf("%w: error parsing json", err)
 	}
 
-	parameteredUrl := fmt.Sprintf("%s/users/%s", c.url, c.clientId)
+	parameteredUrl := fmt.Sprintf(c.Endpoints[endpoint], c.url, c.clientId)
 	res, err := c.PostRequest(parameteredUrl, body)
 	if err != nil {
 
-		return fmt.Errorf("%w: message couldn't be send", err)
+		return nil, fmt.Errorf("%w: message couldn't be send", err)
 	}
 
 	resBody, err := io.ReadAll(res.Body)
 	if err != nil {
 
-		return fmt.Errorf("%w: error reading response body", err)
+		return nil, fmt.Errorf("%w: error reading response body", err)
 	}
 
 	defer res.Body.Close()
 
 	rsp, err := DecodeToResponse(resBody)
 	if err != nil {
-		return fmt.Errorf("%w: error decoding body to Response", err)
+		return nil, fmt.Errorf("%w: error decoding body to Response", err)
 	}
 
-	err = c.register(rsp)
-	if err != nil {
-
-		return fmt.Errorf("%w: error registering client", err)
-	}
-
-	return nil
+	return rsp, nil
 }
 
 // SendDelete sends a DELETE Request to the delete endpoint and
@@ -169,34 +167,9 @@ func (c *ChatClient) SendDelete(msg *Message) error {
 	return nil
 }
 
-// SendPlugin sends a POST request to the corresponding endpoint
-// to deliver a Message
-func (c *ChatClient) SendPlugin(msg *Message) error {
-	body, err := json.Marshal(&msg)
-	if err != nil {
-		return fmt.Errorf("%w: error parsing json", err)
-	}
-
-	parameteredUrl := fmt.Sprintf("%s/users/%s/run", c.url, c.clientId)
-	res, err := c.PostRequest(parameteredUrl, body)
-	if err != nil {
-
-		return fmt.Errorf("%: message couldn't be send", err)
-	}
-
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		//tolerated because it triggeres message poll
-		return nil
-	}
-
-	return nil
-}
-
 // getResponse sends a GET Request to the server, checks the http Response
 // and returns the body
-func (c *ChatClient) GetJsonResponses(url string) ([]byte, error) {
+func (c *ChatClient) GetResponse(url string) (*Response, error) {
 	res, err := c.GetRequest(url)
 	if err != nil {
 		c.unregister()
@@ -218,7 +191,12 @@ func (c *ChatClient) GetJsonResponses(url string) ([]byte, error) {
 		return nil, fmt.Errorf("%s: message body couldn't be read", res.Status)
 	}
 
-	return body, nil
+	rsp, err := DecodeToResponse(body)
+	if err != nil {
+		return nil, fmt.Errorf("%s: error decoding body to Response", res.Status)
+	}
+
+	return rsp, nil
 }
 
 // CreateMessage creates a Message with the given parameters or
