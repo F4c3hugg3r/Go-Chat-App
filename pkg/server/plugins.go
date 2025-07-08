@@ -133,15 +133,15 @@ func (bp *BroadcastPlugin) Execute(message *Message) (*Response, error) {
 	bp.chatService.mu.RLock()
 	defer bp.chatService.mu.RUnlock()
 
+	rsp := &Response{Name: message.Name, Content: message.Content}
+
 	if strings.TrimSpace(message.Content) == "" {
-		return nil, fmt.Errorf("%w: no empty messages allowed", ErrEmptyString)
+		return rsp, nil
 	}
 
 	if len(bp.chatService.clients) <= 0 {
 		return nil, fmt.Errorf("%w: There are no clients registered", ErrClientNotAvailable)
 	}
-
-	rsp := &Response{Name: message.Name, Content: message.Content}
 
 	for _, client := range bp.chatService.clients {
 		if client.ClientId != message.ClientId {

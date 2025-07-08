@@ -56,7 +56,7 @@ func (lp *LogOutPlugin) Description() string {
 
 func (lp *LogOutPlugin) Execute(message *Message) func() error {
 	return func() error {
-		return lp.c.SendDelete(message)
+		return lp.c.PostDelete(message)
 	}
 }
 
@@ -86,6 +86,10 @@ func (rp *RegisterClientPlugin) Execute(message *Message) func() error {
 		}
 
 		rsp, err := rp.c.PostMessage(rp.c.CreateMessage(clientName, message.Plugin, message.Content, message.ClientId), postRegister)
+		if err != nil {
+			return fmt.Errorf("%w: error sending message", err)
+		}
+
 		err = rp.c.register(rsp)
 		if err != nil {
 			return fmt.Errorf("%w: error registering client", err)

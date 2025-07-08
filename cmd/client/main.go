@@ -52,7 +52,7 @@ func interruptListener(interChan chan os.Signal, c *client.ChatClient) {
 	<-interChan
 
 	if c.Registered {
-		err := c.SendDelete(c.CreateMessage("", "/quit", "", ""))
+		err := c.PostDelete(c.CreateMessage("", "/quit", "", ""))
 		if err != nil {
 			log.Print(err)
 		}

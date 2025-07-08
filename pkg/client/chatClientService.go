@@ -123,12 +123,13 @@ func (c *ChatClient) PostMessage(msg *Message, endpoint int) (*Response, error) 
 		return nil, fmt.Errorf("%w: error parsing json", err)
 	}
 
-	parameteredUrl := fmt.Sprintf(c.Endpoints[endpoint], c.url, c.clientId)
-	res, err := c.PostRequest(parameteredUrl, body)
+	res, err := c.PostRequest(c.Endpoints[endpoint], body)
 	if err != nil {
 
-		return nil, fmt.Errorf("%w: message couldn't be send", err)
+		return nil, fmt.Errorf("%w: message couldn't be sent", err)
 	}
+
+	defer res.Body.Close()
 
 	resBody, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -136,28 +137,26 @@ func (c *ChatClient) PostMessage(msg *Message, endpoint int) (*Response, error) 
 		return nil, fmt.Errorf("%w: error reading response body", err)
 	}
 
-	defer res.Body.Close()
-
 	rsp, err := DecodeToResponse(resBody)
-	if err != nil {
-		return nil, fmt.Errorf("%w: error decoding body to Response", err)
-	}
+	// if err != nil {
+	// 	return nil, fmt.Errorf("%w: error decoding body to Response", err)
+	// }
 
 	return rsp, nil
 }
 
-// SendDelete sends a DELETE Request to the delete endpoint and
+// PostDelete sends a DELETE Request to the delete endpoint and
 // unregisteres the ChatClient
-func (c *ChatClient) SendDelete(msg *Message) error {
+func (c *ChatClient) PostDelete(msg *Message) error {
 	body, err := json.Marshal(&msg)
 	if err != nil {
 		return fmt.Errorf("%w: error parsing json", err)
 	}
 
-	res, err := c.DeleteRequest(c.url, body)
+	res, err := c.DeleteRequest(c.Endpoints[delete], body)
 	if err != nil {
 
-		return fmt.Errorf("%w: client couldn't be deleted", err)
+		return fmt.Errorf("%w: delete couldn't be sent", err)
 	}
 
 	defer res.Body.Close()
@@ -170,7 +169,7 @@ func (c *ChatClient) SendDelete(msg *Message) error {
 // getResponse sends a GET Request to the server, checks the http Response
 // and returns the body
 func (c *ChatClient) GetResponse(url string) (*Response, error) {
-	res, err := c.GetRequest(url)
+	res, err := c.GetRequest(c.Endpoints[get])
 	if err != nil {
 		c.unregister()
 		log.Printf("%v: the connection to the server couldn't be established", err)
