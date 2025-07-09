@@ -1,4 +1,4 @@
-package client2
+package client
 
 import (
 	"fmt"
@@ -98,7 +98,7 @@ func (u *UserService) DisplayResponse(rsp *Response) error {
 }
 
 // ParseInputToMessage parses the user input into a Message
-func (u *UserService) ParseInputToMessage(input string) (*Message, error) {
+func (u *UserService) ParseInputToMessage(input string) *Message {
 	input = strings.TrimSuffix(input, "\n")
 
 	var plugin string
@@ -114,19 +114,16 @@ func (u *UserService) ParseInputToMessage(input string) (*Message, error) {
 	content := strings.ReplaceAll(input, plugin, "")
 	content, _ = strings.CutPrefix(content, " ")
 
-	return u.chatClient.CreateMessage("", plugin, content, ""), nil
+	return u.chatClient.CreateMessage("", plugin, content, "")
 }
 
 // Executor takes the parsed input message, executes the corresponding plugin
 func (u *UserService) Executor(input string) {
-	msg, err := u.ParseInputToMessage(input)
-	if err != nil {
-		log.Printf("%v: wrong input", err)
-	}
+	msg := u.ParseInputToMessage(input)
 
-	err = u.plugins.FindAndExecute(msg)()
+	err := u.plugins.FindAndExecute(msg)()
 	if err != nil {
-		log.Printf("%v: couldn't send message", err)
+		log.Printf("%v: %s", err.Error(), err)
 	}
 }
 
