@@ -14,7 +14,7 @@ func (c *ChatClient) GetRequest(url string) (*http.Response, error) {
 	}
 
 	authToken, ok := c.GetAuthToken()
-	if !ok {
+	if !ok && c.Registered {
 		return nil, fmt.Errorf("%w: client not registered anymore", err)
 	}
 
@@ -61,7 +61,7 @@ func (c *ChatClient) PostRequest(url string, body []byte) (*http.Response, error
 	}
 
 	authToken, ok := c.GetAuthToken()
-	if !ok {
+	if !ok && c.Registered {
 		return nil, fmt.Errorf("%w: client not registered anymore", err)
 	}
 

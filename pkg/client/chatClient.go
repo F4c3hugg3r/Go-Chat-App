@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -96,7 +95,11 @@ func (c *ChatClient) GetAuthToken() (string, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	return c.authToken, c.Registered
+	if c.authToken == "" {
+		return "", false
+	}
+
+	return c.authToken, true
 }
 
 func (c *ChatClient) PostMessage(msg *Message, endpoint int) (*Response, error) {
@@ -156,10 +159,8 @@ func (c *ChatClient) GetResponse(url string) (*Response, error) {
 	if err != nil {
 		c.unregister()
 
-		//TODO in Output Channel pushen
-		log.Printf("%v: the connection to the server couldn't be established", err)
-
-		return nil, fmt.Errorf("%w: server not available", err)
+		return &Response{Err: fmt.Errorf("%w: the connection to the server couldn't be established", err)},
+			fmt.Errorf("%w: server not available", err)
 	}
 
 	defer res.Body.Close()

@@ -2,10 +2,8 @@ package client
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/c-bata/go-prompt"
 )
@@ -21,83 +19,61 @@ func NewUserService(c *ChatClient) *UserService {
 
 	u.Cond = sync.NewCond(u.mu)
 
-	go u.ResponsePoller()
+	// go u.ResponsePoller()
 
 	return u
 }
 
 // ResponsePoller gets and displays messages if the client is not typing
-func (u *UserService) ResponsePoller() {
+func (u *UserService) ResponsePoller() *Response {
 	var rsp *Response
 
-	for {
-		u.checkPolling()
+	// for {
+	// u.checkPolling()
 
-		select {
-		case rsp = <-u.chatClient.Output:
-			err := u.DisplayResponse(rsp)
-			if err != nil {
+	// select {
+	// case rsp = <-u.chatClient.Output:
+	rsp = <-u.chatClient.Output
+	// err := u.DisplayResponse(rsp)
+	// if err != nil {
 
-				// TODO in output channel pushen
-				log.Printf("%v: response from %s couldn't be displayed", err, rsp.Name)
-			}
-		default:
-			// bei <-time.After() würde es zu potenziellen synchronisations-Problemen kommen, wenn das polling gestoppt wird
-			time.Sleep(100 * time.Millisecond)
-		}
-	}
+	// 	// TODO in output channel pushen
+	// 	log.Printf("%v: response from %s couldn't be displayed", err, rsp.Name)
+	// }
+	// default:
+	// 	// bei <-time.After() würde es zu potenziellen synchronisations-Problemen kommen, wenn das polling gestoppt wird
+	// 	time.Sleep(100 * time.Millisecond)
+	// // }
+	// }
+	return rsp
 }
 
 // stopPoll stopps the polling
-func (u *UserService) stopPoll() {
-	u.mu.Lock()
-	defer u.mu.Unlock()
+// func (u *UserService) stopPoll() {
+// 	u.mu.Lock()
+// 	defer u.mu.Unlock()
 
-	u.poll = false
-}
+// 	u.poll = false
+// }
 
-// startPoll starts the polling
-func (u *UserService) startPoll() {
-	u.mu.Lock()
-	defer u.mu.Unlock()
+// // startPoll starts the polling
+// func (u *UserService) startPoll() {
+// 	u.mu.Lock()
+// 	defer u.mu.Unlock()
 
-	u.poll = true
-	u.Cond.Signal()
-}
+// 	u.poll = true
+// 	u.Cond.Signal()
+// }
 
-// checkPolling blocks until polling is started
-func (u *UserService) checkPolling() {
-	u.mu.Lock()
-	defer u.mu.Unlock()
+// // checkPolling blocks until polling is started
+// func (u *UserService) checkPolling() {
+// 	u.mu.Lock()
+// 	defer u.mu.Unlock()
 
-	for !u.poll {
-		u.Cond.Wait()
-	}
-}
-
-// TODO durch ui printen lassen
-// DisplayResponse prints out a Response in the proper way
-func (u *UserService) DisplayResponse(rsp *Response) error {
-	if rsp.Content == "" {
-		return nil
-	}
-
-	if strings.HasPrefix(rsp.Content, "[") {
-		output, err := JSONToTable(rsp.Content)
-		if err != nil {
-			return fmt.Errorf("%w: error formatting json to table", err)
-		}
-
-		fmt.Println(output)
-
-		return nil
-	}
-
-	responseString := fmt.Sprintf("%s: %s", rsp.Name, rsp.Content)
-	fmt.Println(responseString)
-
-	return nil
-}
+// 	for !u.poll {
+// 		u.Cond.Wait()
+// 	}
+// }
 
 // ParseInputToMessage parses the user input into a Message
 func (u *UserService) ParseInputToMessage(input string) *Message {
@@ -123,12 +99,12 @@ func (u *UserService) ParseInputToMessage(input string) *Message {
 func (u *UserService) Executor(input string) {
 	msg := u.ParseInputToMessage(input)
 
-	err, _ := u.plugins.FindAndExecute(msg)
+	err, comment := u.plugins.FindAndExecute(msg)
 	if err != nil {
-		// TODO in Output channel pushen
-		log.Printf("%v: %s", err.Error(), err)
+		u.chatClient.Output <- &Response{Err: fmt.Errorf("%v: %s", err.Error(), err)}
 	}
-	//displayString(string)
+
+	u.chatClient.Output <- &Response{Err: fmt.Errorf("%s", comment)}
 }
 
 // IsTyping receives the length of the userinput, checks if the client
@@ -146,14 +122,14 @@ func (u *UserService) isTyping(sliceLength int) bool {
 
 // Completer suggests plugins and their descriptions in the stdIn
 func (u *UserService) Completer(d prompt.Document) []prompt.Suggest {
-	u.stopPoll()
+	// u.stopPoll()
 
 	s := []prompt.Suggest{}
 	textBeforeCursor := d.TextBeforeCursor()
 	words := strings.Fields(textBeforeCursor)
 
 	if !u.isTyping(len(words)) {
-		u.startPoll()
+		// u.startPoll()
 	}
 
 	if len(words) == 1 && d.GetWordBeforeCursor() != "" {

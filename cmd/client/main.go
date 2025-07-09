@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	client "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client"
-	"github.com/c-bata/go-prompt"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 var (
@@ -23,30 +23,35 @@ func init() {
 func main() {
 	c := client.NewClient(*url)
 	u := client.NewUserService(c)
+	programm := tea.NewProgram(client.InitialModel(u))
 	interChan := make(chan os.Signal, 3)
 
-	ctrlCBinding := prompt.KeyBind{
-		Key: prompt.ControlC,
-		Fn:  func(b *prompt.Buffer) { interChan <- os.Interrupt },
-	}
+	// ctrlCBinding := prompt.KeyBind{
+	// 	Key: prompt.ControlC,
+	// 	Fn:  func(b *prompt.Buffer) { interChan <- os.Interrupt },
+	// }
 
-	deleteInput := func(*prompt.Document) { fmt.Print("\033[1A\033[K") }
+	// deleteInput := func(*prompt.Document) { fmt.Print("\033[1A\033[K") }
 
 	signal.Notify(interChan, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
 
 	go interruptListener(interChan, c)
 
-	p := prompt.New(
-		u.Executor,
-		u.Completer,
-		prompt.OptionAddKeyBind(ctrlCBinding),
-		prompt.OptionPrefix(""),
-		prompt.OptionBreakLineCallback(deleteInput),
-	)
+	if _, err := programm.Run(); err != nil {
+		log.Fatal(err)
+	}
+
+	// p := prompt.New(
+	// 	u.Executor,
+	// 	u.Completer,
+	// 	prompt.OptionAddKeyBind(ctrlCBinding),
+	// 	prompt.OptionPrefix(""),
+	// 	prompt.OptionBreakLineCallback(deleteInput),
+	// )
 
 	//TODO das beim starten des Outputs printen
 	fmt.Println("-> registriere dich mit '/register {name}'")
-	p.Run()
+	// p.Run()
 }
 
 // interruptListener sends a cancel() signal and closes all connections and requests if a interruption like
