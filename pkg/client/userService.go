@@ -16,7 +16,7 @@ func NewUserService(c *ChatClient) *UserService {
 		chatClient: c,
 		plugins:    RegisterPlugins(c),
 		poll:       false,
-		mu:         &sync.Mutex{},
+		mu:         &sync.RWMutex{},
 	}
 
 	u.Cond = sync.NewCond(u.mu)
@@ -31,17 +31,18 @@ func (u *UserService) ResponsePoller() {
 	var rsp *Response
 
 	for {
-		u.CheckPolling()
+		u.checkPolling()
 
 		select {
 		case rsp = <-u.chatClient.Output:
 			err := u.DisplayResponse(rsp)
 			if err != nil {
+
+				// TODO in output channel pushen
 				log.Printf("%v: response from %s couldn't be displayed", err, rsp.Name)
 			}
 		default:
-			// bei <-time.After() würde es zu potenziellen synchronisations-Problemen
-			// kommen, wenn das polling gestoppt wird
+			// bei <-time.After() würde es zu potenziellen synchronisations-Problemen kommen, wenn das polling gestoppt wird
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
@@ -64,8 +65,8 @@ func (u *UserService) startPoll() {
 	u.Cond.Signal()
 }
 
-// CheckPolling blocks until polling is started
-func (u *UserService) CheckPolling() {
+// checkPolling blocks until polling is started
+func (u *UserService) checkPolling() {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 
@@ -74,6 +75,7 @@ func (u *UserService) CheckPolling() {
 	}
 }
 
+// TODO durch ui printen lassen
 // DisplayResponse prints out a Response in the proper way
 func (u *UserService) DisplayResponse(rsp *Response) error {
 	if rsp.Content == "" {
@@ -121,10 +123,12 @@ func (u *UserService) ParseInputToMessage(input string) *Message {
 func (u *UserService) Executor(input string) {
 	msg := u.ParseInputToMessage(input)
 
-	err := u.plugins.FindAndExecute(msg)()
+	err, _ := u.plugins.FindAndExecute(msg)
 	if err != nil {
+		// TODO in Output channel pushen
 		log.Printf("%v: %s", err.Error(), err)
 	}
+	//displayString(string)
 }
 
 // IsTyping receives the length of the userinput, checks if the client

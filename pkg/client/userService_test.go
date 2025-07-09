@@ -201,6 +201,32 @@ var (
 // 	return "you should not read this", fmt.Errorf("you should not read this")
 // }
 
+// func TestClient_ResponsePoller(t *testing.T) {
+// 	var logOutput bytes.Buffer
+// 	log.SetOutput(&logOutput)
+// 	defer log.SetOutput(os.Stderr)
+
+// 	c := NewClient("http://localhost:8080")
+// 	c.clientId = clientId
+// 	c.authToken = authToken
+// 	c.Cond = sync.NewCond(c.mu)
+// 	c.Endpoints = c.RegisterEndpoints(c.url)
+
+// 	u := &UserService{
+// 		chatClient: c,
+// 		plugins:    RegisterPlugins(c),
+// 		poll:       false,
+// 		mu:         &sync.Mutex{},
+// 	}
+
+// 	u.Cond = sync.NewCond(u.mu)
+
+// 	go u.ResponsePoller()
+
+// 	assert.Contains(t, logOutput.String(), "")
+
+// }
+
 func TestClient_extractInputToMessage(t *testing.T) {
 	c := NewClient("http://localhost:8080")
 	c.clientId = clientId

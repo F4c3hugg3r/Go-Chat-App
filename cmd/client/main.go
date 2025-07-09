@@ -44,6 +44,7 @@ func main() {
 		prompt.OptionBreakLineCallback(deleteInput),
 	)
 
+	//TODO das beim starten des Outputs printen
 	fmt.Println("-> registriere dich mit '/register {name}'")
 	p.Run()
 }

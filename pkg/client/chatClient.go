@@ -12,8 +12,6 @@ import (
 	"github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
-const inactiveFlag = "inactive"
-
 // NewClient generates a ChatClient and spawns a ResponseReceiver goroutine
 func NewClient(server string) *ChatClient {
 	chatClient := &ChatClient{
@@ -21,8 +19,9 @@ func NewClient(server string) *ChatClient {
 		Output:     make(chan *Response, 10000),
 		HttpClient: &http.Client{},
 		Registered: false,
-		mu:         &sync.Mutex{},
-		url:        server,
+
+		mu:  &sync.RWMutex{},
+		url: server,
 	}
 
 	chatClient.Endpoints = chatClient.RegisterEndpoints(chatClient.url)
@@ -47,39 +46,19 @@ func (c *ChatClient) RegisterEndpoints(url string) map[int]string {
 // and sends then into the output channel
 func (c *ChatClient) ResponseReceiver(url string) {
 	for {
-		c.CheckRegistered()
+		c.checkRegistered()
 
 		rsp, err := c.GetResponse(url)
 		if err != nil {
 			continue
 		}
 
-		valid := c.CheckResponse(rsp)
-		if valid {
-			c.Output <- rsp
-		}
+		c.Output <- rsp
 	}
 }
 
-// CheckResponse checks if the Response is empty or if the client
-// was deleted due to inactvity
-func (c *ChatClient) CheckResponse(rsp *Response) bool {
-	if rsp.Content == "" {
-		return false
-	}
-
-	if rsp.Name == inactiveFlag {
-		log.Println("you got kicked out due to inactivity")
-		c.unregister()
-
-		return false
-	}
-
-	return true
-}
-
-// CheckRegistered blocks until the client is being registered
-func (c *ChatClient) CheckRegistered() {
+// checkRegistered blocks until the client is being registered
+func (c *ChatClient) checkRegistered() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -100,8 +79,6 @@ func (c *ChatClient) register(rsp *Response) error {
 	c.Registered = true
 	c.Cond.Signal()
 
-	fmt.Println("- Du wurdest registriert -\n-> Gebe '/quit' ein, um den Chat zu verlassen\n-> Oder '/help' um Commands auzuführen\n-> Oder ctrl+C um das Programm zu schließen")
-
 	return nil
 }
 
@@ -113,8 +90,13 @@ func (c *ChatClient) unregister() {
 	c.authToken = ""
 	c.clientName = ""
 	c.Registered = false
+}
 
-	fmt.Println("- Du bist nun vom Server getrennt -")
+func (c *ChatClient) GetAuthToken() (string, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.authToken, c.Registered
 }
 
 func (c *ChatClient) PostMessage(msg *Message, endpoint int) (*Response, error) {
@@ -173,6 +155,8 @@ func (c *ChatClient) GetResponse(url string) (*Response, error) {
 	res, err := c.GetRequest(c.Endpoints[get])
 	if err != nil {
 		c.unregister()
+
+		//TODO in Output Channel pushen
 		log.Printf("%v: the connection to the server couldn't be established", err)
 
 		return nil, fmt.Errorf("%w: server not available", err)

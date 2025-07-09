@@ -22,19 +22,17 @@ func (pp *PrivateMessagePlugin) Description() string {
 	return "lets you send a private message to someone"
 }
 
-func (pp *PrivateMessagePlugin) Execute(message *Message) func() error {
-	return func() error {
-		opposingClientId := strings.Fields(message.Content)[0]
+func (pp *PrivateMessagePlugin) Execute(message *Message) (error, string) {
+	opposingClientId := strings.Fields(message.Content)[0]
 
-		content, ok := strings.CutPrefix(message.Content, fmt.Sprintf("%s ", opposingClientId))
-		if !ok {
-			return fmt.Errorf("%w: prefix '%s ' not found", ErrParsing, opposingClientId)
-		}
-
-		_, err := pp.c.PostMessage(pp.c.CreateMessage(message.Name, message.Plugin, content, opposingClientId), postPlugin)
-
-		return err
+	content, ok := strings.CutPrefix(message.Content, fmt.Sprintf("%s ", opposingClientId))
+	if !ok {
+		return fmt.Errorf("%w: prefix '%s ' not found", ErrParsing, opposingClientId), ""
 	}
+
+	_, err := pp.c.PostMessage(pp.c.CreateMessage(message.Name, message.Plugin, content, opposingClientId), postPlugin)
+
+	return err, ""
 }
 
 // LogOutPlugin logs out a client by deleting it out of the clients map
@@ -54,10 +52,8 @@ func (lp *LogOutPlugin) Description() string {
 	return "loggs you out of the chat"
 }
 
-func (lp *LogOutPlugin) Execute(message *Message) func() error {
-	return func() error {
-		return lp.c.PostDelete(message)
-	}
+func (lp *LogOutPlugin) Execute(message *Message) (error, string) {
+	return lp.c.PostDelete(message), "- Du bist nun vom Server getrennt -"
 }
 
 // RegisterClientPlugin safely registeres a client by creating a Client with the received values
@@ -78,25 +74,23 @@ func (rp *RegisterClientPlugin) Description() string {
 	return "registeres a client"
 }
 
-func (rp *RegisterClientPlugin) Execute(message *Message) func() error {
-	return func() error {
-		clientName := message.Content
-		if len(clientName) > 50 || len(clientName) < 3 {
-			return fmt.Errorf("%w: your name has to be between 3 and 50 chars long", ErrParsing)
-		}
-
-		rsp, err := rp.c.PostMessage(rp.c.CreateMessage(clientName, message.Plugin, message.Content, message.ClientId), postRegister)
-		if err != nil {
-			return fmt.Errorf("%w: error sending message", err)
-		}
-
-		err = rp.c.register(rsp)
-		if err != nil {
-			return fmt.Errorf("%w: error registering client", err)
-		}
-
-		return err
+func (rp *RegisterClientPlugin) Execute(message *Message) (error, string) {
+	clientName := message.Content
+	if len(clientName) > 50 || len(clientName) < 3 {
+		return fmt.Errorf("%w: your name has to be between 3 and 50 chars long", ErrParsing), ""
 	}
+
+	rsp, err := rp.c.PostMessage(rp.c.CreateMessage(clientName, message.Plugin, message.Content, message.ClientId), postRegister)
+	if err != nil {
+		return fmt.Errorf("%w: error sending message", err), ""
+	}
+
+	err = rp.c.register(rsp)
+	if err != nil {
+		return fmt.Errorf("%w: error registering client", err), ""
+	}
+
+	return err, "- Du wurdest registriert -\n-> Gebe '/quit' ein, um den Chat zu verlassen\n-> Oder '/help' um Commands auzuführen\n-> Oder ctrl+C um das Programm zu schließen"
 }
 
 // BroadcaastPlugin distributes an incomming message abroad all client channels if
@@ -117,11 +111,9 @@ func (bp *BroadcastPlugin) Description() string {
 	return "distributes a message abroad all clients"
 }
 
-func (bp *BroadcastPlugin) Execute(message *Message) func() error {
-	return func() error {
-		_, err := bp.c.PostMessage(message, postPlugin)
-		return err
-	}
+func (bp *BroadcastPlugin) Execute(message *Message) (error, string) {
+	_, err := bp.c.PostMessage(message, postPlugin)
+	return err, ""
 }
 
 // HelpPlugin tells you information about available plugins
@@ -141,11 +133,9 @@ func (h *HelpPlugin) Description() string {
 	return "tells every plugin and their description"
 }
 
-func (h *HelpPlugin) Execute(message *Message) func() error {
-	return func() error {
-		_, err := h.c.PostMessage(message, postPlugin)
-		return err
-	}
+func (h *HelpPlugin) Execute(message *Message) (error, string) {
+	_, err := h.c.PostMessage(message, postPlugin)
+	return err, ""
 }
 
 // UserPlugin tells you information about all the current users
@@ -165,11 +155,9 @@ func (u *UserPlugin) Description() string {
 	return "tells you information about all the current users"
 }
 
-func (u *UserPlugin) Execute(message *Message) func() error {
-	return func() error {
-		_, err := u.c.PostMessage(message, postPlugin)
-		return err
-	}
+func (u *UserPlugin) Execute(message *Message) (error, string) {
+	_, err := u.c.PostMessage(message, postPlugin)
+	return err, ""
 }
 
 // TimePlugin tells you the current time
@@ -189,9 +177,7 @@ func (t *TimePlugin) Description() string {
 	return "tells you the current time"
 }
 
-func (t *TimePlugin) Execute(message *Message) func() error {
-	return func() error {
-		_, err := t.c.PostMessage(message, postPlugin)
-		return err
-	}
+func (t *TimePlugin) Execute(message *Message) (error, string) {
+	_, err := t.c.PostMessage(message, postPlugin)
+	return err, ""
 }

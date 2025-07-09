@@ -10,14 +10,19 @@ import (
 func (c *ChatClient) GetRequest(url string) (*http.Response, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("%w: Fehler beim erstellen der GET request: ", err)
+		return nil, fmt.Errorf("%w: Fehler beim erstellen der GET request", err)
 	}
 
-	req.Header.Add("Authorization", c.authToken)
+	authToken, ok := c.GetAuthToken()
+	if !ok {
+		return nil, fmt.Errorf("%w: client not registered anymore", err)
+	}
+
+	req.Header.Add("Authorization", authToken)
 
 	res, err := c.HttpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("%w: Fehler beim senden der GET request: ", err)
+		return nil, fmt.Errorf("%w: Fehler beim senden der GET request", err)
 	}
 
 	return res, nil
@@ -31,7 +36,12 @@ func (c *ChatClient) DeleteRequest(url string, body []byte) (*http.Response, err
 		return nil, fmt.Errorf("%w: Fehler beim Erstellen der DELETE req", err)
 	}
 
-	req.Header.Add("Authorization", c.authToken)
+	authToken, ok := c.GetAuthToken()
+	if !ok {
+		return nil, fmt.Errorf("%w: client not registered anymore", err)
+	}
+
+	req.Header.Add("Authorization", authToken)
 	req.Header.Add("Content-Type", "application/json")
 
 	res, err := c.HttpClient.Do(req)
@@ -50,7 +60,12 @@ func (c *ChatClient) PostRequest(url string, body []byte) (*http.Response, error
 		return nil, fmt.Errorf("%w: Fehler beim Erstellen der POST req", err)
 	}
 
-	req.Header.Add("Authorization", c.authToken)
+	authToken, ok := c.GetAuthToken()
+	if !ok {
+		return nil, fmt.Errorf("%w: client not registered anymore", err)
+	}
+
+	req.Header.Add("Authorization", authToken)
 	req.Header.Add("Content-Type", "application/json")
 
 	res, err := c.HttpClient.Do(req)

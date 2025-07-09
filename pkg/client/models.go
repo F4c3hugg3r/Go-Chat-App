@@ -25,7 +25,7 @@ type ChatClient struct {
 	authToken  string
 	HttpClient *http.Client
 	Registered bool
-	mu         *sync.Mutex
+	mu         *sync.RWMutex
 	Cond       *sync.Cond
 	Output     chan *Response
 	url        string
@@ -38,7 +38,7 @@ type UserService struct {
 	plugins    *PluginRegistry
 	poll       bool
 	typing     bool
-	mu         *sync.Mutex
+	mu         *sync.RWMutex
 	Cond       *sync.Cond
 }
 
@@ -54,4 +54,5 @@ type Message struct {
 type Response struct {
 	Name    string `json:"name"`
 	Content string `json:"content"`
+	Err     error  `json:"-"`
 }

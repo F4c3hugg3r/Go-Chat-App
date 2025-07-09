@@ -10,7 +10,7 @@ const (
 
 // PluginInterface describes the plugin methods
 type PluginInterface interface {
-	Execute(message *Message) func() error
+	Execute(message *Message) (error, string)
 	Description() string
 	CheckScope() int
 }
@@ -38,26 +38,24 @@ func RegisterPlugins(chatClient *ChatClient) *PluginRegistry {
 }
 
 // FindAndExecute executes the plugins Execute method if the scope is fitting
-func (pr *PluginRegistry) FindAndExecute(message *Message) func() error {
-	return func() error {
-		plugin, ok := pr.plugins[message.Plugin]
-		if !ok {
-			return fmt.Errorf("%w: plugin not found", ErrNoPermission)
-		}
-
-		scope := pr.plugins[message.Plugin].CheckScope()
-
-		switch scope {
-		case UnregisteredOnly:
-			if pr.chatClient.Registered {
-				return fmt.Errorf("%w: you are already registered", ErrNoPermission)
-			}
-		case RegisteredOnly:
-			if !pr.chatClient.Registered {
-				return fmt.Errorf("%w: you are not registered yet", ErrNoPermission)
-			}
-		}
-
-		return plugin.Execute(message)()
+func (pr *PluginRegistry) FindAndExecute(message *Message) (error, string) {
+	plugin, ok := pr.plugins[message.Plugin]
+	if !ok {
+		return fmt.Errorf("%w: plugin not found", ErrNoPermission), ""
 	}
+
+	scope := pr.plugins[message.Plugin].CheckScope()
+
+	switch scope {
+	case UnregisteredOnly:
+		if pr.chatClient.Registered {
+			return fmt.Errorf("%w: you are already registered", ErrNoPermission), ""
+		}
+	case RegisteredOnly:
+		if !pr.chatClient.Registered {
+			return fmt.Errorf("%w: you are not registered yet", ErrNoPermission), ""
+		}
+	}
+
+	return plugin.Execute(message)
 }

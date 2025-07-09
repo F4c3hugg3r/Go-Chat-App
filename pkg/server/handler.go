@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -44,18 +43,18 @@ func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Re
 
 	client, err := handler.Service.GetClient(clientId)
 	if err != nil {
-		http.Error(w, "client not found ", http.StatusNotFound)
+		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
 	rsp, err := client.Receive(ctx)
 	if errors.Is(err, ErrChannelClosed) {
-		http.Error(w, err.Error(), http.StatusGone)
+		w.WriteHeader(http.StatusGone)
 		return
 	}
 
 	if errors.Is(err, ErrTimeoutReached) {
-		fmt.Fprintf(w, "\033[1A\033[K")
+		w.WriteHeader(http.StatusRequestTimeout)
 		return
 	}
 
