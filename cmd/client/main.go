@@ -33,6 +33,7 @@ func main() {
 	deleteInput := func(*prompt.Document) { fmt.Print("\033[1A\033[K") }
 
 	signal.Notify(interChan, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
+
 	go interruptListener(interChan, c)
 
 	p := prompt.New(
@@ -42,7 +43,8 @@ func main() {
 		prompt.OptionPrefix(""),
 		prompt.OptionBreakLineCallback(deleteInput),
 	)
-	fmt.Println("- registriere dich mit '/register {name}' -")
+
+	fmt.Println("-> registriere dich mit '/register {name}'")
 	p.Run()
 }
 

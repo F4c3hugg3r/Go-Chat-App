@@ -17,9 +17,8 @@ type PluginInterface interface {
 
 // PluginRegistry contains the plugins and their methods
 type PluginRegistry struct {
-	plugins           map[string]PluginInterface
-	registrationScope map[string]int
-	chatClient        *ChatClient
+	plugins    map[string]PluginInterface
+	chatClient *ChatClient
 }
 
 // RegisterPlugins sets up all the plugins
@@ -58,6 +57,7 @@ func (pr *PluginRegistry) FindAndExecute(message *Message) func() error {
 				return fmt.Errorf("%w: you are not registered yet", ErrNoPermission)
 			}
 		}
+
 		return plugin.Execute(message)()
 	}
 }

@@ -125,7 +125,6 @@ func (c *ChatClient) PostMessage(msg *Message, endpoint int) (*Response, error) 
 
 	res, err := c.PostRequest(c.Endpoints[endpoint], body)
 	if err != nil {
-
 		return nil, fmt.Errorf("%w: message couldn't be sent", err)
 	}
 
@@ -133,14 +132,17 @@ func (c *ChatClient) PostMessage(msg *Message, endpoint int) (*Response, error) 
 
 	resBody, err := io.ReadAll(res.Body)
 	if err != nil {
-
 		return nil, fmt.Errorf("%w: error reading response body", err)
 	}
 
+	if len(resBody) == 0 {
+		return nil, nil
+	}
+
 	rsp, err := DecodeToResponse(resBody)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("%w: error decoding body to Response", err)
-	// }
+	if err != nil {
+		return nil, fmt.Errorf("%w: error decoding body to Response", err)
+	}
 
 	return rsp, nil
 }
@@ -155,7 +157,6 @@ func (c *ChatClient) PostDelete(msg *Message) error {
 
 	res, err := c.DeleteRequest(c.Endpoints[delete], body)
 	if err != nil {
-
 		return fmt.Errorf("%w: delete couldn't be sent", err)
 	}
 
@@ -175,7 +176,6 @@ func (c *ChatClient) GetResponse(url string) (*Response, error) {
 		log.Printf("%v: the connection to the server couldn't be established", err)
 
 		return nil, fmt.Errorf("%w: server not available", err)
-
 	}
 
 	defer res.Body.Close()
@@ -185,7 +185,6 @@ func (c *ChatClient) GetResponse(url string) (*Response, error) {
 	}
 
 	body, err := io.ReadAll(res.Body)
-
 	if err != nil {
 		return nil, fmt.Errorf("%s: message body couldn't be read", res.Status)
 	}

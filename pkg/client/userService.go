@@ -29,6 +29,7 @@ func NewUserService(c *ChatClient) *UserService {
 // ResponsePoller gets and displays messages if the client is not typing
 func (u *UserService) ResponsePoller() {
 	var rsp *Response
+
 	for {
 		u.CheckPolling()
 
@@ -82,21 +83,24 @@ func (u *UserService) DisplayResponse(rsp *Response) error {
 	if strings.HasPrefix(rsp.Content, "[") {
 		output, err := JSONToTable(rsp.Content)
 		if err != nil {
-			return fmt.Errorf("%v: error formatting json to table", err)
+			return fmt.Errorf("%w: error formatting json to table", err)
 		}
 
 		fmt.Println(output)
+
 		return nil
 	}
 
 	responseString := fmt.Sprintf("%s: %s", rsp.Name, rsp.Content)
 	fmt.Println(responseString)
+
 	return nil
 }
 
 // ParseInputToMessage parses the user input into a Message
 func (u *UserService) ParseInputToMessage(input string) (*Message, error) {
 	input = strings.TrimSuffix(input, "\n")
+
 	var plugin string
 
 	ok := strings.HasPrefix(input, "/")
@@ -155,8 +159,9 @@ func (u *UserService) Completer(d prompt.Document) []prompt.Suggest {
 		for command, plugin := range u.plugins.plugins {
 			s = append(s, prompt.Suggest{Text: command, Description: plugin.Description()})
 		}
-		return prompt.FilterHasPrefix(s, d.GetWordBeforeCursor(), true)
 
+		return prompt.FilterHasPrefix(s, d.GetWordBeforeCursor(), true)
 	}
+
 	return s
 }
