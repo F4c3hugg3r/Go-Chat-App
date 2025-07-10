@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -53,12 +52,11 @@ func main() {
 	// )
 
 	//TODO das beim starten des Outputs printen
-	fmt.Println("-> registriere dich mit '/register {name}'")
 	// p.Run()
 }
 
 // interruptListener sends a cancel() signal and closes all connections and requests if a interruption like
-// os.Interrupt or syscall.SIGTERM is being triggered
+// os.Interrupt or syscall.SIGTERM is being triggered#BF359B
 func interruptListener(interChan chan os.Signal, c *n.ChatClient) {
 	<-interChan
 

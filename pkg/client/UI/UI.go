@@ -3,6 +3,7 @@ package UI
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	i "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/input"
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/types"
@@ -14,6 +15,13 @@ import (
 )
 
 const gap = "\n\n"
+
+var (
+	red    lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#BF3535"))
+	blue   lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#353EBF"))
+	turkis lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#35BFBC"))
+	green  lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("##53BF35"))
+)
 
 type (
 	errMsg error
@@ -27,6 +35,8 @@ type model struct {
 	outputChan  chan *t.Response
 	userService *i.UserService
 	err         error
+	mu          *sync.RWMutex
+	typing      string
 }
 
 func InitialModel(u *i.UserService) model {
@@ -46,7 +56,8 @@ func InitialModel(u *i.UserService) model {
 	ta.ShowLineNumbers = false
 
 	vp := viewport.New(30, 5)
-	vp.SetContent(`Welcome to the chat room! Type a message and press Enter to send.`)
+	vp.SetContent(`Welcome to the chat room! Register yourself with '/register {name}'")
+`)
 
 	ta.KeyMap.InsertNewline.SetEnabled(false)
 
@@ -54,7 +65,6 @@ func InitialModel(u *i.UserService) model {
 		textarea:    ta,
 		messages:    []string{},
 		viewport:    vp,
-		senderStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
 		err:         nil,
 		userService: u,
 		outputChan:  u.ChatClient.Output,
@@ -65,51 +75,39 @@ func (m model) Init() tea.Cmd {
 	return tea.Batch(textarea.Blink, m.waitForExternalResponse())
 }
 
+// TODO chat hochscollen mit Pfeiltasten oder Mausrad und help Fenster
+// -> dafür vordefinierte keybinds (zB j & k & u usw) umschreiben
+// TODO Suggestions
+// TODO zwischenspeicher für Nachrichten
 func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 	var (
 		tiCmd tea.Cmd
 		vpCmd tea.Cmd
 	)
 
+	// Zustand speichern
+	// m.typing = fmt.Sprint(m.typing, m.textarea.Value())
+
 	m.textarea, tiCmd = m.textarea.Update(rsp)
 	m.viewport, vpCmd = m.viewport.Update(rsp)
 
 	switch rsp := rsp.(type) {
 	case *t.Response:
-		m.messages = append(m.messages, m.evaluateReponse(rsp))
-		// m.messages = append(m.messages, m.senderStyle.Render("You: ")+m.textarea.Value())
-		m.viewport.SetContent(lipgloss.NewStyle().Width(m.viewport.Width).Render(strings.Join(m.messages, "\n")))
-		m.textarea.Reset()
-		m.viewport.GotoBottom()
+		m.HandleResponse(rsp)
 		return m, tea.Batch(tiCmd, vpCmd, m.waitForExternalResponse())
-	// TODO chat hochscollen mit Pfeiltasten oder Mausrad und help Fenster
 
-	// for terminal resize
 	case tea.WindowSizeMsg:
-		m.viewport.Width = rsp.Width
-		m.textarea.SetWidth(rsp.Width)
-		m.viewport.Height = rsp.Height - m.textarea.Height() - lipgloss.Height(gap)
+		m.HandleWindowResize(&rsp)
 
-		if len(m.messages) > 0 {
-			// Wrap content before setting it.
-			m.viewport.SetContent(lipgloss.NewStyle().Width(m.viewport.Width).Render(strings.Join(m.messages, "\n")))
-		}
-		m.viewport.GotoBottom()
 	case tea.KeyMsg:
 		switch rsp.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
-			fmt.Println(m.textarea.Value())
+			m.userService.ChatClient.Interrupt()
 			return m, tea.Quit
 		case tea.KeyEnter:
-			m.messages = append(m.messages, m.senderStyle.Render("You: ")+m.textarea.Value())
-			m.messages = append(m.messages, m.textarea.Value())
-			m.messages = append(m.messages, rsp.String())
-			m.viewport.SetContent(lipgloss.NewStyle().Width(m.viewport.Width).Render(strings.Join(m.messages, "\n")))
-			m.userService.Executor(m.textarea.Value())
-			m.textarea.Reset()
+			m.Execute()
 		}
 
-	// We handle errors just like any other message
 	case errMsg:
 		m.err = rsp
 		return m, nil
@@ -127,30 +125,64 @@ func (m model) View() string {
 	)
 }
 
+func (m *model) HandleWindowResize(rsp *tea.WindowSizeMsg) {
+	m.viewport.Width = rsp.Width
+	m.textarea.SetWidth(rsp.Width)
+	m.viewport.Height = rsp.Height - m.textarea.Height() - lipgloss.Height(gap)
+
+	if len(m.messages) > 0 {
+		// Wrap content before setting it. -> Zeilenumbruch am Rand des Viewportes
+		str, _ := strings.CutSuffix(strings.Join(m.messages, "\n"), "\n")
+		m.viewport.SetContent(lipgloss.NewStyle().Width(m.viewport.Width).Render(str))
+	}
+	m.viewport.GotoBottom()
+}
+
+func (m *model) HandleResponse(rsp *t.Response) {
+	str := m.evaluateReponse(rsp)
+	if str != "" {
+		m.messages = append(m.messages, str)
+	}
+	str, _ = strings.CutSuffix(strings.Join(m.messages, "\n"), "\n")
+	m.viewport.SetContent(lipgloss.NewStyle().Width(m.viewport.Width).Render(str))
+	m.textarea.Reset()
+	m.viewport.GotoBottom()
+}
+
+func (m *model) Execute() {
+	str, _ := strings.CutSuffix(strings.Join(m.messages, "\n"), "\n")
+	m.viewport.SetContent(lipgloss.NewStyle().Width(m.viewport.Width).Render(str))
+	m.userService.Executor(m.textarea.Value())
+	m.textarea.Reset()
+	m.typing = ""
+}
+
 func (m *model) evaluateReponse(rsp *t.Response) string {
 	var rspString string
 
-	if rsp.Content == "" {
-		return rsp.Err.Error()
+	if rsp.Err != nil {
+		return red.Render(rsp.Err.Error())
 	}
 
-	if rsp.Err != nil {
-		// TODO Farbe
-		return rsp.Err.Error()
+	if rsp.Content == "" {
+		return ""
 	}
 
 	if strings.HasPrefix(rsp.Content, "[") {
 		output, err := JSONToTable(rsp.Content)
 		if err != nil {
-			return fmt.Sprintf("%v: error formatting json to table", err)
+			return red.Render(fmt.Sprintf("%v: error formatting json to table", err))
 		}
 
 		return output
 	}
 
-	// TODO Farbe
-	//zB m.senderStyle.Render
-	rspString = fmt.Sprintf("%s: %s", rsp.Name, rsp.Content)
+	if rsp.Name == "" {
+		rspString = fmt.Sprintf("%s", blue.Render(rsp.Content))
+		return rspString
+	}
+
+	rspString = fmt.Sprintf("%s: %s", turkis.Render(rsp.Name), rsp.Content)
 
 	return rspString
 }
@@ -161,25 +193,25 @@ func (m *model) waitForExternalResponse() tea.Cmd {
 	}
 }
 
-// DisplayResponse prints out a Response in the proper way
-func DisplayResponse(rsp *t.Response) error {
-	if rsp.Content == "" {
-		return nil
-	}
+// // DisplayResponse prints out a Response in the proper way
+// func DisplayResponse(rsp *t.Response) error {
+// 	if rsp.Content == "" {
+// 		return nil
+// 	}
 
-	if strings.HasPrefix(rsp.Content, "[") {
-		output, err := JSONToTable(rsp.Content)
-		if err != nil {
-			return fmt.Errorf("%w: error formatting json to table", err)
-		}
+// 	if strings.HasPrefix(rsp.Content, "[") {
+// 		output, err := JSONToTable(rsp.Content)
+// 		if err != nil {
+// 			return fmt.Errorf("%w: error formatting json to table", err)
+// 		}
 
-		fmt.Println(output)
+// 		fmt.Println(output)
 
-		return nil
-	}
+// 		return nil
+// 	}
 
-	responseString := fmt.Sprintf("%s: %s", rsp.Name, rsp.Content)
-	fmt.Println(responseString)
+// 	responseString := fmt.Sprintf("%s: %s", rsp.Name, rsp.Content)
+// 	fmt.Println(responseString)
 
-	return nil
-}
+// 	return nil
+// }

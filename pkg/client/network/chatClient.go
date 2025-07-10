@@ -56,6 +56,17 @@ func (c *ChatClient) RegisterEndpoints(url string) map[int]string {
 	return endpoints
 }
 
+func (c *ChatClient) Interrupt() {
+	if c.Registered {
+		err := c.PostDelete(c.CreateMessage("", "/quit", "", ""))
+		if err != nil {
+			c.Output <- &t.Response{Err: fmt.Errorf("%w: delete could not be sent", err)}
+		}
+	}
+
+	c.HttpClient.CloseIdleConnections()
+}
+
 // ResponseReceiver gets responses if client is registered
 // and sends then into the output channel
 func (c *ChatClient) ResponseReceiver(url string) {

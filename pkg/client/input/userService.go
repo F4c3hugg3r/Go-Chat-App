@@ -117,10 +117,10 @@ func (u *UserService) Executor(input string) {
 
 	err, comment := u.plugins.FindAndExecute(msg)
 	if err != nil {
-		u.ChatClient.Output <- &t.Response{Err: fmt.Errorf("%v: %s", err.Error(), err)}
+		u.ChatClient.Output <- &t.Response{Err: fmt.Errorf("%v", err)}
 	}
 
-	u.ChatClient.Output <- &t.Response{Err: fmt.Errorf("%s", comment)}
+	u.ChatClient.Output <- &t.Response{Content: comment}
 }
 
 // // IsTyping receives the length of the userinput, checks if the client
