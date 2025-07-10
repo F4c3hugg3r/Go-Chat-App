@@ -1,8 +1,9 @@
-package client
+package input
 
 import (
 	"testing"
 
+	"github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/network"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -228,10 +229,11 @@ var (
 // }
 
 func TestClient_extractInputToMessage(t *testing.T) {
-	c := NewClient("http://localhost:8080")
-	c.clientId = clientId
-	c.authToken = authToken
-	c.Endpoints = c.RegisterEndpoints(c.url)
+	c := network.NewClient("http://localhost:8080")
+	// anders handeln
+	// c.clientId = clientId
+	// c.authToken = authToken
+	c.Endpoints = c.RegisterEndpoints(c.Url)
 
 	u := NewUserService(c)
 

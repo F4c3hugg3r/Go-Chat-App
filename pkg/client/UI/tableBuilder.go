@@ -1,4 +1,4 @@
-package client
+package UI
 
 import (
 	"encoding/json"

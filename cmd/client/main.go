@@ -8,8 +8,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	client "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client"
 	tea "github.com/charmbracelet/bubbletea"
+
+	ui "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/UI"
+	i "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/input"
+	n "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/network"
 )
 
 var (
@@ -21,9 +24,9 @@ func init() {
 }
 
 func main() {
-	c := client.NewClient(*url)
-	u := client.NewUserService(c)
-	programm := tea.NewProgram(client.InitialModel(u))
+	c := n.NewClient(*url)
+	u := i.NewUserService(c)
+	programm := tea.NewProgram(ui.InitialModel(u))
 	interChan := make(chan os.Signal, 3)
 
 	// ctrlCBinding := prompt.KeyBind{
@@ -56,7 +59,7 @@ func main() {
 
 // interruptListener sends a cancel() signal and closes all connections and requests if a interruption like
 // os.Interrupt or syscall.SIGTERM is being triggered
-func interruptListener(interChan chan os.Signal, c *client.ChatClient) {
+func interruptListener(interChan chan os.Signal, c *n.ChatClient) {
 	<-interChan
 
 	if c.Registered {

@@ -1,8 +1,11 @@
-package client
+package UI
 
 import (
 	"fmt"
 	"strings"
+
+	i "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/input"
+	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/types"
 
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -21,12 +24,12 @@ type model struct {
 	messages    []string
 	textarea    textarea.Model
 	senderStyle lipgloss.Style
-	outputChan  chan *Response
-	userService *UserService
+	outputChan  chan *t.Response
+	userService *i.UserService
 	err         error
 }
 
-func InitialModel(u *UserService) model {
+func InitialModel(u *i.UserService) model {
 	ta := textarea.New()
 	ta.Placeholder = "Send a message..."
 	ta.Focus()
@@ -54,7 +57,7 @@ func InitialModel(u *UserService) model {
 		senderStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
 		err:         nil,
 		userService: u,
-		outputChan:  u.chatClient.Output,
+		outputChan:  u.ChatClient.Output,
 	}
 }
 
@@ -72,7 +75,7 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 	m.viewport, vpCmd = m.viewport.Update(rsp)
 
 	switch rsp := rsp.(type) {
-	case *Response:
+	case *t.Response:
 		m.messages = append(m.messages, m.evaluateReponse(rsp))
 		// m.messages = append(m.messages, m.senderStyle.Render("You: ")+m.textarea.Value())
 		m.viewport.SetContent(lipgloss.NewStyle().Width(m.viewport.Width).Render(strings.Join(m.messages, "\n")))
@@ -124,7 +127,7 @@ func (m model) View() string {
 	)
 }
 
-func (m *model) evaluateReponse(rsp *Response) string {
+func (m *model) evaluateReponse(rsp *t.Response) string {
 	var rspString string
 
 	if rsp.Content == "" {
@@ -159,7 +162,7 @@ func (m *model) waitForExternalResponse() tea.Cmd {
 }
 
 // DisplayResponse prints out a Response in the proper way
-func DisplayResponse(rsp *Response) error {
+func DisplayResponse(rsp *t.Response) error {
 	if rsp.Content == "" {
 		return nil
 	}

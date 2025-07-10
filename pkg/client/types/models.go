@@ -1,9 +1,7 @@
-package client
+package types
 
 import (
 	"errors"
-	"net/http"
-	"sync"
 )
 
 var (
@@ -12,35 +10,11 @@ var (
 )
 
 const (
-	postPlugin = iota
-	postRegister
-	delete
-	get
+	PostPlugin = iota
+	PostRegister
+	Delete
+	Get
 )
-
-// ChatClient handles all network tasks
-type ChatClient struct {
-	clientName string
-	clientId   string
-	authToken  string
-	HttpClient *http.Client
-	Registered bool
-	mu         *sync.RWMutex
-	Cond       *sync.Cond
-	Output     chan *Response
-	url        string
-	Endpoints  map[int]string
-}
-
-// UserService handles user inputs and outputs
-type UserService struct {
-	chatClient *ChatClient
-	plugins    *PluginRegistry
-	poll       bool
-	typing     bool
-	mu         *sync.RWMutex
-	Cond       *sync.Cond
-}
 
 // Message contains the name of the requester and the message (content) itsself
 type Message struct {
