@@ -8,6 +8,7 @@ import (
 	i "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/input"
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/types"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -56,8 +57,7 @@ func InitialModel(u *i.UserService) model {
 	ta.ShowLineNumbers = false
 
 	vp := viewport.New(30, 5)
-	vp.SetContent(`Welcome to the chat room! Register yourself with '/register {name}'")
-`)
+	vp.KeyMap = initialiseKeyMap()
 
 	ta.KeyMap.InsertNewline.SetEnabled(false)
 
@@ -78,22 +78,21 @@ func (m model) Init() tea.Cmd {
 // TODO chat hochscollen mit Pfeiltasten oder Mausrad und help Fenster
 // -> dafür vordefinierte keybinds (zB j & k & u usw) umschreiben
 // TODO Suggestions
-// TODO zwischenspeicher für Nachrichten
 func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 	var (
-		tiCmd tea.Cmd
 		vpCmd tea.Cmd
+		tiCmd tea.Cmd
 	)
-
-	// Zustand speichern
-	// m.typing = fmt.Sprint(m.typing, m.textarea.Value())
 
 	m.textarea, tiCmd = m.textarea.Update(rsp)
 	m.viewport, vpCmd = m.viewport.Update(rsp)
 
+	m.typing = fmt.Sprint(m.textarea.Value())
+
 	switch rsp := rsp.(type) {
 	case *t.Response:
 		m.HandleResponse(rsp)
+		m.textarea.InsertString(m.typing)
 		return m, tea.Batch(tiCmd, vpCmd, m.waitForExternalResponse())
 
 	case tea.WindowSizeMsg:
@@ -118,7 +117,7 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	return fmt.Sprintf(
-		"%s%s%s",
+		"Welcome to the chat room! \nRegister yourself with '/register {name}'\n%s%s%s",
 		m.viewport.View(),
 		gap,
 		m.textarea.View(),
@@ -190,6 +189,43 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 func (m *model) waitForExternalResponse() tea.Cmd {
 	return func() tea.Msg {
 		return m.userService.ResponsePoller()
+	}
+}
+
+func initialiseKeyMap() viewport.KeyMap {
+	return viewport.KeyMap{
+		PageDown: key.NewBinding(
+			key.WithKeys("ctrl+down"),
+			key.WithHelp("Ctrl+↓", "page down"),
+		),
+		PageUp: key.NewBinding(
+			key.WithKeys("ctrl+up"),
+			key.WithHelp("Ctrl+↑", "page up"),
+		),
+		HalfPageUp: key.NewBinding(
+			key.WithKeys("shift+up"),
+			key.WithHelp("Shift+↑", "½ page up"),
+		),
+		HalfPageDown: key.NewBinding(
+			key.WithKeys("shift+down"),
+			key.WithHelp("Shift+↓", "½ page down"),
+		),
+		Down: key.NewBinding(
+			key.WithKeys("down"),
+			key.WithHelp("↓", "down"),
+		),
+		Up: key.NewBinding(
+			key.WithKeys("up"),
+			key.WithHelp("↑", "up"),
+		),
+		Left: key.NewBinding(
+			key.WithKeys("left"),
+			key.WithHelp("←", "left"),
+		),
+		Right: key.NewBinding(
+			key.WithKeys("right"),
+			key.WithHelp("→", "right"),
+		),
 	}
 }
 
