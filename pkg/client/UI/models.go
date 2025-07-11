@@ -12,6 +12,8 @@ import (
 )
 
 const gap = "\n\n"
+const registerflag = "- Du bist registriert -"
+const unregisterFlag = "- Du bist nun vom Server getrennt -"
 
 var (
 	red          lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#BF3535"))
@@ -81,16 +83,18 @@ type keyMap struct {
 }
 
 type model struct {
-	viewport        viewport.Model
-	messages        []string
-	textinput       textinput.Model
-	textarea        textarea.Model
-	senderStyle     lipgloss.Style
-	outputChan      chan *t.Response
-	userService     *i.UserService
-	err             error
-	typing          string
+	viewport    viewport.Model
+	messages    []string
+	textinput   textinput.Model
+	textarea    textarea.Model
+	senderStyle lipgloss.Style
+	outputChan  chan *t.Response
+	userService *i.UserService
+	err         error
+	// typing          string
 	help            help.Model
 	keyMap          keyMap
 	showSuggestions bool
+	registered      string
+	title           string
 }

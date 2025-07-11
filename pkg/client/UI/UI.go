@@ -16,6 +16,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// TODO AUFRÄUMEN
+// TODO list commands output als Liste darstellen
+// TODO Ordnerstruktur Server
+// TODO eigenen Namen anzeigen
+
 func InitialModel(u *i.UserService) model {
 	ti := textinput.New()
 	ti.Placeholder = "Send a message..."
@@ -81,13 +86,13 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 	m.viewport, vpCmd = m.viewport.Update(rsp)
 	m.textinput, txCmd = m.textinput.Update(rsp)
 
-	m.typing = fmt.Sprint(m.textarea.Value())
+	// m.typing = fmt.Sprint(m.textarea.Value())
 
 	switch rsp := rsp.(type) {
 	case *t.Response:
 		// m.HandleResponse(rsp)
 		m.HandleResponseTextInput(rsp)
-		m.textarea.InsertString(m.typing)
+		// m.textarea.InsertString(m.typing)
 		return m, tea.Batch(tiCmd, vpCmd, m.waitForExternalResponse())
 
 	case tea.WindowSizeMsg:
@@ -114,14 +119,21 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
+	if m.registered == "" {
+		m.title = centered.Width(m.viewport.Width).Bold(true).Render("Welcome to the chat room! \nTry '/register {name}' or '/help'")
+	} else {
+		title := centered.Width(m.viewport.Width).Bold(true).Render(m.registered)
+		heigtDiff := lipgloss.Height(m.title) - lipgloss.Height(title)
+		m.title = title
+		m.viewport.Height = m.viewport.Height + heigtDiff
+	}
+
 	return fmt.Sprintf(
 		"%s%s%s%s%s%s%s",
-		centered.Width(m.viewport.Width).Bold(true).Render("Welcome to the chat room! \nTry '/register {name}' or '/help'"),
+		m.title,
 		gap,
 		m.viewport.View(),
 		gap,
-		// m.textarea.View(),
-		// gap,
 		m.textinput.View(),
 		gap,
 		m.help.View(m.keyMap),
@@ -134,7 +146,7 @@ func (m *model) HandleWindowResize(rsp *tea.WindowSizeMsg) {
 	m.help.Width = rsp.Width
 	// m.textarea.SetWidth(rsp.Width)
 	// m.viewport.Height = rsp.Height - m.textarea.Height() - lipgloss.Height(gap)
-	m.viewport.Height = rsp.Height - lipgloss.Height(gap) - lipgloss.Height("\n\n\n")
+	m.viewport.Height = rsp.Height - lipgloss.Height(gap) - lipgloss.Height(m.title) - lipgloss.Height(gap)
 
 	if len(m.messages) > 0 {
 		str, _ := strings.CutSuffix(strings.Join(m.messages, "\n"), "\n")
@@ -164,6 +176,7 @@ func (m *model) HandleResponseTextInput(rsp *t.Response) {
 	// m.textinput.Reset()
 	m.viewport.GotoBottom()
 }
+
 func (m *model) Execute() {
 	str, _ := strings.CutSuffix(strings.Join(m.messages, "\n"), "\n")
 	m.viewport.SetContent(lipgloss.NewStyle().Width(m.viewport.Width).Render(str))
@@ -171,7 +184,7 @@ func (m *model) Execute() {
 	// // m.userService.Executor(m.textarea.Value())
 	// m.textarea.Reset()
 	m.textinput.Reset()
-	m.typing = ""
+	// m.typing = ""
 }
 
 func (m *model) evaluateReponse(rsp *t.Response) string {
@@ -192,6 +205,16 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 		}
 
 		return output
+	}
+
+	// should be const
+	if strings.Contains(rsp.Content, registerflag) {
+		m.registered = rsp.Content
+		return blue.Render("-> Du kannst nun Nachrichten schreiben oder Commands ausführen")
+	}
+
+	if strings.Contains(rsp.Content, unregisterFlag) {
+		m.registered = ""
 	}
 
 	if rsp.Name == "" {

@@ -45,10 +45,14 @@ func (pp *PrivateMessagePlugin) Execute(message *Message) (*Response, error) {
 // LogOutPlugin logs out a client by deleting it out of the clients map
 type LogOutPlugin struct {
 	chatService *ChatService
+	pr          *PluginRegistry
 }
 
-func NewLogOutPlugin(s *ChatService) *LogOutPlugin {
-	return &LogOutPlugin{chatService: s}
+func NewLogOutPlugin(s *ChatService, pr *PluginRegistry) *LogOutPlugin {
+	return &LogOutPlugin{
+		chatService: s,
+		pr:          pr,
+	}
 }
 
 func (lp *LogOutPlugin) Description() string {
@@ -68,6 +72,8 @@ func (lp *LogOutPlugin) Execute(message *Message) (*Response, error) {
 	client.Close()
 	delete(lp.chatService.clients, message.ClientId)
 
+	go client.Execute(lp.pr, &Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s hat den Chat verlassen", message.Name), ClientId: message.ClientId})
+
 	return &Response{Name: message.Name, Content: "logged out"}, nil
 }
 
@@ -75,10 +81,14 @@ func (lp *LogOutPlugin) Execute(message *Message) (*Response, error) {
 // and putting it into the global clients map
 type RegisterClientPlugin struct {
 	chatService *ChatService
+	pr          *PluginRegistry
 }
 
-func NewRegisterClientPlugin(s *ChatService) *RegisterClientPlugin {
-	return &RegisterClientPlugin{chatService: s}
+func NewRegisterClientPlugin(s *ChatService, pr *PluginRegistry) *RegisterClientPlugin {
+	return &RegisterClientPlugin{
+		chatService: s,
+		pr:          pr,
+	}
 }
 
 func (rp *RegisterClientPlugin) Description() string {
@@ -100,7 +110,7 @@ func (rp *RegisterClientPlugin) Execute(message *Message) (*Response, error) {
 
 	clientCh := make(chan *Response, 100)
 	token := shared.GenerateSecureToken(64)
-	rp.chatService.clients[message.ClientId] = &Client{
+	client := &Client{
 		Name:      message.Name,
 		ClientId:  message.ClientId,
 		clientCh:  clientCh,
@@ -109,8 +119,11 @@ func (rp *RegisterClientPlugin) Execute(message *Message) (*Response, error) {
 		lastSign:  time.Now().UTC(),
 		chClosed:  false,
 	}
+	rp.chatService.clients[message.ClientId] = client
 
-	fmt.Printf("\nNew client '%s' registered.\n", message.Content)
+	fmt.Printf("\nnew client '%s' registered.", message.Content)
+
+	go client.Execute(rp.pr, &Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s ist dem Chat beigetreten", client.Name), ClientId: client.ClientId})
 
 	return &Response{Name: message.Name, Content: token}, nil
 }
