@@ -3,44 +3,36 @@ package UI
 import (
 	"fmt"
 	"strings"
-	"sync"
 
 	i "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/input"
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/types"
 
+	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textarea"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
-const gap = "\n\n"
-
-var (
-	red    lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#BF3535"))
-	blue   lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#353EBF"))
-	turkis lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#35BFBC"))
-	green  lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("##53BF35"))
-)
-
-type (
-	errMsg error
-)
-
-type model struct {
-	viewport    viewport.Model
-	messages    []string
-	textarea    textarea.Model
-	senderStyle lipgloss.Style
-	outputChan  chan *t.Response
-	userService *i.UserService
-	err         error
-	mu          *sync.RWMutex
-	typing      string
-}
-
 func InitialModel(u *i.UserService) model {
+	ti := textinput.New()
+	ti.Placeholder = "Send a message..."
+	ti.Prompt = "┃ "
+	ti.PromptStyle, ti.Cursor.Style = purple, purple
+	ti.Focus()
+	ti.CharLimit = 280
+	ti.Width = 30
+	ti.ShowSuggestions = true
+	//überschreiben, da ctrl+h sonst char löscht
+	ti.KeyMap.DeleteCharacterBackward = key.NewBinding(key.WithKeys("backspace"))
+	ti.KeyMap.NextSuggestion = helpKeys.NextSug
+	ti.KeyMap.PrevSuggestion = helpKeys.PrevSug
+	ti.SetSuggestions(u.InitializeSuggestions())
+
+	h := help.New()
+
 	ta := textarea.New()
 	ta.Placeholder = "Send a message..."
 	ta.Focus()
@@ -57,9 +49,9 @@ func InitialModel(u *i.UserService) model {
 	ta.ShowLineNumbers = false
 
 	vp := viewport.New(30, 5)
-	vp.KeyMap = initialiseKeyMap()
+	vp.KeyMap = viewportKeys
 
-	ta.KeyMap.InsertNewline.SetEnabled(false)
+	// ta.KeyMap.InsertNewline.SetEnabled(false)
 
 	return model{
 		textarea:    ta,
@@ -68,6 +60,9 @@ func InitialModel(u *i.UserService) model {
 		err:         nil,
 		userService: u,
 		outputChan:  u.ChatClient.Output,
+		textinput:   ti,
+		help:        h,
+		keyMap:      helpKeys,
 	}
 }
 
@@ -75,23 +70,23 @@ func (m model) Init() tea.Cmd {
 	return tea.Batch(textarea.Blink, m.waitForExternalResponse())
 }
 
-// TODO chat hochscollen mit Pfeiltasten oder Mausrad und help Fenster
-// -> dafür vordefinierte keybinds (zB j & k & u usw) umschreiben
-// TODO Suggestions
 func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 	var (
 		vpCmd tea.Cmd
 		tiCmd tea.Cmd
+		txCmd tea.Cmd
 	)
 
 	m.textarea, tiCmd = m.textarea.Update(rsp)
 	m.viewport, vpCmd = m.viewport.Update(rsp)
+	m.textinput, txCmd = m.textinput.Update(rsp)
 
 	m.typing = fmt.Sprint(m.textarea.Value())
 
 	switch rsp := rsp.(type) {
 	case *t.Response:
-		m.HandleResponse(rsp)
+		// m.HandleResponse(rsp)
+		m.HandleResponseTextInput(rsp)
 		m.textarea.InsertString(m.typing)
 		return m, tea.Batch(tiCmd, vpCmd, m.waitForExternalResponse())
 
@@ -106,31 +101,42 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyEnter:
 			m.Execute()
 		}
+		if key.Matches(rsp, m.keyMap.Help) {
+			m.help.ShowAll = !m.help.ShowAll
+		}
 
 	case errMsg:
 		m.err = rsp
 		return m, nil
 	}
 
-	return m, tea.Batch(tiCmd, vpCmd)
+	return m, tea.Batch(tiCmd, vpCmd, txCmd)
 }
 
 func (m model) View() string {
 	return fmt.Sprintf(
-		"Welcome to the chat room! \nRegister yourself with '/register {name}'\n%s%s%s",
+		"%s%s%s%s%s%s%s",
+		centered.Width(m.viewport.Width).Bold(true).Render("Welcome to the chat room! \nTry '/register {name}' or '/help'"),
+		gap,
 		m.viewport.View(),
 		gap,
-		m.textarea.View(),
+		// m.textarea.View(),
+		// gap,
+		m.textinput.View(),
+		gap,
+		m.help.View(m.keyMap),
 	)
 }
 
 func (m *model) HandleWindowResize(rsp *tea.WindowSizeMsg) {
 	m.viewport.Width = rsp.Width
-	m.textarea.SetWidth(rsp.Width)
-	m.viewport.Height = rsp.Height - m.textarea.Height() - lipgloss.Height(gap)
+	m.textinput.Width = rsp.Width
+	m.help.Width = rsp.Width
+	// m.textarea.SetWidth(rsp.Width)
+	// m.viewport.Height = rsp.Height - m.textarea.Height() - lipgloss.Height(gap)
+	m.viewport.Height = rsp.Height - lipgloss.Height(gap) - lipgloss.Height("\n\n\n")
 
 	if len(m.messages) > 0 {
-		// Wrap content before setting it. -> Zeilenumbruch am Rand des Viewportes
 		str, _ := strings.CutSuffix(strings.Join(m.messages, "\n"), "\n")
 		m.viewport.SetContent(lipgloss.NewStyle().Width(m.viewport.Width).Render(str))
 	}
@@ -144,15 +150,27 @@ func (m *model) HandleResponse(rsp *t.Response) {
 	}
 	str, _ = strings.CutSuffix(strings.Join(m.messages, "\n"), "\n")
 	m.viewport.SetContent(lipgloss.NewStyle().Width(m.viewport.Width).Render(str))
-	m.textarea.Reset()
+	// m.textarea.Reset()
 	m.viewport.GotoBottom()
 }
 
+func (m *model) HandleResponseTextInput(rsp *t.Response) {
+	str := m.evaluateReponse(rsp)
+	if str != "" {
+		m.messages = append(m.messages, str)
+	}
+	str, _ = strings.CutSuffix(strings.Join(m.messages, "\n"), "\n")
+	m.viewport.SetContent(lipgloss.NewStyle().Width(m.viewport.Width).Render(str))
+	// m.textinput.Reset()
+	m.viewport.GotoBottom()
+}
 func (m *model) Execute() {
 	str, _ := strings.CutSuffix(strings.Join(m.messages, "\n"), "\n")
 	m.viewport.SetContent(lipgloss.NewStyle().Width(m.viewport.Width).Render(str))
-	m.userService.Executor(m.textarea.Value())
-	m.textarea.Reset()
+	m.userService.Executor(m.textinput.Value())
+	// // m.userService.Executor(m.textarea.Value())
+	// m.textarea.Reset()
+	m.textinput.Reset()
 	m.typing = ""
 }
 
@@ -192,41 +210,13 @@ func (m *model) waitForExternalResponse() tea.Cmd {
 	}
 }
 
-func initialiseKeyMap() viewport.KeyMap {
-	return viewport.KeyMap{
-		PageDown: key.NewBinding(
-			key.WithKeys("ctrl+down"),
-			key.WithHelp("Ctrl+↓", "page down"),
-		),
-		PageUp: key.NewBinding(
-			key.WithKeys("ctrl+up"),
-			key.WithHelp("Ctrl+↑", "page up"),
-		),
-		HalfPageUp: key.NewBinding(
-			key.WithKeys("shift+up"),
-			key.WithHelp("Shift+↑", "½ page up"),
-		),
-		HalfPageDown: key.NewBinding(
-			key.WithKeys("shift+down"),
-			key.WithHelp("Shift+↓", "½ page down"),
-		),
-		Down: key.NewBinding(
-			key.WithKeys("down"),
-			key.WithHelp("↓", "down"),
-		),
-		Up: key.NewBinding(
-			key.WithKeys("up"),
-			key.WithHelp("↑", "up"),
-		),
-		Left: key.NewBinding(
-			key.WithKeys("left"),
-			key.WithHelp("←", "left"),
-		),
-		Right: key.NewBinding(
-			key.WithKeys("right"),
-			key.WithHelp("→", "right"),
-		),
-	}
+func (k keyMap) ShortHelp() []key.Binding {
+	return []key.Binding{k.Help, k.Quit, k.Complete, k.NextSug, k.PrevSug}
+}
+
+func (k keyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{{k.Up, k.Down, k.Left, k.Right, k.HalfPageUp, k.HalfPageDown},
+		{k.Help, k.Quit, k.Complete, k.NextSug, k.PrevSug}}
 }
 
 // // DisplayResponse prints out a Response in the proper way

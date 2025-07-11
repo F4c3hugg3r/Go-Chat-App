@@ -8,13 +8,12 @@ import (
 	n "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/network"
 	p "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/plugins"
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/types"
-	"github.com/c-bata/go-prompt"
 )
 
 // UserService handles user inputs and outputs
 type UserService struct {
 	ChatClient *n.ChatClient
-	plugins    *p.PluginRegistry
+	PlugReg    *p.PluginRegistry
 	poll       bool
 	typing     bool
 	mu         *sync.RWMutex
@@ -25,7 +24,7 @@ type UserService struct {
 func NewUserService(c *n.ChatClient) *UserService {
 	u := &UserService{
 		ChatClient: c,
-		plugins:    p.RegisterPlugins(c),
+		PlugReg:    p.RegisterPlugins(c),
 		poll:       false,
 		mu:         &sync.RWMutex{},
 	}
@@ -35,6 +34,16 @@ func NewUserService(c *n.ChatClient) *UserService {
 	// go u.ResponsePoller()
 
 	return u
+}
+
+func (u *UserService) InitializeSuggestions() []string {
+	s := []string{}
+
+	for command := range u.PlugReg.Plugins {
+		s = append(s, command)
+	}
+
+	return s
 }
 
 // ResponsePoller gets and displays messages if the client is not typing
@@ -115,7 +124,7 @@ func (u *UserService) ParseInputToMessage(input string) *t.Message {
 func (u *UserService) Executor(input string) {
 	msg := u.ParseInputToMessage(input)
 
-	err, comment := u.plugins.FindAndExecute(msg)
+	err, comment := u.PlugReg.FindAndExecute(msg)
 	if err != nil {
 		u.ChatClient.Output <- &t.Response{Err: fmt.Errorf("%v", err)}
 	}
@@ -136,25 +145,25 @@ func (u *UserService) Executor(input string) {
 // 	}
 // }
 
-// Completer suggests plugins and their descriptions in the stdIn
-func (u *UserService) Completer(d prompt.Document) []prompt.Suggest {
-	// u.stopPoll()
+// // Completer suggests plugins and their descriptions in the stdIn
+// func (u *UserService) Completer(d prompt.Document) []prompt.Suggest {
+// 	// u.stopPoll()
 
-	s := []prompt.Suggest{}
-	textBeforeCursor := d.TextBeforeCursor()
-	words := strings.Fields(textBeforeCursor)
+// 	s := []prompt.Suggest{}
+// 	textBeforeCursor := d.TextBeforeCursor()
+// 	words := strings.Fields(textBeforeCursor)
 
-	// if !u.isTyping(len(words)) {
-	// 	// u.startPoll()
-	// }
+// 	// if !u.isTyping(len(words)) {
+// 	// 	// u.startPoll()
+// 	// }
 
-	if len(words) == 1 && d.GetWordBeforeCursor() != "" {
-		for command, plugin := range u.plugins.Plugins {
-			s = append(s, prompt.Suggest{Text: command, Description: plugin.Description()})
-		}
+// 	if len(words) == 1 && d.GetWordBeforeCursor() != "" {
+// 		for command, plugin := range u.plugins.Plugins {
+// 			s = append(s, prompt.Suggest{Text: command, Description: plugin.Description()})
+// 		}
 
-		return prompt.FilterHasPrefix(s, d.GetWordBeforeCursor(), true)
-	}
+// 		return prompt.FilterHasPrefix(s, d.GetWordBeforeCursor(), true)
+// 	}
 
-	return s
-}
+// 	return s
+// }
