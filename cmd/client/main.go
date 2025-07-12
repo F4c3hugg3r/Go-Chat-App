@@ -28,13 +28,6 @@ func main() {
 	programm := tea.NewProgram(ui.InitialModel(u))
 	interChan := make(chan os.Signal, 3)
 
-	// ctrlCBinding := prompt.KeyBind{
-	// 	Key: prompt.ControlC,
-	// 	Fn:  func(b *prompt.Buffer) { interChan <- os.Interrupt },
-	// }
-
-	// deleteInput := func(*prompt.Document) { fmt.Print("\033[1A\033[K") }
-
 	signal.Notify(interChan, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
 
 	go interruptListener(interChan, c)
@@ -42,21 +35,10 @@ func main() {
 	if _, err := programm.Run(); err != nil {
 		log.Fatal(err)
 	}
-
-	// p := prompt.New(
-	// 	u.Executor,
-	// 	u.Completer,
-	// 	prompt.OptionAddKeyBind(ctrlCBinding),
-	// 	prompt.OptionPrefix(""),
-	// 	prompt.OptionBreakLineCallback(deleteInput),
-	// )
-
-	//TODO das beim starten des Outputs printen
-	// p.Run()
 }
 
 // interruptListener sends a cancel() signal and closes all connections and requests if a interruption like
-// os.Interrupt or syscall.SIGTERM is being triggered#BF359B
+// os.Interrupt or syscall.SIGTERM is being triggered
 func interruptListener(interChan chan os.Signal, c *n.ChatClient) {
 	<-interChan
 

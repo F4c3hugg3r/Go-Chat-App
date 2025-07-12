@@ -5,7 +5,6 @@ import (
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/types"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
@@ -40,14 +39,14 @@ var (
 			key.WithKeys("up"),
 			key.WithHelp("↑", faint.Render("move up")),
 		),
-		Left: key.NewBinding(
-			key.WithKeys("left"),
-			key.WithHelp("←", faint.Render("move left")),
-		),
-		Right: key.NewBinding(
-			key.WithKeys("right"),
-			key.WithHelp("→", faint.Render("move right")),
-		),
+		// Left: key.NewBinding(
+		// 	key.WithKeys("left"),
+		// 	key.WithHelp("←", faint.Render("move left")),
+		// ),
+		// Right: key.NewBinding(
+		// 	key.WithKeys("right"),
+		// 	key.WithHelp("→", faint.Render("move right")),
+		// ),
 	}
 	helpKeys = keyMap{
 		Help:         key.NewBinding(key.WithKeys("ctrl+h"), key.WithHelp("ctrl h", faint.Render("toggle help"))),
@@ -59,8 +58,8 @@ var (
 		HalfPageDown: viewportKeys.HalfPageDown,
 		Down:         viewportKeys.Down,
 		Up:           viewportKeys.Up,
-		Left:         viewportKeys.Left,
-		Right:        viewportKeys.Right,
+		// Left:         viewportKeys.Left,
+		// Right:        viewportKeys.Right,
 	}
 )
 
@@ -69,10 +68,10 @@ type (
 )
 
 type keyMap struct {
-	Up           key.Binding
-	Down         key.Binding
-	Left         key.Binding
-	Right        key.Binding
+	Up   key.Binding
+	Down key.Binding
+	// Left         key.Binding
+	// Right        key.Binding
 	HalfPageUp   key.Binding
 	HalfPageDown key.Binding
 	Help         key.Binding
@@ -83,16 +82,13 @@ type keyMap struct {
 }
 
 type model struct {
-	viewport    viewport.Model
-	messages    []string
-	textinput   textinput.Model
-	textarea    textarea.Model
-	senderStyle lipgloss.Style
-	outputChan  chan *t.Response
-	userService *i.UserService
-	err         error
-	// typing          string
+	viewport        viewport.Model
+	textinput       textinput.Model
 	help            help.Model
+	messages        []string
+	outputChan      chan *t.Response
+	userService     *i.UserService
+	err             error
 	keyMap          keyMap
 	showSuggestions bool
 	registered      string
