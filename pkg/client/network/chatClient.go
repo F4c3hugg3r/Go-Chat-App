@@ -243,3 +243,10 @@ func DecodeToResponse(body []byte) (*t.Response, error) {
 
 	return response, nil
 }
+
+func (c *ChatClient) GetName() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.clientName
+}

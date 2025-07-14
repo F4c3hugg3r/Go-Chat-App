@@ -16,8 +16,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// TODO list commands output als Liste darstellen
-// TODO eigenen Namen anzeigen
+// (TODO list commands output als Liste darstellen)
 
 func InitialModel(u *i.UserService) model {
 	ti := setUpTextInput(u)
@@ -188,9 +187,12 @@ func (m *model) setTitle() {
 		return
 	}
 
-	title := centered.Width(m.viewport.Width).Bold(true).Render(m.registered)
-	m.title = title
-	heigtDiff := lipgloss.Height(m.title) - lipgloss.Height(title)
+	registerTitle := centered.Width(m.viewport.Width).
+		Render(titleStyle.Render(fmt.Sprintf("Willkommen, %s!",
+			turkis.Render(m.userService.ChatClient.GetName()))))
+
+	heigtDiff := lipgloss.Height(m.title) - lipgloss.Height(registerTitle)
+	m.title = registerTitle
 	m.viewport.Height = m.viewport.Height + heigtDiff
 }
 
@@ -251,7 +253,7 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 	case strings.Contains(rsp.Content, registerflag):
 		m.registered = rsp.Content
 
-		return blue.Render("-> Du kannst nun Nachrichten schreiben oder Commands ausführen")
+		return blue.Render("-> Du kannst nun Nachrichten schreiben oder Commands ausführen\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen")
 
 	// server output
 	case rsp.Name == "":

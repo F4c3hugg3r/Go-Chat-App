@@ -93,7 +93,7 @@ func (rp *RegisterClientPlugin) Execute(message *t.Message) (error, string) {
 		return fmt.Errorf("%w: error registering client", err), ""
 	}
 
-	return err, "- Du bist registriert -\n'/quit' -> Chat verlassen\n'/help' -> Commands ausführen"
+	return err, "- Du bist registriert -"
 }
 
 // BroadcaastPlugin distributes an incomming message abroad all client channels if

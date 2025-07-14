@@ -15,11 +15,19 @@ const registerflag = "- Du bist registriert -"
 const unregisterFlag = "- Du bist nun vom Server getrennt -"
 
 var (
-	red          lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#BF3535"))
-	blue         lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#353EBF"))
-	purple       lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
-	turkis       lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#35BFBC"))
-	green        lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("##53BF35"))
+	// Vordergründe
+	red        lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#BF3535"))
+	blue       lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#353EBF"))
+	purple     lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
+	turkis     lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#35BFBC"))
+	green      lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("##53BF35"))
+	titleStyle lipgloss.Style = lipgloss.NewStyle().
+			Bold(true).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("63")).
+			PaddingLeft(3).
+			PaddingRight(3)
+
 	centered     lipgloss.Style = lipgloss.NewStyle().Align(lipgloss.Center)
 	faint        lipgloss.Style = lipgloss.NewStyle().Faint(true)
 	viewportKeys                = viewport.KeyMap{
