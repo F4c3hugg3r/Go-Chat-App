@@ -1,4 +1,4 @@
-package server
+package api
 
 import (
 	"context"
@@ -7,16 +7,19 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	chat "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server/chat"
+	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server/types"
 )
 
 const authTokenString = "authToken"
 
 type ServerHandler struct {
-	Service *ChatService
-	Plugins *PluginRegistry
+	Service *chat.ChatService
+	Plugins *chat.PluginRegistry
 }
 
-func NewServerHandler(chatService *ChatService, pluginReg *PluginRegistry) *ServerHandler {
+func NewServerHandler(chatService *chat.ChatService, pluginReg *chat.PluginRegistry) *ServerHandler {
 	return &ServerHandler{
 		Service: chatService,
 		Plugins: pluginReg,
@@ -48,12 +51,12 @@ func (handler *ServerHandler) HandleGetRequest(w http.ResponseWriter, r *http.Re
 	}
 
 	rsp, err := client.Receive(ctx)
-	if errors.Is(err, ErrChannelClosed) {
+	if errors.Is(err, ty.ErrChannelClosed) {
 		w.WriteHeader(http.StatusGone)
 		return
 	}
 
-	if errors.Is(err, ErrTimeoutReached) {
+	if errors.Is(err, ty.ErrTimeoutReached) {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
 	}
@@ -87,7 +90,7 @@ func (handler *ServerHandler) HandleRegistry(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	message, err := DecodeToMessage(body)
+	message, err := chat.DecodeToMessage(body)
 	if err != nil {
 		http.Error(w, "error decoding request body", http.StatusInternalServerError)
 		return
@@ -131,7 +134,7 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	message, err := DecodeToMessage(body)
+	message, err := chat.DecodeToMessage(body)
 	if err != nil {
 		http.Error(w, "error decoding request body", http.StatusInternalServerError)
 		return
@@ -150,7 +153,7 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	err = handler.Service.echo(clientId, res)
+	err = handler.Service.Echo(clientId, res)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusRequestTimeout)
 	}
@@ -169,7 +172,7 @@ func (handler *ServerHandler) AuthMiddleware(next http.HandlerFunc) http.Handler
 		}
 
 		client, err := handler.Service.GetClient(clientId)
-		if err != nil || token != client.authToken {
+		if err != nil || token != client.GetAuthToken() {
 			http.Error(w, "client does not exist or token doesn't match", http.StatusForbidden)
 			return
 		}

@@ -1,12 +1,28 @@
-package server
+package chat
 
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
+
+	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server/types"
 )
 
-func (c *Client) Execute(handler *PluginRegistry, msg *Message) (*Response, error) {
+// Client is a communication participant who has a name, unique id and
+// channel to receive messages
+type Client struct {
+	Name      string
+	ClientId  string
+	clientCh  chan *ty.Response
+	Active    bool
+	authToken string
+	lastSign  time.Time
+	mu        sync.RWMutex
+	chClosed  bool
+}
+
+func (c *Client) Execute(handler *PluginRegistry, msg *ty.Message) (*ty.Response, error) {
 	c.setActive(true)
 	defer c.setActive(false)
 
@@ -16,7 +32,7 @@ func (c *Client) Execute(handler *PluginRegistry, msg *Message) (*Response, erro
 }
 
 // Receive receives responses from the clientCh
-func (c *Client) Receive(ctx context.Context) (*Response, error) {
+func (c *Client) Receive(ctx context.Context) (*ty.Response, error) {
 	c.setActive(true)
 	defer c.setActive(false)
 
@@ -25,23 +41,23 @@ func (c *Client) Receive(ctx context.Context) (*Response, error) {
 	select {
 	case rsp, ok := <-c.clientCh:
 		if !ok {
-			return nil, fmt.Errorf("%w: your channel was deleted, please register again", ErrChannelClosed)
+			return nil, fmt.Errorf("%w: your channel was deleted, please register again", ty.ErrChannelClosed)
 		}
 
 		return rsp, nil
 
 	case <-ctx.Done():
-		return nil, fmt.Errorf("%w: get request timed out", ErrTimeoutReached)
+		return nil, fmt.Errorf("%w: get request timed out", ty.ErrTimeoutReached)
 	}
 }
 
 // Send sends a response to the clientCh
-func (c *Client) Send(rsp *Response) error {
+func (c *Client) Send(rsp *ty.Response) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if c.chClosed {
-		return fmt.Errorf("%w: your channel was deleted, please register again", ErrChannelClosed)
+		return fmt.Errorf("%w: your channel was deleted, please register again", ty.ErrChannelClosed)
 	}
 
 	select {
@@ -49,7 +65,7 @@ func (c *Client) Send(rsp *Response) error {
 		fmt.Printf("\n%s -> %s", rsp.Name, c.Name)
 		return nil
 	default:
-		return fmt.Errorf("%w: response couldn't be sent, try again", ErrTimeoutReached)
+		return fmt.Errorf("%w: response couldn't be sent, try again", ty.ErrTimeoutReached)
 	}
 }
 
@@ -92,4 +108,11 @@ func (c *Client) closeChannelRequireLock() {
 		c.chClosed = true
 		close(c.clientCh)
 	}
+}
+
+func (c *Client) GetAuthToken() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.authToken
 }

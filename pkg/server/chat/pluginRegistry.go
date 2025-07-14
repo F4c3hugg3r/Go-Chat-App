@@ -1,20 +1,27 @@
-package server
+package chat
 
 import (
 	"encoding/json"
 	"fmt"
 	"log"
+
+	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server/types"
 )
 
 type PluginInterface interface {
 	// if an error accures, respponse.Content is empty
-	Execute(message *Message) (*Response, error)
+	Execute(message *ty.Message) (*ty.Response, error)
 	// should display the regex/template in which the command should be typed in
 	Description() string
 }
 
 type PluginRegistry struct {
 	plugins map[string]PluginInterface
+}
+
+type Plugin struct {
+	Command     string
+	Description string
 }
 
 // RegisterPlugins sets up all the plugins
@@ -31,10 +38,10 @@ func RegisterPlugins(chatService *ChatService) *PluginRegistry {
 	return pr
 }
 
-func (pr *PluginRegistry) FindAndExecute(message *Message) (*Response, error) {
+func (pr *PluginRegistry) FindAndExecute(message *ty.Message) (*ty.Response, error) {
 	plugin, ok := pr.plugins[message.Plugin]
 	if !ok {
-		return &Response{"Server", fmt.Sprintf("no such plugin found: %s", message.Plugin)}, nil
+		return &ty.Response{Name: "Server", Content: fmt.Sprintf("no such plugin found: %s", message.Plugin)}, nil
 	}
 
 	return plugin.Execute(message)

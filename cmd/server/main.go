@@ -13,7 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/F4c3hugg3r/Go-Chat-Server/pkg/server"
+	api "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server/api"
+	chat "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server/chat"
 )
 
 type Config struct {
@@ -24,9 +25,9 @@ type Config struct {
 
 func main() {
 	cfg := ParseFlags()
-	service := server.NewChatService(cfg.maxUsers)
-	plugin := server.RegisterPlugins(service)
-	handler := server.NewServerHandler(service, plugin)
+	service := chat.NewChatService(cfg.maxUsers)
+	plugin := chat.RegisterPlugins(service)
+	handler := api.NewServerHandler(service, plugin)
 	wg := &sync.WaitGroup{}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -86,7 +87,7 @@ func interruptListener(interChan chan os.Signal, server *http.Server, wg *sync.W
 }
 
 // setUp sets up server handlers and the inactiveClientDeleter routine, which runs until the context cancels
-func setUp(server *http.Server, handler *server.ServerHandler, timeLimit time.Duration, wg *sync.WaitGroup, ctx context.Context) {
+func setUp(server *http.Server, handler *api.ServerHandler, timeLimit time.Duration, wg *sync.WaitGroup, ctx context.Context) {
 	server.Handler = handler.BuildMultiplexer()
 
 	wg.Add(1)

@@ -16,8 +16,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// TODO AUFRÄUMEN
 // TODO list commands output als Liste darstellen
+
 // TODO Ordnerstruktur Server
 // TODO eigenen Namen anzeigen
 // TODO shortcut für last input (Pfeiltasten)

@@ -1,4 +1,4 @@
-package server
+package chat
 
 import (
 	"encoding/json"
@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server/types"
 )
 
 // clients who communicate with the sever
@@ -34,14 +36,14 @@ func (s *ChatService) InactiveClientDeleter(timeLimit time.Duration) {
 	}
 }
 
-// echo sends a response to the request submitter
-func (s *ChatService) echo(clientId string, rsp *Response) error {
+// Echo sends a response to the request submitter
+func (s *ChatService) Echo(clientId string, rsp *ty.Response) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	client, ok := s.clients[clientId]
 	if !ok {
-		return fmt.Errorf("%w: message couldn't be echoed", ErrClientNotAvailable)
+		return fmt.Errorf("%w: message couldn't be echoed", ty.ErrClientNotAvailable)
 	}
 
 	return client.Send(rsp)
@@ -55,15 +57,15 @@ func (s *ChatService) GetClient(clientId string) (*Client, error) {
 
 	client, exists := s.clients[clientId]
 	if !exists {
-		return client, fmt.Errorf("%w: there is no client with id: %s registered", ErrClientNotAvailable, clientId)
+		return client, fmt.Errorf("%w: there is no client with id: %s registered", ty.ErrClientNotAvailable, clientId)
 	}
 
 	return client, nil
 }
 
 // DecodeToMessage decodes a responseBody to a Message struct
-func DecodeToMessage(body []byte) (Message, error) {
-	message := Message{}
+func DecodeToMessage(body []byte) (ty.Message, error) {
+	message := ty.Message{}
 	dec := json.NewDecoder(strings.NewReader(string(body)))
 	err := dec.Decode(&message)
 

@@ -1,4 +1,4 @@
-package server
+package chat
 
 import (
 	"context"
@@ -7,25 +7,27 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
+	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server/types"
 )
 
 func TestReceive(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 
 	client := Client{
-		Name:      name,
-		ClientId:  clientId,
-		clientCh:  make(chan *Response, 100),
+		Name:      Name,
+		ClientId:  ClientId,
+		clientCh:  make(chan *ty.Response, 100),
 		Active:    false,
-		authToken: authToken,
+		authToken: AuthToken,
 		lastSign:  time.Now().UTC().Add(-time.Hour),
 	}
 
-	client.clientCh <- &dummyResponse
+	client.clientCh <- &DummyResponse
 
 	rsp, err := client.Receive(ctx)
 	assert.Nil(t, err)
-	assert.Equal(t, rsp, &dummyResponse)
+	assert.Equal(t, rsp, &DummyResponse)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -38,44 +40,44 @@ func TestReceive(t *testing.T) {
 	cancel()
 	wg.Wait()
 	assert.Nil(t, rsp)
-	assert.ErrorIs(t, err, ErrTimeoutReached)
+	assert.ErrorIs(t, err, ty.ErrTimeoutReached)
 }
 
 func TestSend(t *testing.T) {
 	clientInactive := Client{
-		Name:      name,
-		ClientId:  clientId,
+		Name:      Name,
+		ClientId:  ClientId,
 		clientCh:  nil,
 		Active:    false,
-		authToken: authToken,
+		authToken: AuthToken,
 		lastSign:  time.Now().UTC().Add(-time.Hour),
 		chClosed:  true,
 	}
 
-	err := clientInactive.Send(&dummyResponse)
-	assert.ErrorIs(t, err, ErrChannelClosed)
+	err := clientInactive.Send(&DummyResponse)
+	assert.ErrorIs(t, err, ty.ErrChannelClosed)
 
 	clientActive := Client{
-		Name:      name,
-		ClientId:  clientId,
-		clientCh:  make(chan *Response, 100),
+		Name:      Name,
+		ClientId:  ClientId,
+		clientCh:  make(chan *ty.Response, 100),
 		Active:    false,
-		authToken: authToken,
+		authToken: AuthToken,
 		lastSign:  time.Now().UTC(),
 		chClosed:  false,
 	}
 
-	err = clientActive.Send(&dummyResponse)
+	err = clientActive.Send(&DummyResponse)
 	assert.Nil(t, err)
 }
 
 func TestIsIdle(t *testing.T) {
 	clientInactive := Client{
-		Name:      name,
-		ClientId:  clientId,
+		Name:      Name,
+		ClientId:  ClientId,
 		clientCh:  nil,
 		Active:    false,
-		authToken: authToken,
+		authToken: AuthToken,
 		lastSign:  time.Now().UTC().Add(-time.Hour),
 		chClosed:  true,
 	}
@@ -84,11 +86,11 @@ func TestIsIdle(t *testing.T) {
 	assert.True(t, result)
 
 	clientActive := Client{
-		Name:      name,
-		ClientId:  clientId,
-		clientCh:  make(chan *Response, 100),
+		Name:      Name,
+		ClientId:  ClientId,
+		clientCh:  make(chan *ty.Response, 100),
 		Active:    false,
-		authToken: authToken,
+		authToken: AuthToken,
 		lastSign:  time.Now().UTC(),
 		chClosed:  false,
 	}

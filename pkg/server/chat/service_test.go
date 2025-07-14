@@ -1,4 +1,4 @@
-package server
+package chat
 
 import (
 	"encoding/json"
@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
+	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server/types"
 )
 
 func TestDecodeToMessage(t *testing.T) {
@@ -13,7 +15,7 @@ func TestDecodeToMessage(t *testing.T) {
 	_, err := DecodeToMessage(fakeBody)
 	assert.Error(t, err)
 
-	message := Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/broadcast"}
+	message := ty.Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/broadcast"}
 
 	jsonMessage, err := json.Marshal(&message)
 	if err != nil {
@@ -28,22 +30,22 @@ func TestDecodeToMessage(t *testing.T) {
 func TestEcho(t *testing.T) {
 	service := NewChatService(100)
 
-	err := service.echo(clientId, &dummyResponse)
-	assert.ErrorIs(t, err, ErrClientNotAvailable)
+	err := service.Echo(ClientId, &DummyResponse)
+	assert.ErrorIs(t, err, ty.ErrClientNotAvailable)
 
-	service.clients[clientId] = &Client{
-		Name:      name,
-		ClientId:  clientId,
-		clientCh:  make(chan *Response, 100),
+	service.clients[ClientId] = &Client{
+		Name:      Name,
+		ClientId:  ClientId,
+		clientCh:  make(chan *ty.Response, 100),
 		Active:    false,
-		authToken: authToken,
+		authToken: AuthToken,
 		lastSign:  time.Now().UTC().Add(-time.Hour),
 	}
-	err = service.echo(clientId, &dummyResponse)
+	err = service.Echo(ClientId, &DummyResponse)
 	assert.Nil(t, err)
 
 	select {
-	case <-service.clients[clientId].clientCh:
+	case <-service.clients[ClientId].clientCh:
 	default:
 		t.Errorf("client should receive a message")
 	}
@@ -52,12 +54,12 @@ func TestEcho(t *testing.T) {
 
 func TestInactiveClientDeleter(t *testing.T) {
 	service := NewChatService(100)
-	service.clients[clientId] = &Client{
-		Name:      name,
-		ClientId:  clientId,
-		clientCh:  make(chan *Response, 100),
+	service.clients[ClientId] = &Client{
+		Name:      Name,
+		ClientId:  ClientId,
+		clientCh:  make(chan *ty.Response, 100),
 		Active:    false,
-		authToken: authToken,
+		authToken: AuthToken,
 		lastSign:  time.Now().UTC().Add(-time.Hour),
 	}
 	if len(service.clients) != 1 {
@@ -72,22 +74,22 @@ func TestInactiveClientDeleter(t *testing.T) {
 
 func TestGetClient(t *testing.T) {
 	service := NewChatService(100)
-	_, err := service.GetClient(clientId)
+	_, err := service.GetClient(ClientId)
 	if err == nil {
 		t.Error("there should be an error but instead it's nil")
 	}
 
 	dummyClient := &Client{
-		Name:      name,
-		ClientId:  clientId,
-		clientCh:  make(chan *Response, 100),
+		Name:      Name,
+		ClientId:  ClientId,
+		clientCh:  make(chan *ty.Response, 100),
 		Active:    false,
-		authToken: authToken,
+		authToken: AuthToken,
 		lastSign:  time.Now().UTC().Add(-time.Hour),
 	}
 
-	service.clients[clientId] = dummyClient
-	client, err := service.GetClient(clientId)
+	service.clients[ClientId] = dummyClient
+	client, err := service.GetClient(ClientId)
 	if err != nil {
 		t.Errorf("error should be nil but instead is %v", err)
 	}
