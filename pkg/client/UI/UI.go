@@ -17,10 +17,7 @@ import (
 )
 
 // TODO list commands output als Liste darstellen
-
-// TODO Ordnerstruktur Server
 // TODO eigenen Namen anzeigen
-// TODO shortcut für last input (Pfeiltasten)
 
 func InitialModel(u *i.UserService) model {
 	ti := setUpTextInput(u)
@@ -29,6 +26,11 @@ func InitialModel(u *i.UserService) model {
 
 	vp := viewport.New(30, 5)
 	vp.KeyMap = viewportKeys
+
+	inputManager := &InputHistory{
+		current: -1,
+		inputs:  make([]string, 0, 200),
+	}
 
 	return model{
 		messages:    []string{},
@@ -39,6 +41,7 @@ func InitialModel(u *i.UserService) model {
 		textinput:   ti,
 		help:        h,
 		keyMap:      helpKeys,
+		inH:         inputManager,
 	}
 }
 
@@ -54,6 +57,10 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 
 	m.viewport, vpCmd = m.viewport.Update(rsp)
 	m.textinput, tiCmd = m.textinput.Update(rsp)
+
+	if m.textinput.Value() == "" {
+		m.inH.SaveInput("")
+	}
 
 	switch rsp := rsp.(type) {
 	case *t.Response:
@@ -72,11 +79,17 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case tea.KeyEnter:
-			m.Execute()
+			m.HandleMessage()
 		}
 
-		if key.Matches(rsp, m.keyMap.Help) {
+		switch {
+		case key.Matches(rsp, m.keyMap.Help):
 			m.help.ShowAll = !m.help.ShowAll
+
+		case key.Matches(rsp, m.keyMap.InputLeft), key.Matches(rsp, m.keyMap.InputRight):
+			input := m.SearchInputHistory(rsp)
+			m.textinput.SetValue(input)
+			m.textinput.CursorEnd()
 		}
 
 	case errMsg:
@@ -100,6 +113,55 @@ func (m model) View() string {
 		gap,
 		m.help.View(m.keyMap),
 	)
+}
+
+func (inH *InputHistory) SaveInput(input string) {
+	if input != "" {
+		inH.inputs = append(inH.inputs, input)
+	}
+
+	inH.first = true
+	inH.current = len(inH.inputs) - 1
+}
+
+func (m *model) SearchInputHistory(rsp tea.KeyMsg) string {
+	var pending int
+	if len(m.inH.inputs) < 1 {
+		return ""
+	}
+
+	first := m.inH.checkFirst()
+
+	switch {
+	case key.Matches(rsp, m.keyMap.InputRight):
+		pending = m.inH.current + 1
+
+	case key.Matches(rsp, m.keyMap.InputLeft):
+		if !first {
+			pending = m.inH.current - 1
+		} else {
+			pending = m.inH.current
+		}
+	}
+
+	switch {
+	case pending >= len(m.inH.inputs):
+		m.inH.current = 0
+	case pending < 0:
+		m.inH.current = len(m.inH.inputs) - 1
+	default:
+		m.inH.current = pending
+	}
+
+	return m.inH.inputs[m.inH.current]
+}
+
+func (inH *InputHistory) checkFirst() bool {
+	if inH.first == true {
+		inH.first = false
+		return true
+	}
+	return false
 }
 
 func setUpTextInput(u *i.UserService) textinput.Model {
@@ -156,9 +218,9 @@ func (m *model) HandleResponse(rsp *t.Response) {
 	m.viewport.GotoBottom()
 }
 
-func (m *model) Execute() {
-	str, _ := strings.CutSuffix(strings.Join(m.messages, "\n"), "\n")
-	m.viewport.SetContent(lipgloss.NewStyle().Width(m.viewport.Width).Render(str))
+func (m *model) HandleMessage() {
+	m.inH.SaveInput(m.textinput.Value())
+
 	m.userService.Executor(m.textinput.Value())
 	m.textinput.Reset()
 }
@@ -220,7 +282,7 @@ func (k keyMap) ShortHelp() []key.Binding {
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{k.Up, k.Down, k.HalfPageUp, k.HalfPageDown},
+	return [][]key.Binding{{k.Up, k.Down, k.HalfPageUp, k.HalfPageDown, k.InputRight, k.InputLeft},
 		{k.Help, k.Quit, k.Complete, k.NextSug, k.PrevSug}}
 }
 

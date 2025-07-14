@@ -39,14 +39,6 @@ var (
 			key.WithKeys("up"),
 			key.WithHelp("↑", faint.Render("move up")),
 		),
-		// Left: key.NewBinding(
-		// 	key.WithKeys("left"),
-		// 	key.WithHelp("←", faint.Render("move left")),
-		// ),
-		// Right: key.NewBinding(
-		// 	key.WithKeys("right"),
-		// 	key.WithHelp("→", faint.Render("move right")),
-		// ),
 	}
 	helpKeys = keyMap{
 		Help:         key.NewBinding(key.WithKeys("ctrl+h"), key.WithHelp("ctrl h", faint.Render("toggle help"))),
@@ -58,8 +50,8 @@ var (
 		HalfPageDown: viewportKeys.HalfPageDown,
 		Down:         viewportKeys.Down,
 		Up:           viewportKeys.Up,
-		// Left:         viewportKeys.Left,
-		// Right:        viewportKeys.Right,
+		InputLeft:    key.NewBinding(key.WithKeys("alt+n"), key.WithHelp("alt n", faint.Render("left previous input"))),
+		InputRight:   key.NewBinding(key.WithKeys("alt+m"), key.WithHelp("alt m", faint.Render("right previous input"))),
 	}
 )
 
@@ -68,10 +60,10 @@ type (
 )
 
 type keyMap struct {
-	Up   key.Binding
-	Down key.Binding
-	// Left         key.Binding
-	// Right        key.Binding
+	Up           key.Binding
+	Down         key.Binding
+	InputLeft    key.Binding
+	InputRight   key.Binding
 	HalfPageUp   key.Binding
 	HalfPageDown key.Binding
 	Help         key.Binding
@@ -93,4 +85,11 @@ type model struct {
 	showSuggestions bool
 	registered      string
 	title           string
+	inH             *InputHistory
+}
+
+type InputHistory struct {
+	current int
+	inputs  []string
+	first   bool
 }
