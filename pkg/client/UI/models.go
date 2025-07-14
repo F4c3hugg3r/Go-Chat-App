@@ -11,11 +11,12 @@ import (
 )
 
 const gap = "\n\n"
-const registerflag = "- Du bist registriert -"
+const registerFlag = "- Du bist registriert -"
+const registerTitle = "Du bist registriert %s!"
 const unregisterFlag = "- Du bist nun vom Server getrennt -"
+const unregisterTitle = "Willkommen im Chatraum! \nSchreibe '/register {name}' oder '/help'"
 
 var (
-	// Vordergründe
 	red        lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#BF3535"))
 	blue       lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#353EBF"))
 	purple     lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
@@ -25,9 +26,8 @@ var (
 			Bold(true).
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("63")).
-			PaddingLeft(3).
-			PaddingRight(3)
-
+			PaddingLeft(5).
+			PaddingRight(5)
 	centered     lipgloss.Style = lipgloss.NewStyle().Align(lipgloss.Center)
 	faint        lipgloss.Style = lipgloss.NewStyle().Faint(true)
 	viewportKeys                = viewport.KeyMap{
@@ -67,6 +67,7 @@ type (
 	errMsg error
 )
 
+// keyMap contains the keybinds for the TUI
 type keyMap struct {
 	Up           key.Binding
 	Down         key.Binding
@@ -81,6 +82,8 @@ type keyMap struct {
 	PrevSug      key.Binding
 }
 
+// model contains every view-model and variables/structs needed for
+// the displaying and handling of the TUI
 type model struct {
 	viewport        viewport.Model
 	textinput       textinput.Model
@@ -96,6 +99,7 @@ type model struct {
 	inH             *InputHistory
 }
 
+// InputHistory manageges the inputHistory
 type InputHistory struct {
 	current int
 	inputs  []string

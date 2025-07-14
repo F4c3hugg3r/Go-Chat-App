@@ -20,8 +20,11 @@ func NewPrivateMessagePlugin(s *ChatService) *PrivateMessagePlugin {
 	return &PrivateMessagePlugin{chatService: s}
 }
 
-func (pp *PrivateMessagePlugin) Description() string {
-	return "'/private {Id} {message}'"
+func (pp *PrivateMessagePlugin) Description() *Description {
+	return &Description{
+		Description: "lets you send a private message",
+		Template:    "/private {Id} {message}",
+	}
 }
 
 func (pp *PrivateMessagePlugin) Execute(message *ty.Message) (*ty.Response, error) {
@@ -56,8 +59,11 @@ func NewLogOutPlugin(s *ChatService, pr *PluginRegistry) *LogOutPlugin {
 	}
 }
 
-func (lp *LogOutPlugin) Description() string {
-	return "'/quit'"
+func (lp *LogOutPlugin) Description() *Description {
+	return &Description{
+		Description: "loggs you out of the chat",
+		Template:    "/quit",
+	}
 }
 
 func (lp *LogOutPlugin) Execute(message *ty.Message) (*ty.Response, error) {
@@ -92,8 +98,11 @@ func NewRegisterClientPlugin(s *ChatService, pr *PluginRegistry) *RegisterClient
 	}
 }
 
-func (rp *RegisterClientPlugin) Description() string {
-	return "'/register {name}'"
+func (rp *RegisterClientPlugin) Description() *Description {
+	return &Description{
+		Description: "registeres a client",
+		Template:    "/register {name}",
+	}
 }
 
 func (rp *RegisterClientPlugin) Execute(message *ty.Message) (*ty.Response, error) {
@@ -139,8 +148,11 @@ func NewBroadcastPlugin(s *ChatService) *BroadcastPlugin {
 	return &BroadcastPlugin{chatService: s}
 }
 
-func (bp *BroadcastPlugin) Description() string {
-	return "'{message}' or '/broadcast {message}"
+func (bp *BroadcastPlugin) Description() *Description {
+	return &Description{
+		Description: "distributes a message abroad all clients",
+		Template:    "'{message}' or '/broadcast {message}'",
+	}
 }
 
 func (bp *BroadcastPlugin) Execute(message *ty.Message) (*ty.Response, error) {
@@ -178,8 +190,11 @@ func NewHelpPlugin(pr *PluginRegistry) *HelpPlugin {
 	return &HelpPlugin{pr: pr}
 }
 
-func (h *HelpPlugin) Description() string {
-	return "'/help'"
+func (h *HelpPlugin) Description() *Description {
+	return &Description{
+		Description: "tells every plugin and their description",
+		Template:    "/help",
+	}
 }
 
 func (h *HelpPlugin) Execute(message *ty.Message) (*ty.Response, error) {
@@ -200,8 +215,11 @@ func NewUserPlugin(s *ChatService) *UserPlugin {
 	return &UserPlugin{chatService: s}
 }
 
-func (u *UserPlugin) Description() string {
-	return "'/users'"
+func (u *UserPlugin) Description() *Description {
+	return &Description{
+		Description: "tells you information about all the current users",
+		Template:    "/users",
+	}
 }
 
 func (u *UserPlugin) Execute(message *ty.Message) (*ty.Response, error) {
@@ -234,8 +252,11 @@ func NewTimePlugin() *TimePlugin {
 	return &TimePlugin{}
 }
 
-func (t *TimePlugin) Description() string {
-	return "'/time'"
+func (t *TimePlugin) Description() *Description {
+	return &Description{
+		Description: "tells you the current time",
+		Template:    "/time",
+	}
 }
 
 func (t *TimePlugin) Execute(message *ty.Message) (*ty.Response, error) {

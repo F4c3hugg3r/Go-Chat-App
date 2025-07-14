@@ -12,7 +12,7 @@ type PluginInterface interface {
 	// if an error accures, respponse.Content is empty
 	Execute(message *ty.Message) (*ty.Response, error)
 	// should display the regex/template in which the command should be typed in
-	Description() string
+	Description() *Description
 }
 
 type PluginRegistry struct {
@@ -22,6 +22,11 @@ type PluginRegistry struct {
 type Plugin struct {
 	Command     string
 	Description string
+}
+
+type Description struct {
+	Description string
+	Template    string
 }
 
 // RegisterPlugins sets up all the plugins
@@ -52,7 +57,8 @@ func (pr *PluginRegistry) ListPlugins() []json.RawMessage {
 	jsonSlice := []json.RawMessage{}
 
 	for command, plugin := range pr.plugins {
-		jsonString, err := json.Marshal(Plugin{Command: command, Description: plugin.Description()})
+		desc := plugin.Description()
+		jsonString, err := json.Marshal(Plugin{Command: desc.Template, Description: desc.Description})
 		if err != nil {
 			log.Printf("error parsing plugin %s to json", command)
 		}

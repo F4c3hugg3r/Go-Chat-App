@@ -18,6 +18,7 @@ import (
 
 // (TODO list commands output als Liste darstellen)
 
+// InitialModel initializes the model struct, which is the main struct for the TUI
 func InitialModel(u *i.UserService) model {
 	ti := setUpTextInput(u)
 
@@ -31,7 +32,7 @@ func InitialModel(u *i.UserService) model {
 		inputs:  make([]string, 0, 200),
 	}
 
-	return model{
+	model := model{
 		messages:    []string{},
 		viewport:    vp,
 		err:         nil,
@@ -41,13 +42,18 @@ func InitialModel(u *i.UserService) model {
 		help:        h,
 		keyMap:      helpKeys,
 		inH:         inputManager,
+		registered:  unregisterFlag,
 	}
+
+	return model
 }
 
+// Init is being called before Update listenes and initializes required functions
 func (m model) Init() tea.Cmd {
 	return tea.Batch(textarea.Blink, m.waitForExternalResponse())
 }
 
+// Update handles every input
 func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 	var (
 		vpCmd tea.Cmd
@@ -96,12 +102,13 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	m.setTitle()
+
 	return m, tea.Batch(tiCmd, vpCmd, tiCmd)
 }
 
+// View describes the terminal view
 func (m model) View() string {
-	m.setTitle()
-
 	return fmt.Sprintf(
 		"%s%s%s%s%s%s%s",
 		m.title,
@@ -114,15 +121,18 @@ func (m model) View() string {
 	)
 }
 
-func (inH *InputHistory) SaveInput(input string) {
-	if input != "" {
-		inH.inputs = append(inH.inputs, input)
+// refreshViewPort refreshes the size of the viewport
+func (m *model) refreshViewPort() {
+	if len(m.messages) > 0 {
+		str, _ := strings.CutSuffix(strings.Join(m.messages, "\n"), "\n")
+		m.viewport.SetContent(lipgloss.NewStyle().Width(m.viewport.Width).Render(str))
 	}
 
-	inH.first = true
-	inH.current = len(inH.inputs) - 1
+	m.viewport.GotoBottom()
 }
 
+// SearchInputHistory takes a keybind for left or right, if needed, sets the current index value
+// and decides which index of the history inputs to present
 func (m *model) SearchInputHistory(rsp tea.KeyMsg) string {
 	var pending int
 	if len(m.inH.inputs) < 1 {
@@ -143,26 +153,12 @@ func (m *model) SearchInputHistory(rsp tea.KeyMsg) string {
 		}
 	}
 
-	switch {
-	case pending >= len(m.inH.inputs):
-		m.inH.current = 0
-	case pending < 0:
-		m.inH.current = len(m.inH.inputs) - 1
-	default:
-		m.inH.current = pending
-	}
+	m.inH.setCurrentHistoryIndex(pending)
 
 	return m.inH.inputs[m.inH.current]
 }
 
-func (inH *InputHistory) checkFirst() bool {
-	if inH.first == true {
-		inH.first = false
-		return true
-	}
-	return false
-}
-
+// setUpTexInput sets up a textinput.Model with every needed setting
 func setUpTextInput(u *i.UserService) textinput.Model {
 	ti := textinput.New()
 	ti.Placeholder = "Send a message..."
@@ -181,52 +177,66 @@ func setUpTextInput(u *i.UserService) textinput.Model {
 	return ti
 }
 
+// func (m *model) refreshTitle(title string) {
+// 	heigtDiff := lipgloss.Height(title) - lipgloss.Height(m.title)
+// 	m.title = registerTitle
+// 	m.viewport.Height = m.viewport.Height - heigtDiff
+// }
+
+// setTitle decides between the registered and unregistered title sets it into the viewport
+// and return the heightDiff of the old and new title
 func (m *model) setTitle() {
-	if m.registered == "" {
-		m.title = centered.Width(m.viewport.Width).Bold(true).Render("Welcome to the chat room! \nTry '/register {name}' or '/help'")
+	if strings.Contains(m.registered, unregisterFlag) && !strings.Contains(m.title, unregisterTitle) {
+		m.title = centered.Width(m.viewport.Width).Bold(true).Render(unregisterTitle)
+
 		return
 	}
 
-	registerTitle := centered.Width(m.viewport.Width).
-		Render(titleStyle.Render(fmt.Sprintf("Willkommen, %s!",
-			turkis.Render(m.userService.ChatClient.GetName()))))
+	if strings.Contains(m.registered, registerFlag) && !strings.Contains(m.title, registerTitle) {
+		title := centered.Width(m.viewport.Width).
+			Render(titleStyle.Render(fmt.Sprintf(registerTitle,
+				turkis.Render(m.userService.ChatClient.GetName()))))
 
-	heigtDiff := lipgloss.Height(m.title) - lipgloss.Height(registerTitle)
-	m.title = registerTitle
-	m.viewport.Height = m.viewport.Height + heigtDiff
+		heigtDiff := lipgloss.Height(title) - lipgloss.Height(m.title)
+		m.title = registerTitle
+		m.viewport.Height = m.viewport.Height - heigtDiff
+	}
 }
 
+// HandleWindowResize handles rezising of the terminal window by updating all models sizes
 func (m *model) HandleWindowResize(rsp *tea.WindowSizeMsg) {
 	m.viewport.Width = rsp.Width
 	m.textinput.Width = rsp.Width
 	m.help.Width = rsp.Width
 	m.viewport.Height = rsp.Height - lipgloss.Height(gap) - lipgloss.Height(m.title) - lipgloss.Height(gap)
 
-	if len(m.messages) > 0 {
-		str, _ := strings.CutSuffix(strings.Join(m.messages, "\n"), "\n")
-		m.viewport.SetContent(lipgloss.NewStyle().Width(m.viewport.Width).Render(str))
-	}
-	m.viewport.GotoBottom()
+	m.refreshViewPort()
 }
 
+// HandleResponse handles an incoming Response by evaluating it and refreshing
+// the viewport by adding the corresponding string
 func (m *model) HandleResponse(rsp *t.Response) {
 	str := m.evaluateReponse(rsp)
 	if str != "" {
 		m.messages = append(m.messages, str)
 	}
 
-	str, _ = strings.CutSuffix(strings.Join(m.messages, "\n"), "\n")
-	m.viewport.SetContent(lipgloss.NewStyle().Width(m.viewport.Width).Render(str))
-	m.viewport.GotoBottom()
+	m.refreshViewPort()
 }
 
+// HandleMessage hanbles the input message by saving it for the inputHistory and
+// executeing the fitting userService method
 func (m *model) HandleMessage() {
 	m.inH.SaveInput(m.textinput.Value())
 
 	m.userService.Executor(m.textinput.Value())
 	m.textinput.Reset()
+
+	m.refreshViewPort()
 }
 
+// evaluateResponse evaluates an incoming Response and returns the
+// corresponding rendered string
 func (m *model) evaluateReponse(rsp *t.Response) string {
 	var rspString string
 
@@ -250,7 +260,7 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 		return output
 
 	// register output
-	case strings.Contains(rsp.Content, registerflag):
+	case strings.Contains(rsp.Content, registerFlag):
 		m.registered = rsp.Content
 
 		return blue.Render("-> Du kannst nun Nachrichten schreiben oder Commands ausführen\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen")
@@ -261,7 +271,7 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 
 		// 	unregister output
 		if strings.Contains(rsp.Content, unregisterFlag) {
-			m.registered = ""
+			m.registered = unregisterFlag
 		}
 
 		return rspString
@@ -273,32 +283,21 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 	return rspString
 }
 
+// waitForExternalResponse starts the ResponsePoller() and notifies the Update method
+// if a Response comes in automatically
 func (m *model) waitForExternalResponse() tea.Cmd {
 	return func() tea.Msg {
 		return m.userService.ResponsePoller()
 	}
 }
 
+// ShortHelp decides what to see in the short help window
 func (k keyMap) ShortHelp() []key.Binding {
 	return []key.Binding{k.Help, k.Quit, k.Complete, k.NextSug, k.PrevSug}
 }
 
+// ShortHelp decides what to see in the extended help window
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{{k.Up, k.Down, k.HalfPageUp, k.HalfPageDown, k.InputRight, k.InputLeft},
 		{k.Help, k.Quit, k.Complete, k.NextSug, k.PrevSug}}
 }
-
-// func setUpTextArea(u *i.UserService) textarea.Model {
-// 	ta := textarea.New()
-// 	ta.Placeholder = "Send a message..."
-// 	ta.Focus()
-// 	ta.Prompt = "┃ "
-// 	ta.CharLimit = 280
-// 	ta.SetWidth(30)
-// 	ta.SetHeight(3)
-// 	// Remove cursor line styling
-// 	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
-// 	ta.ShowLineNumbers = false
-// 	ta.KeyMap.InsertNewline.SetEnabled(false)
-// 	return ta
-// }

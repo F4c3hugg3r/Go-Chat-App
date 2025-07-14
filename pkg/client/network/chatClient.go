@@ -46,6 +46,7 @@ func NewClient(server string) *ChatClient {
 	return chatClient
 }
 
+// RegisterEndpoints registeres endpoint urls to the corresponding enum values
 func (c *ChatClient) RegisterEndpoints(url string) map[int]string {
 	endpoints := make(map[int]string)
 	endpoints[t.PostRegister] = fmt.Sprintf("%s/users/%s", url, c.clientId)
@@ -56,6 +57,7 @@ func (c *ChatClient) RegisterEndpoints(url string) map[int]string {
 	return endpoints
 }
 
+// Interrupt sends a Delete to the server and closes idle connections
 func (c *ChatClient) Interrupt() {
 	if c.Registered {
 		err := c.PostDelete(c.CreateMessage("", "/quit", "", ""))
@@ -117,6 +119,7 @@ func (c *ChatClient) Unregister() {
 	c.Registered = false
 }
 
+// GetAuthToken returns the authToken and a bool if the token is set
 func (c *ChatClient) GetAuthToken() (string, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -128,6 +131,8 @@ func (c *ChatClient) GetAuthToken() (string, bool) {
 	return c.authToken, true
 }
 
+// PostMessage marshals a Message and posts it the the given endpoint
+// returning the http response and an error
 func (c *ChatClient) PostMessage(msg *t.Message, endpoint int) (*t.Response, error) {
 	body, err := json.Marshal(&msg)
 	if err != nil {
@@ -244,6 +249,7 @@ func DecodeToResponse(body []byte) (*t.Response, error) {
 	return response, nil
 }
 
+// GetName returns the name of the client
 func (c *ChatClient) GetName() string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
