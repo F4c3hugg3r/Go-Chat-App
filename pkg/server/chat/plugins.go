@@ -151,7 +151,7 @@ func NewBroadcastPlugin(s *ChatService) *BroadcastPlugin {
 func (bp *BroadcastPlugin) Description() *Description {
 	return &Description{
 		Description: "distributes a message abroad all clients",
-		Template:    "'{message}' or '/broadcast {message}'",
+		Template:    "{message} | /broadcast {message}",
 	}
 }
 
@@ -192,7 +192,7 @@ func NewHelpPlugin(pr *PluginRegistry) *HelpPlugin {
 
 func (h *HelpPlugin) Description() *Description {
 	return &Description{
-		Description: "tells every plugin and their description",
+		Description: "tells every plugin plus description",
 		Template:    "/help",
 	}
 }
@@ -217,7 +217,7 @@ func NewUserPlugin(s *ChatService) *UserPlugin {
 
 func (u *UserPlugin) Description() *Description {
 	return &Description{
-		Description: "tells you information about all the current users",
+		Description: "tells information about all current users",
 		Template:    "/users",
 	}
 }

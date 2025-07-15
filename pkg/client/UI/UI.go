@@ -177,12 +177,6 @@ func setUpTextInput(u *i.UserService) textinput.Model {
 	return ti
 }
 
-// func (m *model) refreshTitle(title string) {
-// 	heigtDiff := lipgloss.Height(title) - lipgloss.Height(m.title)
-// 	m.title = registerTitle
-// 	m.viewport.Height = m.viewport.Height - heigtDiff
-// }
-
 // setTitle decides between the registered and unregistered title sets it into the viewport
 // and return the heightDiff of the old and new title
 func (m *model) setTitle() {
@@ -197,9 +191,9 @@ func (m *model) setTitle() {
 			Render(titleStyle.Render(fmt.Sprintf(registerTitle,
 				turkis.Render(m.userService.ChatClient.GetName()))))
 
-		heigtDiff := lipgloss.Height(title) - lipgloss.Height(m.title)
-		m.title = registerTitle
-		m.viewport.Height = m.viewport.Height - heigtDiff
+		heightDiff := lipgloss.Height(title) - lipgloss.Height(m.title)
+		m.title = title
+		m.viewport.Height = m.viewport.Height - heightDiff
 	}
 }
 
