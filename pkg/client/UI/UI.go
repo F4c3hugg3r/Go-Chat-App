@@ -102,8 +102,6 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	m.setTitle()
-
 	return m, tea.Batch(tiCmd, vpCmd, tiCmd)
 }
 
@@ -256,6 +254,7 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 	// register output
 	case strings.Contains(rsp.Content, registerFlag):
 		m.registered = rsp.Content
+		m.setTitle()
 
 		return blue.Render("-> Du kannst nun Nachrichten schreiben oder Commands ausführen\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen")
 
@@ -263,9 +262,10 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 	case rsp.Name == "":
 		rspString = fmt.Sprintf("%s", blue.Render(rsp.Content))
 
-		// 	unregister output
+		// unregister output
 		if strings.Contains(rsp.Content, unregisterFlag) {
 			m.registered = unregisterFlag
+			m.setTitle()
 		}
 
 		return rspString
