@@ -3,7 +3,6 @@ package chat
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -33,7 +32,7 @@ func (pp *PrivateMessagePlugin) Execute(message *ty.Message) (*ty.Response, erro
 
 	client, ok := pp.chatService.clients[message.ClientId]
 	if !ok {
-		return nil, fmt.Errorf("%w: client with id: %s not found", ty.ErrClientNotAvailable, message.ClientId)
+		return &ty.Response{Err: fmt.Errorf("%w: client with id: %s not found", ty.ErrNotAvailable, message.ClientId)}, nil
 	}
 
 	rsp := &ty.Response{Name: fmt.Sprintf("[Private] - %s", message.Name), Content: message.Content}
@@ -72,16 +71,16 @@ func (lp *LogOutPlugin) Execute(message *ty.Message) (*ty.Response, error) {
 
 	client, ok := lp.chatService.clients[message.ClientId]
 	if !ok {
-		return nil, fmt.Errorf("%w: client (probably) already deleted", ty.ErrClientNotAvailable)
+		return nil, fmt.Errorf("%w: client (probably) already deleted", ty.ErrNotAvailable)
 	}
 
-	fmt.Println("\nlogged out ", client.Name)
+	fmt.Println("logged out ", client.Name)
 	client.Close()
 	delete(lp.chatService.clients, message.ClientId)
 
 	go client.Execute(lp.pr, &ty.Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s hat den Chat verlassen", message.Name), ClientId: message.ClientId})
 
-	return &ty.Response{Name: message.Name, Content: "logged out"}, nil
+	return &ty.Response{Name: message.Name, Content: "Du hast dich ausgeloggt"}, nil
 }
 
 // RegisterClientPlugin safely registeres a client by creating a Client with the received values
@@ -110,12 +109,11 @@ func (rp *RegisterClientPlugin) Execute(message *ty.Message) (*ty.Response, erro
 	defer rp.chatService.mu.Unlock()
 
 	if len(rp.chatService.clients) >= rp.chatService.maxUsers {
-		return nil,
-			fmt.Errorf("%w: usercap %d reached, try again later. users:%d", ty.ErrNoPermission, rp.chatService.maxUsers, len(rp.chatService.clients))
+		return &ty.Response{Err: fmt.Errorf("%w: usercap %d reached, try again later. users:%d", ty.ErrNoPermission, rp.chatService.maxUsers, len(rp.chatService.clients))}, nil
 	}
 
 	if _, exists := rp.chatService.clients[message.ClientId]; exists {
-		return nil, fmt.Errorf("%w: client already defined", ty.ErrNoPermission)
+		return &ty.Response{Err: fmt.Errorf("%w: client already registered", ty.ErrNoPermission)}, nil
 	}
 
 	clientCh := make(chan *ty.Response, 100)
@@ -156,28 +154,28 @@ func (bp *BroadcastPlugin) Description() *Description {
 }
 
 func (bp *BroadcastPlugin) Execute(message *ty.Message) (*ty.Response, error) {
-	bp.chatService.mu.RLock()
-	defer bp.chatService.mu.RUnlock()
-
 	rsp := &ty.Response{Name: message.Name, Content: message.Content}
 
 	if strings.TrimSpace(message.Content) == "" {
 		return rsp, nil
 	}
 
-	if len(bp.chatService.clients) <= 0 {
-		return nil, fmt.Errorf("%w: There are no clients registered", ty.ErrClientNotAvailable)
+	client, err := bp.chatService.GetClient(message.ClientId)
+	if err != nil {
+		return nil, fmt.Errorf("%w: error getting the client", err)
 	}
 
-	for _, client := range bp.chatService.clients {
-		if client.ClientId != message.ClientId {
-			err := client.Send(rsp)
-			if err != nil {
-				log.Printf("\n%v: %s -> %s", err, message.Name, client.Name)
-			}
-		}
+	group, err := GetCurrentGroup(client, bp.chatService)
+	if err != nil {
+		return nil, fmt.Errorf("%w: error getting the group", err)
 	}
 
+	if group != nil {
+		bp.chatService.Broadcast(group.GetClients(), rsp, message.ClientId)
+		return rsp, nil
+	}
+
+	bp.chatService.Broadcast(nil, rsp, message.ClientId)
 	return rsp, nil
 }
 
@@ -198,7 +196,7 @@ func (h *HelpPlugin) Description() *Description {
 }
 
 func (h *HelpPlugin) Execute(message *ty.Message) (*ty.Response, error) {
-	jsonList, err := json.Marshal(h.pr.ListPlugins())
+	jsonList, err := json.Marshal(ListPlugins(h.pr.plugins))
 	if err != nil {
 		return nil, fmt.Errorf("%w: error parsing plugins to json", err)
 	}
@@ -206,36 +204,27 @@ func (h *HelpPlugin) Execute(message *ty.Message) (*ty.Response, error) {
 	return &ty.Response{Name: "Help", Content: string(jsonList)}, nil
 }
 
-// UserPlugin tells you information about all the current users
-type UserPlugin struct {
+// ListUsersPlugin tells you information about all the current users
+type ListUsersPlugin struct {
 	chatService *ChatService
 }
 
-func NewUserPlugin(s *ChatService) *UserPlugin {
-	return &UserPlugin{chatService: s}
+func NewListUsersPlugin(s *ChatService) *ListUsersPlugin {
+	return &ListUsersPlugin{chatService: s}
 }
 
-func (u *UserPlugin) Description() *Description {
+func (u *ListUsersPlugin) Description() *Description {
 	return &Description{
 		Description: "tells information about all current users",
 		Template:    "/users",
 	}
 }
 
-func (u *UserPlugin) Execute(message *ty.Message) (*ty.Response, error) {
+func (u *ListUsersPlugin) Execute(message *ty.Message) (*ty.Response, error) {
 	u.chatService.mu.RLock()
 	defer u.chatService.mu.RUnlock()
 
-	clientsSlice := []json.RawMessage{}
-
-	for _, client := range u.chatService.clients {
-		jsonString, err := json.Marshal(client)
-		if err != nil {
-			log.Printf("error parsing client %s to json", client.Name)
-		}
-
-		clientsSlice = append(clientsSlice, jsonString)
-	}
+	clientsSlice := GenericMapToJSONSlice(u.chatService.clients)
 
 	jsonList, err := json.Marshal(clientsSlice)
 	if err != nil {

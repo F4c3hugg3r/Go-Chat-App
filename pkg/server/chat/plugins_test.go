@@ -84,7 +84,7 @@ func TestQuitPlugin(t *testing.T) {
 	registry := RegisterPlugins(service)
 
 	_, err := registry.FindAndExecute(message)
-	assert.Error(t, err, ty.ErrClientNotAvailable)
+	assert.Error(t, err, ty.ErrNotAvailable)
 
 	service.clients[ClientId] = &Client{
 		Name:      Name,
@@ -107,7 +107,7 @@ func TestBroadcastPlugin(t *testing.T) {
 	message := &ty.Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/broadcast"}
 
 	_, err := registry.FindAndExecute(message)
-	assert.ErrorIs(t, err, ty.ErrClientNotAvailable)
+	assert.ErrorIs(t, err, ty.ErrNotAvailable)
 
 	service.clients[ClientId] = &Client{
 		Name:      Name,

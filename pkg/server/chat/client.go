@@ -20,6 +20,7 @@ type Client struct {
 	lastSign  time.Time
 	mu        sync.RWMutex
 	chClosed  bool
+	groupId   string
 }
 
 func (c *Client) Execute(handler *PluginRegistry, msg *ty.Message) (*ty.Response, error) {
@@ -115,4 +116,25 @@ func (c *Client) GetAuthToken() string {
 	defer c.mu.RUnlock()
 
 	return c.authToken
+}
+
+func (c *Client) GetGroupId() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.groupId
+}
+
+func (c *Client) SetGroup(groupId string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.groupId = groupId
+}
+
+func (c *Client) UnsetGroup() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.groupId = ""
 }

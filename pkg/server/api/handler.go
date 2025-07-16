@@ -148,7 +148,7 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 
 	res, err := client.Execute(handler.Plugins, &message)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 
 		return
 	}
