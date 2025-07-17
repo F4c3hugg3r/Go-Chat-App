@@ -15,10 +15,13 @@ const registerFlag = "- Du bist registriert -"
 const registerTitle = "Du bist registriert %s!"
 const unregisterFlag = "- Du bist nun vom Server getrennt -"
 const unregisterTitle = "Willkommen im Chatraum! \nSchreibe '/register {name}' oder '/help'"
+const addGroupFlag = "Add Group"
+const leaveGroupFlag = "Leave Group"
+const GroupTitle = "%s, du bist in der Gruppe %s!"
 
 var (
 	red        lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#BF3535"))
-	blue       lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#353EBF"))
+	blue       lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#3571bfff"))
 	purple     lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
 	turkis     lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#35BFBC"))
 	green      lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("##53BF35"))

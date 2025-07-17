@@ -83,6 +83,7 @@ func (u *UserService) Executor(input string) {
 	err, comment := u.PlugReg.FindAndExecute(msg)
 	if err != nil {
 		u.ChatClient.Output <- &t.Response{Err: fmt.Errorf("%v", err)}
+		return
 	}
 
 	u.ChatClient.Output <- &t.Response{Content: comment}

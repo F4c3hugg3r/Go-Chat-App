@@ -30,3 +30,10 @@ type Response struct {
 	Content string `json:"content"`
 	Err     error  `json:"-"`
 }
+
+// Group contains
+type Group struct {
+	GroupId string `json:"groupId"`
+	Name    string `json:"name"`
+	Size    int    `json:"size"`
+}

@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -9,10 +10,10 @@ import (
 
 type Group struct {
 	clients map[string]*Client
-	Id      string
-	Name    string
+	GroupId string `json:"groupId"`
+	Name    string `json:"name"`
 	mu      *sync.RWMutex
-	Size    int
+	Size    int `json:"size"`
 }
 
 type GroupPluginRegistry struct {
@@ -45,7 +46,7 @@ func (gp *GroupPluginRegistry) Description() *Description {
 func (gp *GroupPluginRegistry) Execute(message *ty.Message) (*ty.Response, error) {
 	newMsg, err := extractIdentifierMessage(message)
 	if err != nil {
-		return nil, fmt.Errorf("%w: message couldn't be parsed to group command", err)
+		return &ty.Response{Err: fmt.Errorf("%w: no empty identifier allowed", err)}, nil
 	}
 
 	plugin, ok := gp.gPlugins[newMsg.Plugin]
@@ -92,4 +93,11 @@ func (g *Group) RemoveClient(client *Client) error {
 	}
 
 	return fmt.Errorf("%w: you are not in this group", ty.ErrNoPermission)
+}
+
+func (g *Group) SafeGetGroupSlice() []json.RawMessage {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	return GenericMapToJSONSlice(g.clients)
 }

@@ -236,6 +236,14 @@ func (c *ChatClient) CreateMessage(clientName string, plugin string, content str
 	return msg
 }
 
+// GetName returns the name of the client
+func (c *ChatClient) GetName() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.clientName
+}
+
 // DecodeToResponse decodes a responseBody to a Response struct
 func DecodeToResponse(body []byte) (*t.Response, error) {
 	response := &t.Response{}
@@ -249,10 +257,15 @@ func DecodeToResponse(body []byte) (*t.Response, error) {
 	return response, nil
 }
 
-// GetName returns the name of the client
-func (c *ChatClient) GetName() string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+// DecodeToGroup decodes a responseBody to a Group struct
+func DecodeToGroup(body []byte) (*t.Group, error) {
+	group := &t.Group{}
+	dec := json.NewDecoder(strings.NewReader(string(body)))
 
-	return c.clientName
+	err := dec.Decode(&group)
+	if err != nil {
+		return group, err
+	}
+
+	return group, nil
 }

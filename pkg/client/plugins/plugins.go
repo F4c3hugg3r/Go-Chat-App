@@ -8,6 +8,29 @@ import (
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/types"
 )
 
+// TODO rsp vom Server auswerten oder zumindest den error Teil davon
+// GroupPlugin lets you participate in a group chat
+type GroupPlugin struct {
+	c *n.ChatClient
+}
+
+func NewGroupPlugin(chatClient *n.ChatClient) *GroupPlugin {
+	return &GroupPlugin{c: chatClient}
+}
+
+func (lp *GroupPlugin) CheckScope() int {
+	return RegisteredOnly
+}
+
+func (lp *GroupPlugin) Execute(message *t.Message) (error, string) {
+	_, err := lp.c.PostMessage(message, t.PostPlugin)
+	return err, ""
+}
+
+//fmt.Sprintf("Du hast die Gruppe %s erstellt", name)
+// Content: "Du hast die Gruppe verlassen"
+// Content: "Du bist der Gruppe beigetreten"
+
 // PrivateMessage Plugin lets a client send a private message to another client identified by it's clientId
 type PrivateMessagePlugin struct {
 	c *n.ChatClient
@@ -19,10 +42,6 @@ func NewPrivateMessagePlugin(chatClient *n.ChatClient) *PrivateMessagePlugin {
 
 func (pp *PrivateMessagePlugin) CheckScope() int {
 	return RegisteredOnly
-}
-
-func (pp *PrivateMessagePlugin) Description() string {
-	return "lets you send a private message to someone"
 }
 
 func (pp *PrivateMessagePlugin) Execute(message *t.Message) (error, string) {
@@ -51,10 +70,6 @@ func (lp *LogOutPlugin) CheckScope() int {
 	return RegisteredOnly
 }
 
-func (lp *LogOutPlugin) Description() string {
-	return "loggs you out of the chat"
-}
-
 func (lp *LogOutPlugin) Execute(message *t.Message) (error, string) {
 	return lp.c.PostDelete(message), "- Du bist nun vom Server getrennt -"
 }
@@ -71,10 +86,6 @@ func NewRegisterClientPlugin(chatClient *n.ChatClient) *RegisterClientPlugin {
 
 func (rp *RegisterClientPlugin) CheckScope() int {
 	return UnregisteredOnly
-}
-
-func (rp *RegisterClientPlugin) Description() string {
-	return "registeres a client"
 }
 
 func (rp *RegisterClientPlugin) Execute(message *t.Message) (error, string) {
@@ -110,10 +121,6 @@ func (bp *BroadcastPlugin) CheckScope() int {
 	return RegisteredOnly
 }
 
-func (bp *BroadcastPlugin) Description() string {
-	return "distributes a message abroad all clients"
-}
-
 func (bp *BroadcastPlugin) Execute(message *t.Message) (error, string) {
 	_, err := bp.c.PostMessage(message, t.PostPlugin)
 	return err, ""
@@ -130,10 +137,6 @@ func NewHelpPlugin(chatClient *n.ChatClient) *HelpPlugin {
 
 func (hp *HelpPlugin) CheckScope() int {
 	return RegisteredOnly
-}
-
-func (h *HelpPlugin) Description() string {
-	return "tells every plugin and their description"
 }
 
 func (h *HelpPlugin) Execute(message *t.Message) (error, string) {
@@ -154,10 +157,6 @@ func (up *UserPlugin) CheckScope() int {
 	return RegisteredOnly
 }
 
-func (u *UserPlugin) Description() string {
-	return "tells you information about all the current users"
-}
-
 func (u *UserPlugin) Execute(message *t.Message) (error, string) {
 	_, err := u.c.PostMessage(message, t.PostPlugin)
 	return err, ""
@@ -174,10 +173,6 @@ func NewTimePlugin(chatClient *n.ChatClient) *TimePlugin {
 
 func (tp *TimePlugin) CheckScope() int {
 	return RegisteredOnly
-}
-
-func (tp *TimePlugin) Description() string {
-	return "tells you the current time"
 }
 
 func (tp *TimePlugin) Execute(message *t.Message) (error, string) {

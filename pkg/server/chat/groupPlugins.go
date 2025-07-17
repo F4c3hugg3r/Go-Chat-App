@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 
 	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server/types"
 	"github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
@@ -36,7 +37,7 @@ func (ghp *GroupHelpPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return nil, fmt.Errorf("%w: error parsing plugins to json", err)
 	}
 
-	return &ty.Response{Name: "Help", Content: string(jsonList)}, nil
+	return &ty.Response{Name: "Group Help", Content: string(jsonList)}, nil
 }
 
 // GroupListPlugin
@@ -59,6 +60,10 @@ func (glp *GroupListPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	glp.s.mu.Lock()
 	defer glp.s.mu.Unlock()
 
+	if len(glp.s.groups) < 1 {
+		return &ty.Response{Err: fmt.Errorf("%v: there are no groups", ty.ErrNotAvailable)}, nil
+	}
+
 	groupSlice := []json.RawMessage{}
 
 	for _, group := range glp.s.groups {
@@ -77,7 +82,7 @@ func (glp *GroupListPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return nil, fmt.Errorf("%w: error parsing clients to json", err)
 	}
 
-	return &ty.Response{Name: "Users", Content: string(jsonList)}, nil
+	return &ty.Response{Name: "Group List", Content: string(jsonList)}, nil
 }
 
 // GroupCreatePlugin
@@ -104,15 +109,25 @@ func (gcp *GroupCreatePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	id := shared.GenerateSecureToken(32)
 	clients := make(map[string]*Client)
 
-	client, err := gcp.s.GetClient(msg.ClientId)
-	if err != nil {
-		return nil, fmt.Errorf("%w: you got deleted", err)
+	client, exists := gcp.s.clients[msg.ClientId]
+	if !exists {
+		return nil, fmt.Errorf("%w: there is no client with id: %s registered", ty.ErrNotAvailable, msg.ClientId)
 	}
 
 	clients[msg.ClientId] = client
-	gcp.s.groups[id] = &Group{Id: id, Name: name, clients: clients}
+	group := &Group{GroupId: id, Name: name, clients: clients, mu: &sync.RWMutex{}}
+	gcp.s.groups[id] = group
+	client.SetGroup(id)
 
-	return &ty.Response{Name: "Server", Content: fmt.Sprintf("Du hast die Gruppe %s erstellt", name)}, nil
+	fmt.Printf("\nnew group %s created", group.Name)
+
+	jsonGroup, err := json.Marshal(group)
+	if err != nil {
+		return nil, fmt.Errorf("%w: error parsing group to json", err)
+	}
+
+	// TODO in client jsonGroup verarbeiten
+	return &ty.Response{Name: "Add Group", Content: string(jsonGroup)}, nil
 }
 
 // TODO GroupInvitePlugin
@@ -169,7 +184,7 @@ func (glp *GroupLeavePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 
 	client.UnsetGroup()
 
-	return &ty.Response{Name: "Server", Content: "Du hast die Gruppe verlassen"}, nil
+	return &ty.Response{Name: "Leave Group", Content: "Du hast die Gruppe verlassen"}, nil
 }
 
 // GroupUserPlugin
@@ -189,17 +204,28 @@ func (gup *GroupUsersPlugin) Description() *Description {
 }
 
 func (gup *GroupUsersPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
-	gup.s.mu.RLock()
-	defer gup.s.mu.RUnlock()
+	client, err := gup.s.GetClient(msg.ClientId)
+	if err != nil {
+		return nil, fmt.Errorf("%w: client (probably) already deleted", ty.ErrNotAvailable)
+	}
 
-	groupsSlice := GenericMapToJSONSlice(gup.s.groups)
+	group, err := GetCurrentGroup(client, gup.s)
+	if err != nil {
+		return &ty.Response{Err: fmt.Errorf("%w: error finding group", err)}, nil
+	}
+
+	if group == nil {
+		return &ty.Response{Err: fmt.Errorf("%w: you are not in a group", ty.ErrNoPermission)}, nil
+	}
+
+	groupsSlice := group.SafeGetGroupSlice()
 
 	jsonList, err := json.Marshal(groupsSlice)
 	if err != nil {
 		return nil, fmt.Errorf("%w: error parsing groups to json", err)
 	}
 
-	return &ty.Response{Name: "Users", Content: string(jsonList)}, nil
+	return &ty.Response{Name: "Group Users", Content: string(jsonList)}, nil
 }
 
 // GroupJoinPlugin
@@ -226,13 +252,16 @@ func (gjp *GroupJoinPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return nil, fmt.Errorf("%w: client (probably) already deleted", ty.ErrNotAvailable)
 	}
 
-	group, err := GetCurrentGroup(client, gjp.s)
+	currentGroup := client.GetGroupId()
+
+	group, err := gjp.s.GetGroup(groupId)
 	if err != nil {
-		return &ty.Response{Err: fmt.Errorf("%w: error finding group", err)}, nil
+		return &ty.Response{Err: fmt.Errorf("%w: error finding group with id %s", err, groupId)}, nil
 	}
 
-	if group != nil {
+	if currentGroup != "" {
 		client.UnsetGroup()
+		group.RemoveClient(client)
 	}
 
 	err = group.AddClient(client)
@@ -242,5 +271,5 @@ func (gjp *GroupJoinPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 
 	client.SetGroup(groupId)
 
-	return &ty.Response{Name: "Server", Content: "Du hast die Gruppe verlassen"}, nil
+	return &ty.Response{Name: "Add Group", Content: "Du bist der Gruppe beigetreten"}, nil
 }

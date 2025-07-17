@@ -17,6 +17,9 @@ import (
 )
 
 // (TODO list commands output als Liste darstellen)
+// TODO titel nicht korrekt weil gruppe nicht ausgelesen wird
+// TODO nachrichten von außerhalb kommen noch an
+// TODO refactoring
 
 // InitialModel initializes the model struct, which is the main struct for the TUI
 func InitialModel(u *i.UserService) model {
@@ -42,7 +45,9 @@ func InitialModel(u *i.UserService) model {
 		help:        h,
 		keyMap:      helpKeys,
 		inH:         inputManager,
-		registered:  unregisterFlag,
+		// registered kann weg
+		registered: unregisterFlag,
+		title:      unregisterTitle,
 	}
 
 	return model
@@ -175,24 +180,26 @@ func setUpTextInput(u *i.UserService) textinput.Model {
 	return ti
 }
 
-// setTitle decides between the registered and unregistered title sets it into the viewport
+// renderTitle decides between the registered and unregistered title sets it into the viewport
 // and return the heightDiff of the old and new title
-func (m *model) setTitle() {
-	if strings.Contains(m.registered, unregisterFlag) && !strings.Contains(m.title, unregisterTitle) {
-		m.title = centered.Width(m.viewport.Width).Bold(true).Render(unregisterTitle)
-
-		return
-	}
-
-	if strings.Contains(m.registered, registerFlag) && !strings.Contains(m.title, registerTitle) {
-		title := centered.Width(m.viewport.Width).
-			Render(titleStyle.Render(fmt.Sprintf(registerTitle,
+func (m *model) renderTitle(title string) {
+	switch title {
+	case unregisterFlag:
+		title = centered.Width(m.viewport.Width).Bold(true).Render(title)
+	case registerFlag:
+		title = centered.Width(m.viewport.Width).
+			Render(titleStyle.Render(fmt.Sprintf(title,
 				turkis.Render(m.userService.ChatClient.GetName()))))
-
-		heightDiff := lipgloss.Height(title) - lipgloss.Height(m.title)
-		m.title = title
-		m.viewport.Height = m.viewport.Height - heightDiff
+	case addGroupFlag:
+		title = GroupTitle
+	case leaveGroupFlag:
+		title = registerTitle
 	}
+
+	heightDiff := lipgloss.Height(title) - lipgloss.Height(m.title)
+	m.title = title
+	m.viewport.Height = m.viewport.Height - heightDiff
+	// m.viewport.Height = rsp.Height - lipgloss.Height(gap) - lipgloss.Height(m.title) - lipgloss.Height(gap)
 }
 
 // HandleWindowResize handles rezising of the terminal window by updating all models sizes
@@ -200,8 +207,9 @@ func (m *model) HandleWindowResize(rsp *tea.WindowSizeMsg) {
 	m.viewport.Width = rsp.Width
 	m.textinput.Width = rsp.Width
 	m.help.Width = rsp.Width
-	m.viewport.Height = rsp.Height - lipgloss.Height(gap) - lipgloss.Height(m.title) - lipgloss.Height(gap)
+	m.viewport.Height = rsp.Height - lipgloss.Height(gap) - lipgloss.Height(m.title) - 2
 
+	m.renderTitle(m.title)
 	m.refreshViewPort()
 }
 
@@ -254,7 +262,7 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 	// register output
 	case strings.Contains(rsp.Content, registerFlag):
 		m.registered = rsp.Content
-		m.setTitle()
+		m.renderTitle(registerTitle)
 
 		return blue.Render("-> Du kannst nun Nachrichten schreiben oder Commands ausführen\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen")
 
@@ -265,10 +273,18 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 		// unregister output
 		if strings.Contains(rsp.Content, unregisterFlag) {
 			m.registered = unregisterFlag
-			m.setTitle()
+			m.renderTitle(unregisterTitle)
 		}
 
 		return rspString
+
+	// addGroup output
+	case rsp.Name == addGroupFlag:
+		return blue.Render("-> Du bist nun Teil der Gruppe und kannst Nachrichten in ihr schreiben\nPrivate Nachrichten kannst du weiterhin außerhalb verschicken")
+
+	// leaveGroup output
+	case rsp.Name == leaveGroupFlag:
+		return blue.Render("Du hast die Gruppe verlassen!\n-> Du kannst nun Nachrichten schreiben oder Commands ausführen\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen")
 	}
 
 	// response output

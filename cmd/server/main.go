@@ -76,6 +76,8 @@ func interruptListener(interChan chan os.Signal, server *http.Server, wg *sync.W
 	ctx, cancelTimeout := context.WithTimeout(context.Background(), time.Minute)
 	defer cancelTimeout()
 
+	// TODO clients benachrichtigen
+
 	err := server.Shutdown(ctx)
 	if err != nil {
 		log.Printf("unable to shutdown server: %s", err)

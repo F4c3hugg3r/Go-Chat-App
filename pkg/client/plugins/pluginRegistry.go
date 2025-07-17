@@ -16,7 +16,6 @@ const (
 // PluginInterface describes the plugin methods
 type PluginInterface interface {
 	Execute(message *t.Message) (error, string)
-	Description() string
 	CheckScope() int
 }
 
@@ -36,6 +35,7 @@ func RegisterPlugins(chatClient *n.ChatClient) *PluginRegistry {
 	pr.Plugins["/broadcast"] = NewBroadcastPlugin(chatClient)
 	pr.Plugins["/quit"] = NewLogOutPlugin(chatClient)
 	pr.Plugins["/private"] = NewPrivateMessagePlugin(chatClient)
+	pr.Plugins["/group"] = NewGroupPlugin(chatClient)
 
 	pr.chatClient = chatClient
 

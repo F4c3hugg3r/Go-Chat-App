@@ -57,6 +57,10 @@ func GenericMapToJSONSlice[T any](items map[string]T) []json.RawMessage {
 }
 
 func extractIdentifierMessage(msg *ty.Message) (*ty.Message, error) {
+	if strings.TrimSpace(msg.Content) == "" {
+		return nil, fmt.Errorf("%v: missing identifier", ty.ErrNotAvailable)
+	}
+
 	identifier := strings.Fields(msg.Content)[0]
 	content, _ := strings.CutPrefix(msg.Content, fmt.Sprintf("%s ", identifier))
 	msg.Plugin = identifier

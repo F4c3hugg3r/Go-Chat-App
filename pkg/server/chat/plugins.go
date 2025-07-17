@@ -74,7 +74,7 @@ func (lp *LogOutPlugin) Execute(message *ty.Message) (*ty.Response, error) {
 		return nil, fmt.Errorf("%w: client (probably) already deleted", ty.ErrNotAvailable)
 	}
 
-	fmt.Println("logged out ", client.Name)
+	fmt.Println("\nlogged out ", client.Name)
 	client.Close()
 	delete(lp.chatService.clients, message.ClientId)
 
@@ -167,7 +167,7 @@ func (bp *BroadcastPlugin) Execute(message *ty.Message) (*ty.Response, error) {
 
 	group, err := GetCurrentGroup(client, bp.chatService)
 	if err != nil {
-		return nil, fmt.Errorf("%w: error getting the group", err)
+		return nil, fmt.Errorf("%w: error finding group", err)
 	}
 
 	if group != nil {

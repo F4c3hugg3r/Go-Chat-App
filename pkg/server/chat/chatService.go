@@ -22,6 +22,7 @@ type ChatService struct {
 func NewChatService(maxUsers int) *ChatService {
 	return &ChatService{
 		clients:  make(map[string]*Client),
+		groups:   make(map[string]*Group),
 		maxUsers: maxUsers,
 	}
 }
