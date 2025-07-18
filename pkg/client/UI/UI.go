@@ -16,10 +16,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// (TODO list commands output als Liste darstellen)
-// TODO titel nicht korrekt weil gruppe nicht ausgelesen wird
-// TODO nachrichten von außerhalb kommen noch an
-// TODO refactoring
+// TODO server: nachrichten von außerhalb kommen noch an
+// TODO allgemein: refactoring
 
 // InitialModel initializes the model struct, which is the main struct for the TUI
 func InitialModel(u *i.UserService) model {
@@ -46,8 +44,8 @@ func InitialModel(u *i.UserService) model {
 		keyMap:      helpKeys,
 		inH:         inputManager,
 		// registered kann weg
-		registered: unregisterFlag,
-		title:      unregisterTitle,
+		registered: UnregisterFlag,
+		title:      UnregisterTitle,
 	}
 
 	return model
@@ -115,11 +113,11 @@ func (m model) View() string {
 	return fmt.Sprintf(
 		"%s%s%s%s%s%s%s",
 		m.title,
-		gap,
+		Gap,
 		m.viewport.View(),
-		gap,
+		Gap,
 		m.textinput.View(),
-		gap,
+		Gap,
 		m.help.View(m.keyMap),
 	)
 }
@@ -182,22 +180,23 @@ func setUpTextInput(u *i.UserService) textinput.Model {
 
 // renderTitle decides between the registered and unregistered title sets it into the viewport
 // and return the heightDiff of the old and new title
-func (m *model) renderTitle(title string) {
-	switch title {
-	case unregisterFlag:
-		title = centered.Width(m.viewport.Width).Bold(true).Render(title)
-	case registerFlag:
-		title = centered.Width(m.viewport.Width).
-			Render(titleStyle.Render(fmt.Sprintf(title,
-				turkis.Render(m.userService.ChatClient.GetName()))))
-	case addGroupFlag:
-		title = GroupTitle
-	case leaveGroupFlag:
-		title = registerTitle
+func (m *model) renderTitle(title string, param []string) {
+	if param == nil || param[0] != WindowResizeFlag {
+		switch {
+		case strings.Contains(title, UnregisterFlag):
+			title = UnregisterTitle
+
+		case strings.Contains(title, RegisterFlag):
+			title = titleStyle.Render(fmt.Sprintf(RegisterTitle,
+				turkis.Render(param[0])))
+
+		case strings.Contains(title, AddGroupFlag):
+			title = titleStyle.Render(fmt.Sprintf(GroupTitle, turkis.Render(param[0]), turkis.Render(param[1])))
+		}
 	}
 
 	heightDiff := lipgloss.Height(title) - lipgloss.Height(m.title)
-	m.title = title
+	m.title = centered.Width(m.viewport.Width).Bold(true).Render(title)
 	m.viewport.Height = m.viewport.Height - heightDiff
 	// m.viewport.Height = rsp.Height - lipgloss.Height(gap) - lipgloss.Height(m.title) - lipgloss.Height(gap)
 }
@@ -207,9 +206,9 @@ func (m *model) HandleWindowResize(rsp *tea.WindowSizeMsg) {
 	m.viewport.Width = rsp.Width
 	m.textinput.Width = rsp.Width
 	m.help.Width = rsp.Width
-	m.viewport.Height = rsp.Height - lipgloss.Height(gap) - lipgloss.Height(m.title) - 2
+	m.viewport.Height = rsp.Height - lipgloss.Height(Gap) - lipgloss.Height(m.title) - 2
 
-	m.renderTitle(m.title)
+	m.renderTitle(m.title, []string{WindowResizeFlag})
 	m.refreshViewPort()
 }
 
@@ -260,9 +259,9 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 		return output
 
 	// register output
-	case strings.Contains(rsp.Content, registerFlag):
+	case strings.Contains(rsp.Content, RegisterFlag):
 		m.registered = rsp.Content
-		m.renderTitle(registerTitle)
+		m.renderTitle(RegisterFlag, []string{m.userService.ChatClient.GetName()})
 
 		return blue.Render("-> Du kannst nun Nachrichten schreiben oder Commands ausführen\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen")
 
@@ -271,19 +270,29 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 		rspString = fmt.Sprintf("%s", blue.Render(rsp.Content))
 
 		// unregister output
-		if strings.Contains(rsp.Content, unregisterFlag) {
-			m.registered = unregisterFlag
-			m.renderTitle(unregisterTitle)
+		if strings.Contains(rsp.Content, UnregisterFlag) {
+			m.registered = UnregisterFlag
+			m.renderTitle(UnregisterFlag, nil)
 		}
 
 		return rspString
 
 	// addGroup output
-	case rsp.Name == addGroupFlag:
-		return blue.Render("-> Du bist nun Teil der Gruppe und kannst Nachrichten in ihr schreiben\nPrivate Nachrichten kannst du weiterhin außerhalb verschicken")
+	case strings.Contains(rsp.Name, AddGroupFlag):
+		group, err := m.userService.HandleAddGroup(rsp.Content)
+		if err != nil {
+			return red.Render(fmt.Sprintf("%v: error formatting json to group", err))
+		}
+
+		m.renderTitle(AddGroupFlag, []string{m.userService.ChatClient.GetName(), group.Name})
+
+		return blue.Render(fmt.Sprintf("-> Du bist nun Teil der Gruppe %s und kannst Nachrichten in ihr schreiben\nPrivate Nachrichten kannst du weiterhin außerhalb verschicken", group.Name))
 
 	// leaveGroup output
-	case rsp.Name == leaveGroupFlag:
+	case strings.Contains(rsp.Name, LeaveGroupFlag):
+		m.userService.ChatClient.UnsetGroupId()
+		m.renderTitle(RegisterFlag, []string{m.userService.ChatClient.GetName()})
+
 		return blue.Render("Du hast die Gruppe verlassen!\n-> Du kannst nun Nachrichten schreiben oder Commands ausführen\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen")
 	}
 

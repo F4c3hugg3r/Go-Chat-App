@@ -126,7 +126,6 @@ func (gcp *GroupCreatePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return nil, fmt.Errorf("%w: error parsing group to json", err)
 	}
 
-	// TODO in client jsonGroup verarbeiten
 	return &ty.Response{Name: "Add Group", Content: string(jsonGroup)}, nil
 }
 

@@ -18,6 +18,7 @@ type Message struct {
 	Content  string `json:"content"`
 	Plugin   string `json:"plugin"`
 	ClientId string `json:"clientId"`
+	GroupId  string `json:"groupId"`
 }
 
 // Response contains the name of the sender and the response (content) itsself

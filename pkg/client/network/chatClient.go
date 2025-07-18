@@ -24,6 +24,7 @@ type ChatClient struct {
 	Output     chan *t.Response
 	Url        string
 	Endpoints  map[int]string
+	groupId    string
 }
 
 // NewClient generates a ChatClient and spawns a ResponseReceiver goroutine
@@ -234,6 +235,20 @@ func (c *ChatClient) CreateMessage(clientName string, plugin string, content str
 	msg.Plugin = plugin
 
 	return msg
+}
+
+func (c *ChatClient) SetGroupId(id string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.groupId = id
+}
+
+func (c *ChatClient) UnsetGroupId() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.groupId = ""
 }
 
 // GetName returns the name of the client

@@ -1,6 +1,7 @@
 package input
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -32,6 +33,16 @@ func NewUserService(c *n.ChatClient) *UserService {
 	u.cond = sync.NewCond(u.mu)
 
 	return u
+}
+
+func (u *UserService) HandleAddGroup(groupJson string) (*t.Group, error) {
+	group, err := decodeStringToGroup(groupJson)
+	if err != nil {
+		return nil, err
+	}
+
+	u.ChatClient.SetGroupId(group.GroupId)
+	return group, nil
 }
 
 func (u *UserService) InitializeSuggestions() []string {
@@ -87,4 +98,11 @@ func (u *UserService) Executor(input string) {
 	}
 
 	u.ChatClient.Output <- &t.Response{Content: comment}
+}
+
+func decodeStringToGroup(jsonGroup string) (*t.Group, error) {
+	var group *t.Group
+	dec := json.NewDecoder(strings.NewReader(jsonGroup))
+	err := dec.Decode(&group)
+	return group, err
 }

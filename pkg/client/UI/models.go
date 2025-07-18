@@ -10,30 +10,32 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-const gap = "\n\n"
-const registerFlag = "- Du bist registriert -"
-const registerTitle = "Du bist registriert %s!"
-const unregisterFlag = "- Du bist nun vom Server getrennt -"
-const unregisterTitle = "Willkommen im Chatraum! \nSchreibe '/register {name}' oder '/help'"
-const addGroupFlag = "Add Group"
-const leaveGroupFlag = "Leave Group"
+const Gap = "\n\n"
+const RegisterFlag = "- Du bist registriert -"
+const RegisterTitle = "Du bist registriert %s!"
+const UnregisterFlag = "- Du bist nun vom Server getrennt -"
+const UnregisterTitle = "Willkommen im Chatraum! \nSchreibe '/register {name}' oder '/help'"
+const AddGroupFlag = "Add Group"
+const LeaveGroupFlag = "Leave Group"
 const GroupTitle = "%s, du bist in der Gruppe %s!"
+const WindowResizeFlag = "windowResize"
 
 var (
-	red        lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#BF3535"))
-	blue       lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#3571bfff"))
-	purple     lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
-	turkis     lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#35BFBC"))
-	green      lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("##53BF35"))
+	red    lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#BF3535"))
+	blue   lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#3571bfff"))
+	purple lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
+	turkis lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#35BFBC"))
+	green  lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("##53BF35"))
+
 	titleStyle lipgloss.Style = lipgloss.NewStyle().
-			Bold(true).
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("63")).
 			PaddingLeft(5).
 			PaddingRight(5)
-	centered     lipgloss.Style = lipgloss.NewStyle().Align(lipgloss.Center)
-	faint        lipgloss.Style = lipgloss.NewStyle().Faint(true)
-	viewportKeys                = viewport.KeyMap{
+	centered lipgloss.Style = lipgloss.NewStyle().Align(lipgloss.Center)
+	faint    lipgloss.Style = lipgloss.NewStyle().Faint(true)
+
+	viewportKeys = viewport.KeyMap{
 		HalfPageUp: key.NewBinding(
 			key.WithKeys("shift+up"),
 			key.WithHelp("shift ↑", faint.Render("move ½ page up")),
