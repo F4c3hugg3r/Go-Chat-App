@@ -20,14 +20,13 @@ type GroupPluginRegistry struct {
 	gPlugins map[string]PluginInterface
 }
 
-// TODO autodelete
-func RegisterGroupPlugins(s *ChatService) *GroupPluginRegistry {
+func RegisterGroupPlugins(s *ChatService, pr *PluginRegistry) *GroupPluginRegistry {
 	gp := &GroupPluginRegistry{gPlugins: make(map[string]PluginInterface)}
 	gp.gPlugins["help"] = NewGroupHelpPlugin(s, gp)
 	gp.gPlugins["list"] = NewGroupListPlugin(s)
-	gp.gPlugins["join"] = NewGroupJoinPlugin(s)
+	gp.gPlugins["join"] = NewGroupJoinPlugin(s, pr)
 	gp.gPlugins["create"] = NewGroupCreatePlugin(s)
-	gp.gPlugins["leave"] = NewGroupLeavePlugin(s)
+	gp.gPlugins["leave"] = NewGroupLeavePlugin(s, pr)
 	gp.gPlugins["users"] = NewGroupUsersPlugin(s)
 	// gp.gPlugins["invite"] = NewGroupInvitePlugin(s)
 	// rules
@@ -64,11 +63,12 @@ func (g *Group) GetClients() map[string]*Client {
 	return g.clients
 }
 
-func (g *Group) SetSize() {
+func (g *Group) SetSize() int {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
 	g.Size = len(g.clients)
+	return g.Size
 }
 
 func (g *Group) AddClient(client *Client) error {

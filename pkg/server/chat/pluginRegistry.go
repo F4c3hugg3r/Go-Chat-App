@@ -35,7 +35,7 @@ func RegisterPlugins(chatService *ChatService) *PluginRegistry {
 	pr.plugins["/broadcast"] = NewBroadcastPlugin(chatService)
 	pr.plugins["/quit"] = NewLogOutPlugin(chatService, pr)
 	pr.plugins["/private"] = NewPrivateMessagePlugin(chatService)
-	pr.plugins["/group"] = RegisterGroupPlugins(chatService)
+	pr.plugins["/group"] = RegisterGroupPlugins(chatService, pr)
 
 	return pr
 }

@@ -162,7 +162,7 @@ func (bp *BroadcastPlugin) Execute(message *ty.Message) (*ty.Response, error) {
 
 	client, err := bp.chatService.GetClient(message.ClientId)
 	if err != nil {
-		return nil, fmt.Errorf("%w: error getting the client", err)
+		return nil, fmt.Errorf("%w: client (probably) already deleted", err)
 	}
 
 	group, err := GetCurrentGroup(client, bp.chatService)

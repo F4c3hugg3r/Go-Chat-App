@@ -31,28 +31,43 @@ func (s *ChatService) Broadcast(clientsToIterate map[string]*Client, rsp *ty.Res
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if clientsToIterate == nil {
+	switch clientsToIterate {
+	case nil:
 		clientsToIterate = s.clients
-	}
-
-	for _, client := range clientsToIterate {
-		if client.ClientId != clientId {
-			err := client.Send(rsp)
-			if err != nil {
-				log.Printf("\n%v: %s -> %s", err, rsp.Name, client.Name)
+		for _, client := range clientsToIterate {
+			if client.ClientId != clientId && client.GetGroupId() == "" {
+				err := client.Send(rsp)
+				if err != nil {
+					log.Printf("\n%v: %s -> %s", err, rsp.Name, client.Name)
+				}
+			}
+		}
+	default:
+		for _, client := range clientsToIterate {
+			if client.ClientId != clientId {
+				err := client.Send(rsp)
+				if err != nil {
+					log.Printf("\n%v: %s -> %s", err, rsp.Name, client.Name)
+				}
 			}
 		}
 	}
 }
 
-// InactiveClientDeleter searches for idle clients and deletes them as well as closes their message-channel
-func (s *ChatService) InactiveClientDeleter(timeLimit time.Duration) {
+// InactiveObjectDeleter searches for idle clients and deletes them as well as closes their message-channel
+func (s *ChatService) InactiveObjectDeleter(timeLimit time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	for clientId, client := range s.clients {
 		if client.Idle(timeLimit) {
 			delete(s.clients, clientId)
+		}
+	}
+
+	for groupId, group := range s.groups {
+		if group.SetSize() < 1 {
+			delete(s.groups, groupId)
 		}
 	}
 }

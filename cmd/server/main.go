@@ -104,7 +104,7 @@ func setUp(server *http.Server, handler *api.ServerHandler, timeLimit time.Durat
 		for {
 			select {
 			case <-ticker.C:
-				handler.Service.InactiveClientDeleter(timeLimit)
+				handler.Service.InactiveObjectDeleter(timeLimit)
 			case <-ctx.Done():
 				return
 			}

@@ -151,11 +151,15 @@ func (gcp *GroupCreatePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 
 // GrouLeavePlugin
 type GroupLeavePlugin struct {
-	s *ChatService
+	s  *ChatService
+	pr *PluginRegistry
 }
 
-func NewGroupLeavePlugin(s *ChatService) *GroupLeavePlugin {
-	return &GroupLeavePlugin{s: s}
+func NewGroupLeavePlugin(s *ChatService, pr *PluginRegistry) *GroupLeavePlugin {
+	return &GroupLeavePlugin{
+		s:  s,
+		pr: pr,
+	}
 }
 
 func (glp *GroupLeavePlugin) Description() *Description {
@@ -171,7 +175,7 @@ func (glp *GroupLeavePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return nil, fmt.Errorf("%w: client (probably) already deleted", err)
 	}
 
-	group, err := GetCurrentGroup(client, glp.s)
+	group, err := glp.s.GetGroup(msg.GroupId)
 	if err != nil {
 		return nil, fmt.Errorf("%w: group (probably) already deleted", err)
 	}
@@ -180,6 +184,8 @@ func (glp *GroupLeavePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	if err != nil {
 		return &ty.Response{Err: err}, nil
 	}
+
+	client.Execute(glp.pr, &ty.Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s hat die Gruppe verlassen", msg.Name), ClientId: msg.ClientId, GroupId: msg.GroupId})
 
 	client.UnsetGroup()
 
@@ -203,12 +209,7 @@ func (gup *GroupUsersPlugin) Description() *Description {
 }
 
 func (gup *GroupUsersPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
-	client, err := gup.s.GetClient(msg.ClientId)
-	if err != nil {
-		return nil, fmt.Errorf("%w: client (probably) already deleted", ty.ErrNotAvailable)
-	}
-
-	group, err := GetCurrentGroup(client, gup.s)
+	group, err := gup.s.GetGroup(msg.GroupId)
 	if err != nil {
 		return &ty.Response{Err: fmt.Errorf("%w: error finding group", err)}, nil
 	}
@@ -229,11 +230,15 @@ func (gup *GroupUsersPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 
 // GroupJoinPlugin
 type GroupJoinPlugin struct {
-	s *ChatService
+	s  *ChatService
+	pr *PluginRegistry
 }
 
-func NewGroupJoinPlugin(s *ChatService) *GroupJoinPlugin {
-	return &GroupJoinPlugin{s: s}
+func NewGroupJoinPlugin(s *ChatService, pr *PluginRegistry) *GroupJoinPlugin {
+	return &GroupJoinPlugin{
+		s:  s,
+		pr: pr,
+	}
 }
 
 func (gjp *GroupJoinPlugin) Description() *Description {
@@ -244,21 +249,20 @@ func (gjp *GroupJoinPlugin) Description() *Description {
 }
 
 func (gjp *GroupJoinPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
-	groupId := strings.TrimSpace(msg.Content)
+	newGroupId := strings.TrimSpace(msg.Content)
 
 	client, err := gjp.s.GetClient(msg.ClientId)
 	if err != nil {
 		return nil, fmt.Errorf("%w: client (probably) already deleted", ty.ErrNotAvailable)
 	}
 
-	currentGroup := client.GetGroupId()
-
-	group, err := gjp.s.GetGroup(groupId)
+	group, err := gjp.s.GetGroup(newGroupId)
 	if err != nil {
-		return &ty.Response{Err: fmt.Errorf("%w: error finding group with id %s", err, groupId)}, nil
+		return &ty.Response{Err: fmt.Errorf("%w: error finding group with id %s", err, newGroupId)}, nil
 	}
 
-	if currentGroup != "" {
+	if msg.GroupId != "" {
+		client.Execute(gjp.pr, &ty.Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s hat die Gruppe verlassen", msg.Name), ClientId: msg.ClientId, GroupId: msg.GroupId})
 		client.UnsetGroup()
 		group.RemoveClient(client)
 	}
@@ -268,7 +272,14 @@ func (gjp *GroupJoinPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return &ty.Response{Err: err}, nil
 	}
 
-	client.SetGroup(groupId)
+	client.SetGroup(newGroupId)
 
-	return &ty.Response{Name: "Add Group", Content: "Du bist der Gruppe beigetreten"}, nil
+	client.Execute(gjp.pr, &ty.Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s ist der Gruppe beigetreten", msg.Name), ClientId: msg.ClientId, GroupId: newGroupId})
+
+	jsonGroup, err := json.Marshal(group)
+	if err != nil {
+		return nil, fmt.Errorf("%w: error parsing group to json", err)
+	}
+
+	return &ty.Response{Name: "Add Group", Content: string(jsonGroup)}, nil
 }

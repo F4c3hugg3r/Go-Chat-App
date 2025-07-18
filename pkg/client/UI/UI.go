@@ -16,7 +16,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// TODO server: nachrichten von außerhalb kommen noch an
 // TODO allgemein: refactoring
 
 // InitialModel initializes the model struct, which is the main struct for the TUI

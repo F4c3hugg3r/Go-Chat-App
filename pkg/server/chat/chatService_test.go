@@ -66,7 +66,7 @@ func TestInactiveClientDeleter(t *testing.T) {
 		t.Errorf(("Setup incorrect there should be just 1 client but there is %d"), len(service.clients))
 	}
 
-	service.InactiveClientDeleter(30 * time.Minute)
+	service.InactiveObjectDeleter(30 * time.Minute)
 	if len(service.clients) != 0 {
 		t.Errorf(("There should be 0 client but there is %d"), len(service.clients))
 	}

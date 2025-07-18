@@ -220,21 +220,36 @@ func (c *ChatClient) CreateMessage(clientName string, plugin string, content str
 	msg := &t.Message{}
 
 	if clientName == "" && c.Registered {
-		msg.Name = c.clientName
+		msg.Name = c.GetName()
 	} else {
 		msg.Name = clientName
 	}
 
 	if clientId == "" {
-		msg.ClientId = c.clientId
+		msg.ClientId = c.GetClientId()
 	} else {
 		msg.ClientId = clientId
 	}
 
 	msg.Content = content
 	msg.Plugin = plugin
+	msg.GroupId = c.GetGroupId()
 
 	return msg
+}
+
+func (c *ChatClient) GetClientId() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.clientId
+}
+
+func (c *ChatClient) GetGroupId() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.groupId
 }
 
 func (c *ChatClient) SetGroupId(id string) {
