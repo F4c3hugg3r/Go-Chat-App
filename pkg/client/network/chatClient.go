@@ -63,7 +63,7 @@ func (c *ChatClient) Interrupt() {
 	if c.Registered {
 		err := c.PostDelete(c.CreateMessage("", "/quit", "", ""))
 		if err != nil {
-			c.Output <- &t.Response{Err: fmt.Errorf("%w: delete could not be sent", err)}
+			c.Output <- &t.Response{Err: fmt.Sprintf("%v: delete could not be sent", err)}
 		}
 	}
 
@@ -191,7 +191,7 @@ func (c *ChatClient) GetResponse(url string) (*t.Response, error) {
 	if err != nil {
 		c.Unregister()
 
-		return &t.Response{Err: fmt.Errorf("%w: the connection to the server couldn't be established", err)},
+		return &t.Response{Err: fmt.Sprintf("%v: the connection to the server couldn't be established", err)},
 			fmt.Errorf("%w: server not available", err)
 	}
 

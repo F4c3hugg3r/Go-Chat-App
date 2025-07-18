@@ -61,7 +61,7 @@ func (u *UserService) ResponsePoller() *t.Response {
 
 	rsp, ok := <-u.ChatClient.Output
 	if !ok {
-		return &t.Response{Err: fmt.Errorf("%w: channel is closed", t.ErrNoPermission)}
+		return &t.Response{Err: fmt.Sprintf("%v: channel is closed", t.ErrNoPermission)}
 	}
 
 	return rsp
@@ -93,7 +93,7 @@ func (u *UserService) Executor(input string) {
 
 	err, comment := u.PlugReg.FindAndExecute(msg)
 	if err != nil {
-		u.ChatClient.Output <- &t.Response{Err: fmt.Errorf("%v", err)}
+		u.ChatClient.Output <- &t.Response{Err: err.Error()}
 		return
 	}
 

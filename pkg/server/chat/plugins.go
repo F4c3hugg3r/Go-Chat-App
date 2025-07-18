@@ -32,7 +32,7 @@ func (pp *PrivateMessagePlugin) Execute(message *ty.Message) (*ty.Response, erro
 
 	client, ok := pp.chatService.clients[message.ClientId]
 	if !ok {
-		return &ty.Response{Err: fmt.Errorf("%w: client with id: %s not found", ty.ErrNotAvailable, message.ClientId)}, nil
+		return &ty.Response{Err: fmt.Sprintf("%v: client with id: %s not found", ty.ErrNotAvailable, message.ClientId)}, nil
 	}
 
 	rsp := &ty.Response{Name: fmt.Sprintf("[Private] - %s", message.Name), Content: message.Content}
@@ -109,11 +109,11 @@ func (rp *RegisterClientPlugin) Execute(message *ty.Message) (*ty.Response, erro
 	defer rp.chatService.mu.Unlock()
 
 	if len(rp.chatService.clients) >= rp.chatService.maxUsers {
-		return &ty.Response{Err: fmt.Errorf("%w: usercap %d reached, try again later. users:%d", ty.ErrNoPermission, rp.chatService.maxUsers, len(rp.chatService.clients))}, nil
+		return &ty.Response{Err: fmt.Sprintf("%v: usercap %d reached, try again later. users:%d", ty.ErrNoPermission, rp.chatService.maxUsers, len(rp.chatService.clients))}, nil
 	}
 
 	if _, exists := rp.chatService.clients[message.ClientId]; exists {
-		return &ty.Response{Err: fmt.Errorf("%w: client already registered", ty.ErrNoPermission)}, nil
+		return &ty.Response{Err: fmt.Sprintf("%v: client already registered", ty.ErrNoPermission)}, nil
 	}
 
 	clientCh := make(chan *ty.Response, 100)

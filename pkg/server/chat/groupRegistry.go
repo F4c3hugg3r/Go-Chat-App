@@ -45,12 +45,12 @@ func (gp *GroupPluginRegistry) Description() *Description {
 func (gp *GroupPluginRegistry) Execute(message *ty.Message) (*ty.Response, error) {
 	newMsg, err := extractIdentifierMessage(message)
 	if err != nil {
-		return &ty.Response{Err: fmt.Errorf("%w: no empty identifier allowed", err)}, nil
+		return &ty.Response{Err: fmt.Sprintf("%v: no empty identifier allowed", err)}, nil
 	}
 
 	plugin, ok := gp.gPlugins[newMsg.Plugin]
 	if !ok {
-		return &ty.Response{Err: fmt.Errorf("%w: no such group command identifier found: %s", ty.ErrNoPermission, newMsg.Plugin)}, nil
+		return &ty.Response{Err: fmt.Sprintf("%v: no such group command identifier found: %s", ty.ErrNoPermission, newMsg.Plugin)}, nil
 	}
 
 	return plugin.Execute(message)

@@ -61,7 +61,7 @@ func (glp *GroupListPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	defer glp.s.mu.Unlock()
 
 	if len(glp.s.groups) < 1 {
-		return &ty.Response{Err: fmt.Errorf("%v: there are no groups", ty.ErrNotAvailable)}, nil
+		return &ty.Response{Err: fmt.Sprintf("%v: there are no groups", ty.ErrNotAvailable)}, nil
 	}
 
 	groupSlice := []json.RawMessage{}
@@ -182,7 +182,7 @@ func (glp *GroupLeavePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 
 	err = group.RemoveClient(client)
 	if err != nil {
-		return &ty.Response{Err: err}, nil
+		return &ty.Response{Err: fmt.Sprintf("%v: error while removing client from group", err)}, nil
 	}
 
 	client.Execute(glp.pr, &ty.Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s hat die Gruppe verlassen", msg.Name), ClientId: msg.ClientId, GroupId: msg.GroupId})
@@ -211,11 +211,11 @@ func (gup *GroupUsersPlugin) Description() *Description {
 func (gup *GroupUsersPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	group, err := gup.s.GetGroup(msg.GroupId)
 	if err != nil {
-		return &ty.Response{Err: fmt.Errorf("%w: error finding group", err)}, nil
+		return &ty.Response{Err: fmt.Sprintf("%v: error finding group", err)}, nil
 	}
 
 	if group == nil {
-		return &ty.Response{Err: fmt.Errorf("%w: you are not in a group", ty.ErrNoPermission)}, nil
+		return &ty.Response{Err: fmt.Sprintf("%v: you are not in a group", ty.ErrNoPermission)}, nil
 	}
 
 	groupsSlice := group.SafeGetGroupSlice()
@@ -258,7 +258,7 @@ func (gjp *GroupJoinPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 
 	group, err := gjp.s.GetGroup(newGroupId)
 	if err != nil {
-		return &ty.Response{Err: fmt.Errorf("%w: error finding group with id %s", err, newGroupId)}, nil
+		return &ty.Response{Err: fmt.Sprintf("%v: error finding group with id %s", err, newGroupId)}, nil
 	}
 
 	if msg.GroupId != "" {
@@ -269,7 +269,7 @@ func (gjp *GroupJoinPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 
 	err = group.AddClient(client)
 	if err != nil {
-		return &ty.Response{Err: err}, nil
+		return &ty.Response{Err: fmt.Sprintf("%v: error while adding client to group", err)}, nil
 	}
 
 	client.SetGroup(newGroupId)

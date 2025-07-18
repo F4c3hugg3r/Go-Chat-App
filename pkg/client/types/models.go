@@ -29,7 +29,7 @@ type Message struct {
 type Response struct {
 	Name    string `json:"name"`
 	Content string `json:"content"`
-	Err     error  `json:"-"`
+	Err     string `json:"errorString"`
 }
 
 // Group contains

@@ -240,8 +240,8 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 
 	switch {
 	// error output
-	case rsp.Err != nil:
-		return red.Render(rsp.Err.Error())
+	case rsp.Err != "":
+		return red.Render(rsp.Err)
 
 	// empty output
 	case rsp.Content == "":
