@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	clientTy "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/types"
 	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server/types"
 )
 
@@ -69,6 +70,14 @@ func (s *ChatService) InactiveObjectDeleter(timeLimit time.Duration) {
 		if group.SetSize() < 1 {
 			delete(s.groups, groupId)
 		}
+	}
+}
+
+func (s *ChatService) LogOutAllUsers() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, client := range s.clients {
+		client.Send(&ty.Response{Content: clientTy.UnregisterFlag})
 	}
 }
 

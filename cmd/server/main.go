@@ -47,7 +47,7 @@ func main() {
 
 	wg.Add(1)
 
-	go interruptListener(interChan, server, wg, cancel)
+	go interruptListener(interChan, server, wg, cancel, handler)
 
 	ln, err := net.Listen("tcp", server.Addr)
 	if err != nil {
@@ -68,7 +68,7 @@ func main() {
 
 // interruptListener sends a cancel() signal and shuts down the server gracefully if a interruption like
 // os.Interrupt or syscall.SIGTERM is being triggered
-func interruptListener(interChan chan os.Signal, server *http.Server, wg *sync.WaitGroup, cancel context.CancelFunc) {
+func interruptListener(interChan chan os.Signal, server *http.Server, wg *sync.WaitGroup, cancel context.CancelFunc, handler *api.ServerHandler) {
 	defer wg.Done()
 
 	<-interChan
@@ -76,7 +76,7 @@ func interruptListener(interChan chan os.Signal, server *http.Server, wg *sync.W
 	ctx, cancelTimeout := context.WithTimeout(context.Background(), time.Minute)
 	defer cancelTimeout()
 
-	// TODO clients benachrichtigen
+	handler.Service.LogOutAllUsers()
 
 	err := server.Shutdown(ctx)
 	if err != nil {

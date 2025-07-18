@@ -16,6 +16,11 @@ const (
 	Get
 )
 
+const UnregisterFlag = "- Du bist nun vom Server getrennt -"
+const RegisterFlag = "- Du bist registriert -"
+const AddGroupFlag = "Add Group"
+const LeaveGroupFlag = "Leave Group"
+
 // Message contains the name of the requester and the message (content) itsself
 type Message struct {
 	Name     string `json:"name"`

@@ -43,7 +43,7 @@ func InitialModel(u *i.UserService) model {
 		keyMap:      helpKeys,
 		inH:         inputManager,
 		// registered kann weg
-		registered: UnregisterFlag,
+		registered: t.UnregisterFlag,
 		title:      UnregisterTitle,
 	}
 
@@ -182,14 +182,14 @@ func setUpTextInput(u *i.UserService) textinput.Model {
 func (m *model) renderTitle(title string, param []string) {
 	if param == nil || param[0] != WindowResizeFlag {
 		switch {
-		case strings.Contains(title, UnregisterFlag):
+		case strings.Contains(title, t.UnregisterFlag):
 			title = UnregisterTitle
 
-		case strings.Contains(title, RegisterFlag):
+		case strings.Contains(title, t.RegisterFlag):
 			title = titleStyle.Render(fmt.Sprintf(RegisterTitle,
 				turkis.Render(param[0])))
 
-		case strings.Contains(title, AddGroupFlag):
+		case strings.Contains(title, t.AddGroupFlag):
 			title = titleStyle.Render(fmt.Sprintf(GroupTitle, turkis.Render(param[0]), turkis.Render(param[1])))
 		}
 	}
@@ -258,9 +258,9 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 		return output
 
 	// register output
-	case strings.Contains(rsp.Content, RegisterFlag):
+	case strings.Contains(rsp.Content, t.RegisterFlag):
 		m.registered = rsp.Content
-		m.renderTitle(RegisterFlag, []string{m.userService.ChatClient.GetName()})
+		m.renderTitle(t.RegisterFlag, []string{m.userService.ChatClient.GetName()})
 
 		return blue.Render("-> Du kannst nun Nachrichten schreiben oder Commands ausführen\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen")
 
@@ -269,28 +269,28 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 		rspString = fmt.Sprintf("%s", blue.Render(rsp.Content))
 
 		// unregister output
-		if strings.Contains(rsp.Content, UnregisterFlag) {
-			m.registered = UnregisterFlag
-			m.renderTitle(UnregisterFlag, nil)
+		if strings.Contains(rsp.Content, t.UnregisterFlag) {
+			m.registered = t.UnregisterFlag
+			m.renderTitle(t.UnregisterFlag, nil)
 		}
 
 		return rspString
 
 	// addGroup output
-	case strings.Contains(rsp.Name, AddGroupFlag):
+	case strings.Contains(rsp.Name, t.AddGroupFlag):
 		group, err := m.userService.HandleAddGroup(rsp.Content)
 		if err != nil {
 			return red.Render(fmt.Sprintf("%v: error formatting json to group", err))
 		}
 
-		m.renderTitle(AddGroupFlag, []string{m.userService.ChatClient.GetName(), group.Name})
+		m.renderTitle(t.AddGroupFlag, []string{m.userService.ChatClient.GetName(), group.Name})
 
 		return blue.Render(fmt.Sprintf("-> Du bist nun Teil der Gruppe %s und kannst Nachrichten in ihr schreiben\nPrivate Nachrichten kannst du weiterhin außerhalb verschicken", group.Name))
 
 	// leaveGroup output
-	case strings.Contains(rsp.Name, LeaveGroupFlag):
+	case strings.Contains(rsp.Name, t.LeaveGroupFlag):
 		m.userService.ChatClient.UnsetGroupId()
-		m.renderTitle(RegisterFlag, []string{m.userService.ChatClient.GetName()})
+		m.renderTitle(t.RegisterFlag, []string{m.userService.ChatClient.GetName()})
 
 		return blue.Render("Du hast die Gruppe verlassen!\n-> Du kannst nun Nachrichten schreiben oder Commands ausführen\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen")
 	}

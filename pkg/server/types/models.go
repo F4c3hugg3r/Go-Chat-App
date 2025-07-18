@@ -25,6 +25,5 @@ type Message struct {
 type Response struct {
 	Name    string `json:"name"`
 	Content string `json:"content"`
-	// TODO wird nicht richtig gemarshalt deshalb muss als string hier oder im body als string übergeben werden
-	Err string `json:"errorString"`
+	Err     string `json:"errorString"`
 }

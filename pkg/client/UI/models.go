@@ -11,12 +11,8 @@ import (
 )
 
 const Gap = "\n\n"
-const RegisterFlag = "- Du bist registriert -"
 const RegisterTitle = "Du bist registriert %s!"
-const UnregisterFlag = "- Du bist nun vom Server getrennt -"
 const UnregisterTitle = "Willkommen im Chatraum! \nSchreibe '/register {name}' oder '/help'"
-const AddGroupFlag = "Add Group"
-const LeaveGroupFlag = "Leave Group"
 const GroupTitle = "%s, du bist in der Gruppe %s!"
 const WindowResizeFlag = "windowResize"
 

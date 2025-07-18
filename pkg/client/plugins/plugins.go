@@ -8,7 +8,6 @@ import (
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/types"
 )
 
-// TODO rsp vom Server auswerten oder zumindest den error Teil davon
 // GroupPlugin lets you participate in a group chat
 type GroupPlugin struct {
 	c *n.ChatClient
@@ -45,6 +44,9 @@ func (pp *PrivateMessagePlugin) CheckScope() int {
 }
 
 func (pp *PrivateMessagePlugin) Execute(message *t.Message) (error, string) {
+	if message.Content == "" {
+		return fmt.Errorf("%w: prefix shouldn't be empty", t.ErrParsing), ""
+	}
 	opposingClientId := strings.Fields(message.Content)[0]
 
 	content, ok := strings.CutPrefix(message.Content, fmt.Sprintf("%s ", opposingClientId))
@@ -71,7 +73,7 @@ func (lp *LogOutPlugin) CheckScope() int {
 }
 
 func (lp *LogOutPlugin) Execute(message *t.Message) (error, string) {
-	return lp.c.PostDelete(message), "- Du bist nun vom Server getrennt -"
+	return lp.c.PostDelete(message), t.UnregisterFlag
 }
 
 // RegisterClientPlugin safely registeres a client by creating a Client with the received values
