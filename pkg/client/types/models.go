@@ -14,6 +14,7 @@ const (
 	PostRegister
 	Delete
 	Get
+	SignalWebRTC
 )
 
 const UnregisterFlag = "- Du bist nun vom Server getrennt -"

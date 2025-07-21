@@ -54,6 +54,7 @@ func (c *ChatClient) RegisterEndpoints(url string) map[int]string {
 	endpoints[t.PostPlugin] = fmt.Sprintf("%s/users/%s/run", url, c.clientId)
 	endpoints[t.Delete] = fmt.Sprintf("%s/users/%s", url, c.clientId)
 	endpoints[t.Get] = fmt.Sprintf("%s/users/%s/chat", url, c.clientId)
+	endpoints[t.SignalWebRTC] = fmt.Sprintf("%s/users/%s/signal", url, c.clientId)
 
 	return endpoints
 }

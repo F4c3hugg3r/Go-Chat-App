@@ -10,6 +10,8 @@ import (
 	"github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
+// TODO Plugins fürs Signalling erstellen
+
 // PrivateMessage Plugin lets a client send a private message to another client identified by it's clientId
 type PrivateMessagePlugin struct {
 	chatService *ChatService

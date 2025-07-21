@@ -16,7 +16,12 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// TODO allgemein: refactoring
+// TODO beim Input Parsen die receive ICECandidate und SignalOffer & SignalAnswer hinzufügen
+
+// TODO Peer bei incoming offer oder bei eigenem Starten eines Sprachanrufes erstellen
+// und JoinSession starten
+
+// TODO Model für Anrufe einbinden
 
 // InitialModel initializes the model struct, which is the main struct for the TUI
 func InitialModel(u *i.UserService) model {
@@ -42,9 +47,7 @@ func InitialModel(u *i.UserService) model {
 		help:        h,
 		keyMap:      helpKeys,
 		inH:         inputManager,
-		// registered kann weg
-		registered: t.UnregisterFlag,
-		title:      UnregisterTitle,
+		title:       UnregisterTitle,
 	}
 
 	return model
@@ -259,7 +262,6 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 
 	// register output
 	case strings.Contains(rsp.Content, t.RegisterFlag):
-		m.registered = rsp.Content
 		m.renderTitle(t.RegisterFlag, []string{m.userService.ChatClient.GetName()})
 
 		return blue.Render("-> Du kannst nun Nachrichten schreiben oder Commands ausführen\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen")
@@ -270,7 +272,6 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 
 		// unregister output
 		if strings.Contains(rsp.Content, t.UnregisterFlag) {
-			m.registered = t.UnregisterFlag
 			m.renderTitle(t.UnregisterFlag, nil)
 		}
 

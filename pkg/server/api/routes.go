@@ -10,6 +10,7 @@ func (h *ServerHandler) BuildMultiplexer() http.Handler {
 	multiplexer.Handle("POST /users/{clientId}/run", h.AuthMiddleware(h.HandleMessages))
 	multiplexer.Handle("GET /users/{clientId}/chat", h.AuthMiddleware(h.HandleGetRequest))
 	multiplexer.Handle("DELETE /users/{clientId}", h.AuthMiddleware(h.HandleMessages))
+	multiplexer.Handle("POST /users/{clientId}/signal", h.AuthMiddleware(h.HandleMessages))
 
 	return multiplexer
 }
