@@ -16,9 +16,10 @@ const UnregisterFlag = "- Du bist nun vom Server getrennt -"
 const RegisterFlag = "- Du bist registriert -"
 const AddGroupFlag = "Add Group"
 const LeaveGroupFlag = "Leave Group"
-const ReceiveICECandidate = "ICE Candidate Answer"
+const ICECandidate = "ICE Candidate"
 const OfferSignal = "Offer Signal"
 const AnswerSignal = "Answer Signal"
+const StartCallFlag = "Call Started"
 
 var (
 	ErrNotAvailable   error = errors.New("item is not available")
@@ -32,11 +33,11 @@ var (
 // Message contains the name and id of the requester and the message (content) itsself
 // as well as the uses plugin and groupId if a user is in a group
 type Message struct {
-	ClientName string `json:"name"`
-	Content    string `json:"content"`
-	Plugin     string `json:"plugin"`
-	ClientId   string `json:"clientId"`
-	GroupId    string `json:"groupId"`
+	Name     string `json:"name"`
+	Content  string `json:"content"`
+	Plugin   string `json:"plugin"`
+	ClientId string `json:"clientId"`
+	GroupId  string `json:"groupId"`
 }
 
 // Response contains the name and id of the sender, the response (content) itsself

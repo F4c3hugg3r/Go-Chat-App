@@ -70,6 +70,19 @@ func (c *Client) Send(rsp *ty.Response) error {
 	}
 }
 
+// IsIdle checks if the client is inactive
+func (c *Client) Idle(timeLimit time.Duration) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if !c.Active && time.Since(c.lastSign) >= timeLimit {
+		c.closeChannelRequireLock()
+		return true
+	}
+
+	return false
+}
+
 func (c *Client) setActive(active bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -89,19 +102,6 @@ func (c *Client) Close() {
 	defer c.mu.Unlock()
 
 	c.closeChannelRequireLock()
-}
-
-// IsIdle checks if the client is inactive
-func (c *Client) Idle(timeLimit time.Duration) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if !c.Active && time.Since(c.lastSign) >= timeLimit {
-		c.closeChannelRequireLock()
-		return true
-	}
-
-	return false
 }
 
 func (c *Client) closeChannelRequireLock() {

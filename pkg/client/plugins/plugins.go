@@ -8,6 +8,24 @@ import (
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
+// CallPlugin lets you participate in a voice call
+type CallPlugin struct {
+	c *n.ChatClient
+}
+
+func NewCallPlugin(chatClient *n.ChatClient) *CallPlugin {
+	return &CallPlugin{c: chatClient}
+}
+
+func (cp *CallPlugin) CheckScope() int {
+	return InGroupOnly
+}
+
+func (cp *CallPlugin) Execute(message *t.Message) (error, string) {
+	_, err := cp.c.PostMessage(message, t.PostPlugin)
+	return err, ""
+}
+
 // GroupPlugin lets you participate in a group chat
 type GroupPlugin struct {
 	c *n.ChatClient
@@ -17,12 +35,12 @@ func NewGroupPlugin(chatClient *n.ChatClient) *GroupPlugin {
 	return &GroupPlugin{c: chatClient}
 }
 
-func (lp *GroupPlugin) CheckScope() int {
+func (gp *GroupPlugin) CheckScope() int {
 	return RegisteredOnly
 }
 
-func (lp *GroupPlugin) Execute(message *t.Message) (error, string) {
-	_, err := lp.c.PostMessage(message, t.PostPlugin)
+func (gp *GroupPlugin) Execute(message *t.Message) (error, string) {
+	_, err := gp.c.PostMessage(message, t.PostPlugin)
 	return err, ""
 }
 
@@ -50,7 +68,7 @@ func (pp *PrivateMessagePlugin) Execute(message *t.Message) (error, string) {
 		return fmt.Errorf("%w: prefix '%s ' not found", t.ErrParsing, opposingClientId), ""
 	}
 
-	_, err := pp.c.PostMessage(pp.c.CreateMessage(message.ClientName, message.Plugin, content, opposingClientId), t.PostPlugin)
+	_, err := pp.c.PostMessage(pp.c.CreateMessage(message.Name, message.Plugin, content, opposingClientId), t.PostPlugin)
 
 	return err, ""
 }

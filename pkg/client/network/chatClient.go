@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"sync"
 
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
@@ -16,14 +15,19 @@ type ChatClient struct {
 	clientName string
 	clientId   string
 	authToken  string
-	HttpClient *http.Client
-	Registered bool
-	mu         *sync.RWMutex
-	cond       *sync.Cond
-	Output     chan *t.Response
-	Url        string
-	Endpoints  map[int]string
 	groupId    string
+	Registered bool
+	Output     chan *t.Response
+
+	mu   *sync.RWMutex
+	cond *sync.Cond
+
+	Url        string
+	HttpClient *http.Client
+	Endpoints  map[int]string
+
+	// TODO functionallity to cleer inactive peers
+	peers map[string]*Peer
 }
 
 // NewClient generates a ChatClient and spawns a ResponseReceiver goroutine
@@ -156,7 +160,7 @@ func (c *ChatClient) PostMessage(msg *t.Message, endpoint int) (*t.Response, err
 		return nil, nil
 	}
 
-	rsp, err := DecodeToResponse(resBody)
+	rsp, err := t.DecodeToResponse(resBody)
 	if err != nil {
 		return nil, fmt.Errorf("%w: error decoding body to Response", err)
 	}
@@ -206,7 +210,7 @@ func (c *ChatClient) GetResponse(url string) (*t.Response, error) {
 		return nil, fmt.Errorf("%s: message body couldn't be read", res.Status)
 	}
 
-	rsp, err := DecodeToResponse(body)
+	rsp, err := t.DecodeToResponse(body)
 	if err != nil {
 		return nil, fmt.Errorf("%s: error decoding body to Response", res.Status)
 	}
@@ -220,9 +224,9 @@ func (c *ChatClient) CreateMessage(clientName string, plugin string, content str
 	msg := &t.Message{}
 
 	if clientName == "" && c.Registered {
-		msg.ClientName = c.GetName()
+		msg.Name = c.GetName()
 	} else {
-		msg.ClientName = clientName
+		msg.Name = clientName
 	}
 
 	if clientId == "" {
@@ -236,6 +240,27 @@ func (c *ChatClient) CreateMessage(clientName string, plugin string, content str
 	msg.GroupId = c.GetGroupId()
 
 	return msg
+}
+
+func (c *ChatClient) HandleSignal(rsp *t.Response) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	peer, exists := c.peers[rsp.ClientId]
+	if exists {
+		peer.SignalChan <- rsp
+		return nil
+	}
+
+	peer = NewPeer(rsp.ClientId)
+	c.peers[rsp.ClientId] = peer
+	err := peer.JoinSession(c)
+	if err != nil {
+		return err
+	}
+	peer.SignalChan <- rsp
+
+	return nil
 }
 
 func (c *ChatClient) GetClientId() string {
@@ -272,30 +297,4 @@ func (c *ChatClient) GetName() string {
 	defer c.mu.RUnlock()
 
 	return c.clientName
-}
-
-// DecodeToResponse decodes a responseBody to a Response struct
-func DecodeToResponse(body []byte) (*t.Response, error) {
-	response := &t.Response{}
-	dec := json.NewDecoder(strings.NewReader(string(body)))
-
-	err := dec.Decode(&response)
-	if err != nil {
-		return response, err
-	}
-
-	return response, nil
-}
-
-// DecodeToGroup decodes a responseBody to a Group struct
-func DecodeToGroup(body []byte) (*t.JsonGroup, error) {
-	group := &t.JsonGroup{}
-	dec := json.NewDecoder(strings.NewReader(string(body)))
-
-	err := dec.Decode(&group)
-	if err != nil {
-		return group, err
-	}
-
-	return group, nil
 }

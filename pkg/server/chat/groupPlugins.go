@@ -169,14 +169,13 @@ func (glp *GroupLeavePlugin) Description() *Description {
 }
 
 func (glp *GroupLeavePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
-	client, err := glp.s.GetClient(msg.ClientId)
+	group, client, err := GetCurrentGroup(msg.Name, glp.s)
 	if err != nil {
-		return nil, fmt.Errorf("%w: client (probably) already deleted", err)
+		return &ty.Response{Err: fmt.Sprintf("%v: error getting current group", err)}, nil
 	}
 
-	group, err := glp.s.GetGroup(msg.GroupId)
-	if err != nil {
-		return nil, fmt.Errorf("%w: group (probably) already deleted", err)
+	if group == nil {
+		return &ty.Response{Err: fmt.Sprintf("%v: you are not in a group", ty.ErrNotAvailable)}, nil
 	}
 
 	err = group.RemoveClient(client)
@@ -184,7 +183,7 @@ func (glp *GroupLeavePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return &ty.Response{Err: fmt.Sprintf("%v: error while removing client from group", err)}, nil
 	}
 
-	client.Execute(glp.pr, &ty.Message{ClientName: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s hat die Gruppe verlassen", msg.ClientName), ClientId: msg.ClientId, GroupId: msg.GroupId})
+	client.Execute(glp.pr, &ty.Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s hat die Gruppe verlassen", msg.Name), ClientId: msg.ClientId, GroupId: msg.GroupId})
 
 	client.UnsetGroup()
 
@@ -261,7 +260,7 @@ func (gjp *GroupJoinPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	}
 
 	if msg.GroupId != "" {
-		client.Execute(gjp.pr, &ty.Message{ClientName: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s hat die Gruppe verlassen", msg.ClientName), ClientId: msg.ClientId, GroupId: msg.GroupId})
+		client.Execute(gjp.pr, &ty.Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s hat die Gruppe verlassen", msg.Name), ClientId: msg.ClientId, GroupId: msg.GroupId})
 		client.UnsetGroup()
 		group.RemoveClient(client)
 	}
@@ -273,7 +272,7 @@ func (gjp *GroupJoinPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 
 	client.SetGroup(newGroupId)
 
-	client.Execute(gjp.pr, &ty.Message{ClientName: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s ist der Gruppe beigetreten", msg.ClientName), ClientId: msg.ClientId, GroupId: newGroupId})
+	client.Execute(gjp.pr, &ty.Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s ist der Gruppe beigetreten", msg.Name), ClientId: msg.ClientId, GroupId: newGroupId})
 
 	jsonGroup, err := json.Marshal(group)
 	if err != nil {

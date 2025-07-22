@@ -1,7 +1,6 @@
 package input
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -36,7 +35,7 @@ func NewUserService(c *n.ChatClient) *UserService {
 }
 
 func (u *UserService) HandleAddGroup(groupJson string) (*t.JsonGroup, error) {
-	group, err := decodeStringToGroup(groupJson)
+	group, err := t.DecodeStringToJsonGroup(groupJson)
 	if err != nil {
 		return nil, err
 	}
@@ -98,11 +97,4 @@ func (u *UserService) Executor(input string) {
 	}
 
 	u.ChatClient.Output <- &t.Response{Content: comment}
-}
-
-func decodeStringToGroup(jsonGroup string) (*t.JsonGroup, error) {
-	var group *t.JsonGroup
-	dec := json.NewDecoder(strings.NewReader(jsonGroup))
-	err := dec.Decode(&group)
-	return group, err
 }

@@ -12,7 +12,7 @@ import (
 func TestHelpPlugin(t *testing.T) {
 	service := NewChatService(100)
 	registry := RegisterPlugins(service)
-	message := &ty.Message{ClientName: "Arndt", Content: "wubbalubbadubdub", Plugin: "/help", ClientId: DummyClient.ClientId}
+	message := &ty.Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/help", ClientId: DummyClient.ClientId}
 
 	rsp, err := registry.FindAndExecute(message)
 	assert.Nil(t, err)
@@ -22,7 +22,7 @@ func TestHelpPlugin(t *testing.T) {
 func TestUserPlugin(t *testing.T) {
 	service := NewChatService(100)
 	registry := RegisterPlugins(service)
-	message := &ty.Message{ClientName: "Arndt", Content: "wubbalubbadubdub", Plugin: "/users", ClientId: DummyClient.ClientId}
+	message := &ty.Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/users", ClientId: DummyClient.ClientId}
 
 	rsp, err := registry.FindAndExecute(message)
 	assert.Equal(t, rsp, &ty.Response{RspName: "Users", Content: "[]"})
@@ -56,7 +56,7 @@ func TestUserPlugin(t *testing.T) {
 func TestRegisterPlugin(t *testing.T) {
 	service := NewChatService(100)
 	registry := RegisterPlugins(service)
-	message := &ty.Message{ClientName: "Arndt", Content: "wubbalubbadubdub", Plugin: "/register", ClientId: DummyClient.ClientId}
+	message := &ty.Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/register", ClientId: DummyClient.ClientId}
 
 	service.clients[ClientId] = &Client{
 		Name:      ClientName,
@@ -79,7 +79,7 @@ func TestRegisterPlugin(t *testing.T) {
 }
 
 func TestQuitPlugin(t *testing.T) {
-	message := &ty.Message{ClientName: "Arndt", Content: "wubbalubbadubdub", Plugin: "/quit", ClientId: DummyClient.ClientId}
+	message := &ty.Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/quit", ClientId: DummyClient.ClientId}
 	service := NewChatService(100)
 	registry := RegisterPlugins(service)
 
@@ -98,13 +98,13 @@ func TestQuitPlugin(t *testing.T) {
 	rsp, err := registry.FindAndExecute(message)
 	assert.Equal(t, 0, len(service.clients))
 	assert.Nil(t, err)
-	assert.Equal(t, rsp, &ty.Response{RspName: message.ClientName, Content: "logged out"})
+	assert.Equal(t, rsp, &ty.Response{RspName: message.Name, Content: "logged out"})
 }
 
 func TestBroadcastPlugin(t *testing.T) {
 	service := NewChatService(100)
 	registry := RegisterPlugins(service)
-	message := &ty.Message{ClientName: "Arndt", Content: "wubbalubbadubdub", Plugin: "/broadcast"}
+	message := &ty.Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/broadcast"}
 
 	_, err := registry.FindAndExecute(message)
 	assert.ErrorIs(t, err, ty.ErrNotAvailable)
@@ -138,6 +138,6 @@ func TestBroadcastPlugin(t *testing.T) {
 		}()
 	}
 
-	_, err = registry.FindAndExecute(&ty.Message{ClientName: "Arndt", Content: "", Plugin: "/broadcast"})
+	_, err = registry.FindAndExecute(&ty.Message{Name: "Arndt", Content: "", Plugin: "/broadcast"})
 	assert.ErrorIs(t, err, ty.ErrEmptyString)
 }

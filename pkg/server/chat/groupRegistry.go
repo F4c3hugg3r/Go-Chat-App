@@ -56,21 +56,6 @@ func (gp *GroupPluginRegistry) Execute(message *ty.Message) (*ty.Response, error
 	return plugin.Execute(message)
 }
 
-func (g *Group) GetClients() map[string]*Client {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-
-	return g.clients
-}
-
-func (g *Group) SetSize() int {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	g.Size = len(g.clients)
-	return g.Size
-}
-
 func (g *Group) AddClient(client *Client) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -93,6 +78,21 @@ func (g *Group) RemoveClient(client *Client) error {
 	}
 
 	return fmt.Errorf("%w: you are not in this group", ty.ErrNoPermission)
+}
+
+func (g *Group) GetClients() map[string]*Client {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	return g.clients
+}
+
+func (g *Group) SetSize() int {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	g.Size = len(g.clients)
+	return g.Size
 }
 
 func (g *Group) SafeGetGroupSlice() []json.RawMessage {

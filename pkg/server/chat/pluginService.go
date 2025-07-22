@@ -27,18 +27,23 @@ func ListPlugins(plugins map[string]PluginInterface) []json.RawMessage {
 	return jsonSlice
 }
 
-func GetCurrentGroup(client *Client, s *ChatService) (*Group, error) {
+func GetCurrentGroup(clientId string, s *ChatService) (*Group, *Client, error) {
+	client, err := s.GetClient(clientId)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w: client (probably) already deleted", err)
+	}
+
 	groupId := client.GetGroupId()
 	if groupId == "" {
-		return nil, nil
+		return nil, client, nil
 	}
 
 	group, err := s.GetGroup(groupId)
 	if err != nil {
-		return nil, fmt.Errorf("%w: group not found", err)
+		return nil, client, fmt.Errorf("%w: group not found", err)
 	}
 
-	return group, nil
+	return group, client, nil
 }
 
 func GenericMapToJSONSlice[T any](items map[string]T) []json.RawMessage {

@@ -10,6 +10,7 @@ import (
 const (
 	UnregisteredOnly = iota
 	RegisteredOnly
+	InGroupOnly
 	Always
 )
 
@@ -36,6 +37,7 @@ func RegisterPlugins(chatClient *n.ChatClient) *PluginRegistry {
 	pr.Plugins["/quit"] = NewLogOutPlugin(chatClient)
 	pr.Plugins["/private"] = NewPrivateMessagePlugin(chatClient)
 	pr.Plugins["/group"] = NewGroupPlugin(chatClient)
+	pr.Plugins["/call"] = NewCallPlugin(chatClient)
 
 	pr.chatClient = chatClient
 
@@ -59,6 +61,10 @@ func (pr *PluginRegistry) FindAndExecute(message *t.Message) (error, string) {
 	case RegisteredOnly:
 		if !pr.chatClient.Registered {
 			return fmt.Errorf("%w: you are not registered yet", t.ErrNoPermission), ""
+		}
+	case InGroupOnly:
+		if pr.chatClient.GetGroupId() == "" {
+			return fmt.Errorf("%w: you are not in a group yet", t.ErrNoPermission), ""
 		}
 	}
 

@@ -1,10 +1,9 @@
-package webrtc
+package network
 
 import (
 	"fmt"
 	"log"
 
-	n "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/network"
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 	"golang.org/x/net/context"
 
@@ -20,15 +19,15 @@ type Peer struct {
 	Cancel     context.CancelFunc
 }
 
-func NewPeer() *Peer {
-	peer := &Peer{SignalChan: make(chan *t.Response)}
-	ctx, cancel := context.WithCancel(context.Background())
-	peer.Ctx, peer.Cancel = ctx, cancel
+func NewPeer(clientId string) *Peer {
+	peer := &Peer{SignalChan: make(chan *t.Response, 100)}
+	// TODO cancel kontext wenn peer verbindung geschlossen wird
+	peer.Ctx, peer.Cancel = context.WithCancel(context.Background())
 
 	return peer
 }
 
-func (p *Peer) JoinSession(chatClient *n.ChatClient) error {
+func (p *Peer) JoinSession(chatClient *ChatClient) error {
 
 	api, codecSelector, err := InitWebRTCAPI()
 	if err != nil {
@@ -77,18 +76,17 @@ func (p *Peer) JoinSession(chatClient *n.ChatClient) error {
 		return err
 	}
 
-	msg := chatClient.CreateMessage("", "/signal offer", offer.SDP, "")
+	msg := chatClient.CreateMessage("", t.OfferSignal, offer.SDP, "")
 	_, err = chatClient.PostMessage(msg, t.SignalWebRTC)
 	if err != nil {
 		log.Printf("%v: error posting signal offer", err)
 	}
 
-	// TODO bei eingehender Response in UI an signalChannel weiterleiten
 	peerConnection.OnICECandidate(func(candidate *webrtc.ICECandidate) {
 		if candidate == nil {
 			return
 		}
-		candidateMsg := chatClient.CreateMessage("", "/signal candidate", candidate.ToJSON().Candidate, "")
+		candidateMsg := chatClient.CreateMessage("", t.ICECandidate, candidate.ToJSON().Candidate, "")
 		_, err := chatClient.PostMessage(candidateMsg, t.SignalWebRTC)
 		if err != nil {
 			log.Printf("%v: error posting ICE candidate", err)
@@ -106,7 +104,7 @@ func (p *Peer) JoinSession(chatClient *n.ChatClient) error {
 	return nil
 }
 
-func pollSignals(peerConnection *webrtc.PeerConnection, signalChan chan *t.Response, chatClient *n.ChatClient, ctx context.Context) {
+func pollSignals(peerConnection *webrtc.PeerConnection, signalChan chan *t.Response, chatClient *ChatClient, ctx context.Context) {
 	for {
 		select {
 		case rsp := <-signalChan:
@@ -125,7 +123,7 @@ func pollSignals(peerConnection *webrtc.PeerConnection, signalChan chan *t.Respo
 	}
 }
 
-func HandleIncomingOffer(peerConnection *webrtc.PeerConnection, chatClient *n.ChatClient, SDPOffer string) {
+func HandleIncomingOffer(peerConnection *webrtc.PeerConnection, chatClient *ChatClient, SDPOffer string) {
 	err := peerConnection.SetRemoteDescription(webrtc.SessionDescription{
 		Type: webrtc.SDPTypeOffer,
 		SDP:  SDPOffer,
@@ -148,7 +146,7 @@ func HandleIncomingOffer(peerConnection *webrtc.PeerConnection, chatClient *n.Ch
 	}
 
 	// Sende die Answer zurück
-	msg := chatClient.CreateMessage("", "/signal answer", answer.SDP, "")
+	msg := chatClient.CreateMessage("", t.AnswerSignal, answer.SDP, "")
 	_, err = chatClient.PostMessage(msg, t.SignalWebRTC)
 	if err != nil {
 		log.Printf("%v: error posting signal answer", err)

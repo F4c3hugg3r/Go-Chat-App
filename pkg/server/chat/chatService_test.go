@@ -12,17 +12,17 @@ import (
 
 func TestDecodeToMessage(t *testing.T) {
 	fakeBody := []byte("fake")
-	_, err := DecodeToMessage(fakeBody)
+	_, err := ty.DecodeToMessage(fakeBody)
 	assert.Error(t, err)
 
-	message := ty.Message{ClientName: "Arndt", Content: "wubbalubbadubdub", Plugin: "/broadcast"}
+	message := ty.Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/broadcast"}
 
 	jsonMessage, err := json.Marshal(&message)
 	if err != nil {
 		t.Errorf("%v: Message couldn't be parsed to json", err)
 	}
 
-	resultMessage, err := DecodeToMessage(jsonMessage)
+	resultMessage, err := ty.DecodeToMessage(jsonMessage)
 	assert.Nil(t, err)
 	assert.Equal(t, resultMessage, message)
 }

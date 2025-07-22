@@ -55,31 +55,31 @@ var (
 			//valid
 			Method:   "POST",
 			ClientId: ClientId,
-			Message:  ty.Message{ClientName: "Arndt", Content: "wubbalubbadubdub", Plugin: "/broadcast", ClientId: ClientId},
+			Message:  ty.Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/broadcast", ClientId: ClientId},
 			Token:    AuthToken,
 		},
 		{
 			Method: "POST",
 			//empty
 			ClientId: "",
-			Message:  ty.Message{ClientName: "Arndt", Content: "wubbalubbadubdub", Plugin: "/broadcast", ClientId: ClientId},
+			Message:  ty.Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/broadcast", ClientId: ClientId},
 		},
 		{
 			Method:   "POST",
 			ClientId: ClientId,
 			//empty content
-			Message: ty.Message{ClientName: "Arndt", Content: "", Plugin: "/broadcast", ClientId: ClientId},
+			Message: ty.Message{Name: "Arndt", Content: "", Plugin: "/broadcast", ClientId: ClientId},
 		},
 		{
 			Method:   "POST",
 			ClientId: ClientId2,
 			//too large
-			Message: ty.Message{ClientName: "Arndt", Content: strings.Repeat("s", (int(1<<20) + 1)), Plugin: "/broadcast", ClientId: ClientId},
+			Message: ty.Message{Name: "Arndt", Content: strings.Repeat("s", (int(1<<20) + 1)), Plugin: "/broadcast", ClientId: ClientId},
 		},
 		{
 			Method:   "POST",
 			ClientId: ClientId,
-			Message:  ty.Message{ClientName: "Arndt", Content: "wubbalubbadubdub", Plugin: "/broadcast", ClientId: ClientId},
+			Message:  ty.Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/broadcast", ClientId: ClientId},
 			//empty
 			Token: "",
 		},
@@ -87,14 +87,14 @@ var (
 			//register plugin
 			Method:   "POST",
 			ClientId: ClientId2,
-			Message:  ty.Message{ClientName: "Arndt", Content: "wubbalubbadubdub", Plugin: "/register", ClientId: ClientId2},
+			Message:  ty.Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/register", ClientId: ClientId2},
 			Token:    AuthToken,
 		},
 		{
 			Method:   "POST",
 			ClientId: ClientId,
 			//invalid plugin
-			Message: ty.Message{ClientName: "Arndt", Content: "wubbalubbadubdub", Plugin: "/skdalskjd", ClientId: ClientId},
+			Message: ty.Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/skdalskjd", ClientId: ClientId},
 			Token:   AuthToken2,
 		},
 	}

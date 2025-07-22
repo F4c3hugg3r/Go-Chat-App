@@ -2,7 +2,6 @@ package UI
 
 import (
 	i "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/input"
-	wrtc "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/webRTC"
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -88,17 +87,18 @@ type keyMap struct {
 // the displaying and handling of the TUI
 type model struct {
 	viewport        viewport.Model
-	textinput       textinput.Model
-	help            help.Model
 	messages        []string
-	outputChan      chan *t.Response
-	userService     *i.UserService
-	err             error
-	keyMap          keyMap
-	showSuggestions bool
 	title           string
-	inH             *InputHistory
-	peers           map[string]*wrtc.Peer
+	textinput       textinput.Model
+	showSuggestions bool
+	help            help.Model
+	keyMap          keyMap
+	err             error
+
+	userService *i.UserService
+	outputChan  chan *t.Response
+
+	inH *InputHistory
 }
 
 // InputHistory manageges the inputHistory

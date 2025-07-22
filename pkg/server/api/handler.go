@@ -91,7 +91,7 @@ func (handler *ServerHandler) HandleRegistry(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	message, err := chat.DecodeToMessage(body)
+	message, err := ty.DecodeToMessage(body)
 	if err != nil {
 		http.Error(w, "error decoding request body", http.StatusInternalServerError)
 		return
@@ -134,7 +134,7 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	message, err := chat.DecodeToMessage(body)
+	message, err := ty.DecodeToMessage(body)
 	if err != nil {
 		http.Error(w, "error decoding request body", http.StatusInternalServerError)
 		return

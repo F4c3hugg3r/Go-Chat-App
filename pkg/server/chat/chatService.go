@@ -1,10 +1,8 @@
 package chat
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
-	"strings"
 	"sync"
 	"time"
 
@@ -116,17 +114,4 @@ func (s *ChatService) GetGroup(groupId string) (*Group, error) {
 	}
 
 	return group, nil
-}
-
-// DecodeToMessage decodes a responseBody to a Message struct
-func DecodeToMessage(body []byte) (ty.Message, error) {
-	message := ty.Message{}
-	dec := json.NewDecoder(strings.NewReader(string(body)))
-	err := dec.Decode(&message)
-
-	if err != nil {
-		return message, err
-	}
-
-	return message, nil
 }
