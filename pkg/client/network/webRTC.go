@@ -5,11 +5,12 @@ import (
 	"log"
 
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
-	"golang.org/x/net/context"
-
+	"github.com/ebitengine/oto/v3"
 	"github.com/pion/mediadevices"
 	"github.com/pion/mediadevices/pkg/codec/opus"
 	"github.com/pion/webrtc/v4"
+	"golang.org/x/net/context"
+	opusDec "gopkg.in/hraban/opus.v2"
 )
 
 type Peer struct {
@@ -98,7 +99,34 @@ func (p *Peer) JoinSession(chatClient *ChatClient) error {
 	// Handler für eingehende Tracks
 	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
 		fmt.Printf("Received track: ID=%s, kind=%s\n", track.ID(), track.Kind())
-		// TODO: Audio abspielen
+		if track.Kind() != webrtc.RTPCodecTypeAudio {
+			return
+		}
+
+		otoCtx, ready, err := oto.NewContext(&oto.NewContextOptions{
+			SampleRate:   48000,
+			ChannelCount: 1,
+			Format:       oto.FormatSignedInt16LE,
+			BufferSize:   0,
+		})
+		if err != nil {
+			log.Println("oto.NewContext error:", err)
+			return
+		}
+		<-ready
+
+		decoder, err := opusDec.NewDecoder(48000, 1)
+		if err != nil {
+			log.Println("opus.NewDecoder error:", err)
+			return
+		}
+		// (TODO) jitter buffer für stabilere Audioqualität
+		// TODO player und context schließen, wenn verbindung beendet wird
+
+		// RTP Pakete von Opus in PCM decodieren
+		reader := t.NewOpusRTPReader(track, decoder)
+		player := otoCtx.NewPlayer(reader)
+		go player.Play()
 	})
 
 	return nil
