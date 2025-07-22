@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server/types"
+	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
 func TestDecodeToMessage(t *testing.T) {
@@ -15,7 +15,7 @@ func TestDecodeToMessage(t *testing.T) {
 	_, err := DecodeToMessage(fakeBody)
 	assert.Error(t, err)
 
-	message := ty.Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/broadcast"}
+	message := ty.Message{ClientName: "Arndt", Content: "wubbalubbadubdub", Plugin: "/broadcast"}
 
 	jsonMessage, err := json.Marshal(&message)
 	if err != nil {
@@ -34,7 +34,7 @@ func TestEcho(t *testing.T) {
 	assert.ErrorIs(t, err, ty.ErrNotAvailable)
 
 	service.clients[ClientId] = &Client{
-		Name:      Name,
+		Name:      ClientName,
 		ClientId:  ClientId,
 		clientCh:  make(chan *ty.Response, 100),
 		Active:    false,
@@ -55,7 +55,7 @@ func TestEcho(t *testing.T) {
 func TestInactiveClientDeleter(t *testing.T) {
 	service := NewChatService(100)
 	service.clients[ClientId] = &Client{
-		Name:      Name,
+		Name:      ClientName,
 		ClientId:  ClientId,
 		clientCh:  make(chan *ty.Response, 100),
 		Active:    false,
@@ -80,7 +80,7 @@ func TestGetClient(t *testing.T) {
 	}
 
 	dummyClient := &Client{
-		Name:      Name,
+		Name:      ClientName,
 		ClientId:  ClientId,
 		clientCh:  make(chan *ty.Response, 100),
 		Active:    false,

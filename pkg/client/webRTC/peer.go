@@ -5,7 +5,7 @@ import (
 	"log"
 
 	n "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/network"
-	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/types"
+	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 	"golang.org/x/net/context"
 
 	"github.com/pion/mediadevices"
@@ -14,6 +14,7 @@ import (
 )
 
 type Peer struct {
+	peerId     string
 	SignalChan chan *t.Response
 	Ctx        context.Context
 	Cancel     context.CancelFunc
@@ -109,7 +110,7 @@ func pollSignals(peerConnection *webrtc.PeerConnection, signalChan chan *t.Respo
 	for {
 		select {
 		case rsp := <-signalChan:
-			switch rsp.Name {
+			switch rsp.RspName {
 			case "signal answer":
 				go HandleIncomingAnswer(peerConnection, rsp.Content)
 			case "signal candidate":

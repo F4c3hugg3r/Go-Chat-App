@@ -8,8 +8,7 @@ import (
 	"sync"
 	"time"
 
-	clientTy "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/types"
-	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server/types"
+	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
 // clients who communicate with the sever
@@ -39,7 +38,7 @@ func (s *ChatService) Broadcast(clientsToIterate map[string]*Client, rsp *ty.Res
 			if client.ClientId != clientId && client.GetGroupId() == "" {
 				err := client.Send(rsp)
 				if err != nil {
-					log.Printf("\n%v: %s -> %s", err, rsp.Name, client.Name)
+					log.Printf("\n%v: %s -> %s", err, rsp.RspName, client.Name)
 				}
 			}
 		}
@@ -48,7 +47,7 @@ func (s *ChatService) Broadcast(clientsToIterate map[string]*Client, rsp *ty.Res
 			if client.ClientId != clientId {
 				err := client.Send(rsp)
 				if err != nil {
-					log.Printf("\n%v: %s -> %s", err, rsp.Name, client.Name)
+					log.Printf("\n%v: %s -> %s", err, rsp.RspName, client.Name)
 				}
 			}
 		}
@@ -77,7 +76,7 @@ func (s *ChatService) LogOutAllUsers() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, client := range s.clients {
-		client.Send(&ty.Response{Content: clientTy.UnregisterFlag})
+		client.Send(&ty.Response{Content: ty.UnregisterFlag})
 	}
 }
 

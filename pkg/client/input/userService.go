@@ -8,7 +8,7 @@ import (
 
 	n "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/network"
 	p "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/plugins"
-	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/types"
+	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
 // UserService handles user inputs and outputs
@@ -35,7 +35,7 @@ func NewUserService(c *n.ChatClient) *UserService {
 	return u
 }
 
-func (u *UserService) HandleAddGroup(groupJson string) (*t.Group, error) {
+func (u *UserService) HandleAddGroup(groupJson string) (*t.JsonGroup, error) {
 	group, err := decodeStringToGroup(groupJson)
 	if err != nil {
 		return nil, err
@@ -100,8 +100,8 @@ func (u *UserService) Executor(input string) {
 	u.ChatClient.Output <- &t.Response{Content: comment}
 }
 
-func decodeStringToGroup(jsonGroup string) (*t.Group, error) {
-	var group *t.Group
+func decodeStringToGroup(jsonGroup string) (*t.JsonGroup, error) {
+	var group *t.JsonGroup
 	dec := json.NewDecoder(strings.NewReader(jsonGroup))
 	err := dec.Decode(&group)
 	return group, err

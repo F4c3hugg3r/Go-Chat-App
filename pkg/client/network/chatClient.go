@@ -8,8 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/types"
-	"github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
+	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
 // ChatClient handles all network tasks
@@ -30,7 +29,7 @@ type ChatClient struct {
 // NewClient generates a ChatClient and spawns a ResponseReceiver goroutine
 func NewClient(server string) *ChatClient {
 	chatClient := &ChatClient{
-		clientId:   shared.GenerateSecureToken(32),
+		clientId:   t.GenerateSecureToken(32),
 		Output:     make(chan *t.Response, 10000),
 		HttpClient: &http.Client{},
 		Registered: false,
@@ -102,7 +101,7 @@ func (c *ChatClient) Register(rsp *t.Response) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.clientName = rsp.Name
+	c.clientName = rsp.RspName
 	c.authToken = rsp.Content
 
 	c.Registered = true
@@ -221,9 +220,9 @@ func (c *ChatClient) CreateMessage(clientName string, plugin string, content str
 	msg := &t.Message{}
 
 	if clientName == "" && c.Registered {
-		msg.Name = c.GetName()
+		msg.ClientName = c.GetName()
 	} else {
-		msg.Name = clientName
+		msg.ClientName = clientName
 	}
 
 	if clientId == "" {
@@ -289,8 +288,8 @@ func DecodeToResponse(body []byte) (*t.Response, error) {
 }
 
 // DecodeToGroup decodes a responseBody to a Group struct
-func DecodeToGroup(body []byte) (*t.Group, error) {
-	group := &t.Group{}
+func DecodeToGroup(body []byte) (*t.JsonGroup, error) {
+	group := &t.JsonGroup{}
 	dec := json.NewDecoder(strings.NewReader(string(body)))
 
 	err := dec.Decode(&group)

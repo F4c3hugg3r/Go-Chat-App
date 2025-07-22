@@ -5,7 +5,8 @@ import (
 	"strings"
 
 	i "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/input"
-	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/types"
+	wrtc "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/webRTC"
+	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -48,6 +49,7 @@ func InitialModel(u *i.UserService) model {
 		keyMap:      helpKeys,
 		inH:         inputManager,
 		title:       UnregisterTitle,
+		peers:       make(map[string]*wrtc.Peer),
 	}
 
 	return model
@@ -250,6 +252,55 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 	case rsp.Content == "":
 		return ""
 
+	// server output
+	case rsp.RspName == "":
+		rspString = fmt.Sprintf("%s", blue.Render(rsp.Content))
+
+		// unregister output
+		if strings.Contains(rsp.Content, t.UnregisterFlag) {
+			m.renderTitle(t.UnregisterFlag, nil)
+		}
+
+		return rspString
+
+	case rsp.RspName != "":
+		switch rsp.RspName {
+
+		// addGroup output
+		case t.AddGroupFlag:
+			group, err := m.userService.HandleAddGroup(rsp.Content)
+			if err != nil {
+				return red.Render(fmt.Sprintf("%v: error formatting json to group", err))
+			}
+
+			m.renderTitle(t.AddGroupFlag, []string{m.userService.ChatClient.GetName(), group.Name})
+
+			return blue.Render(fmt.Sprintf("-> Du bist nun Teil der Gruppe %s und kannst Nachrichten in ihr schreiben\nPrivate Nachrichten kannst du weiterhin außerhalb verschicken", group.Name))
+
+		// leaveGroup output
+		case t.LeaveGroupFlag:
+			m.userService.ChatClient.UnsetGroupId()
+			m.renderTitle(t.RegisterFlag, []string{m.userService.ChatClient.GetName()})
+
+			return blue.Render("Du hast die Gruppe verlassen!\n-> Du kannst nun Nachrichten schreiben oder Commands ausführen\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen")
+
+			// TODO
+		// Offer Signal
+		case t.OfferSignal:
+			// HandleOfferSignal(rsp)
+			return ""
+
+		// Answer Signal
+		case t.AnswerSignal:
+			// HandleAnswerSignal(rsp)
+			return ""
+
+		// Receive ICE Candidate
+		case t.ReceiveICECandidate:
+			// HandleICEandidate(rsp)
+			return ""
+		}
+
 	// slice output
 	case strings.HasPrefix(rsp.Content, "["):
 		output, err := JSONToTable(rsp.Content)
@@ -265,39 +316,10 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 		m.renderTitle(t.RegisterFlag, []string{m.userService.ChatClient.GetName()})
 
 		return blue.Render("-> Du kannst nun Nachrichten schreiben oder Commands ausführen\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen")
-
-	// server output
-	case rsp.Name == "":
-		rspString = fmt.Sprintf("%s", blue.Render(rsp.Content))
-
-		// unregister output
-		if strings.Contains(rsp.Content, t.UnregisterFlag) {
-			m.renderTitle(t.UnregisterFlag, nil)
-		}
-
-		return rspString
-
-	// addGroup output
-	case strings.Contains(rsp.Name, t.AddGroupFlag):
-		group, err := m.userService.HandleAddGroup(rsp.Content)
-		if err != nil {
-			return red.Render(fmt.Sprintf("%v: error formatting json to group", err))
-		}
-
-		m.renderTitle(t.AddGroupFlag, []string{m.userService.ChatClient.GetName(), group.Name})
-
-		return blue.Render(fmt.Sprintf("-> Du bist nun Teil der Gruppe %s und kannst Nachrichten in ihr schreiben\nPrivate Nachrichten kannst du weiterhin außerhalb verschicken", group.Name))
-
-	// leaveGroup output
-	case strings.Contains(rsp.Name, t.LeaveGroupFlag):
-		m.userService.ChatClient.UnsetGroupId()
-		m.renderTitle(t.RegisterFlag, []string{m.userService.ChatClient.GetName()})
-
-		return blue.Render("Du hast die Gruppe verlassen!\n-> Du kannst nun Nachrichten schreiben oder Commands ausführen\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen")
 	}
 
 	// response output
-	rspString = fmt.Sprintf("%s: %s", turkis.Render(rsp.Name), rsp.Content)
+	rspString = fmt.Sprintf("%s: %s", turkis.Render(rsp.RspName), rsp.Content)
 
 	return rspString
 }

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server/types"
+	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
 // Client is a communication participant who has a name, unique id and
@@ -63,7 +63,7 @@ func (c *Client) Send(rsp *ty.Response) error {
 
 	select {
 	case c.clientCh <- rsp:
-		fmt.Printf("\n%s -> %s", rsp.Name, c.Name)
+		fmt.Printf("\n%s -> %s", rsp.RspName, c.Name)
 		return nil
 	default:
 		return fmt.Errorf("%w: response couldn't be sent, try again", ty.ErrTimeoutReached)

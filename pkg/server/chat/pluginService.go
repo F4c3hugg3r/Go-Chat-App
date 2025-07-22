@@ -6,7 +6,7 @@ import (
 	"log"
 	"strings"
 
-	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server/types"
+	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
 // ListPlugins lists all Plugins with correspontig commands

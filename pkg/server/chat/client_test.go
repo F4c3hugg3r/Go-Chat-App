@@ -8,14 +8,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server/types"
+	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
 func TestReceive(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 
 	client := Client{
-		Name:      Name,
+		Name:      ClientName,
 		ClientId:  ClientId,
 		clientCh:  make(chan *ty.Response, 100),
 		Active:    false,
@@ -45,7 +45,7 @@ func TestReceive(t *testing.T) {
 
 func TestSend(t *testing.T) {
 	clientInactive := Client{
-		Name:      Name,
+		Name:      ClientName,
 		ClientId:  ClientId,
 		clientCh:  nil,
 		Active:    false,
@@ -58,7 +58,7 @@ func TestSend(t *testing.T) {
 	assert.ErrorIs(t, err, ty.ErrChannelClosed)
 
 	clientActive := Client{
-		Name:      Name,
+		Name:      ClientName,
 		ClientId:  ClientId,
 		clientCh:  make(chan *ty.Response, 100),
 		Active:    false,
@@ -73,7 +73,7 @@ func TestSend(t *testing.T) {
 
 func TestIsIdle(t *testing.T) {
 	clientInactive := Client{
-		Name:      Name,
+		Name:      ClientName,
 		ClientId:  ClientId,
 		clientCh:  nil,
 		Active:    false,
@@ -86,7 +86,7 @@ func TestIsIdle(t *testing.T) {
 	assert.True(t, result)
 
 	clientActive := Client{
-		Name:      Name,
+		Name:      ClientName,
 		ClientId:  ClientId,
 		clientCh:  make(chan *ty.Response, 100),
 		Active:    false,

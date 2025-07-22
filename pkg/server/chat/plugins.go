@@ -6,8 +6,7 @@ import (
 	"strings"
 	"time"
 
-	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server/types"
-	"github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
+	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
 // TODO Plugins fürs Signalling erstellen
@@ -37,7 +36,7 @@ func (pp *PrivateMessagePlugin) Execute(message *ty.Message) (*ty.Response, erro
 		return &ty.Response{Err: fmt.Sprintf("%v: client with id: %s not found", ty.ErrNotAvailable, message.ClientId)}, nil
 	}
 
-	rsp := &ty.Response{Name: fmt.Sprintf("[Private] - %s", message.Name), Content: message.Content}
+	rsp := &ty.Response{RspName: fmt.Sprintf("[Private] - %s", message.ClientName), Content: message.Content}
 
 	err := client.Send(rsp)
 	if err != nil {
@@ -80,9 +79,9 @@ func (lp *LogOutPlugin) Execute(message *ty.Message) (*ty.Response, error) {
 	client.Close()
 	delete(lp.chatService.clients, message.ClientId)
 
-	go client.Execute(lp.pr, &ty.Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s hat den Chat verlassen", message.Name), ClientId: message.ClientId})
+	go client.Execute(lp.pr, &ty.Message{ClientName: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s hat den Chat verlassen", message.ClientName), ClientId: message.ClientId})
 
-	return &ty.Response{Name: message.Name, Content: "Du hast dich ausgeloggt"}, nil
+	return &ty.Response{RspName: message.ClientName, Content: "Du hast dich ausgeloggt"}, nil
 }
 
 // RegisterClientPlugin safely registeres a client by creating a Client with the received values
@@ -119,9 +118,9 @@ func (rp *RegisterClientPlugin) Execute(message *ty.Message) (*ty.Response, erro
 	}
 
 	clientCh := make(chan *ty.Response, 100)
-	token := shared.GenerateSecureToken(64)
+	token := ty.GenerateSecureToken(64)
 	client := &Client{
-		Name:      message.Name,
+		Name:      message.ClientName,
 		ClientId:  message.ClientId,
 		clientCh:  clientCh,
 		Active:    true,
@@ -133,9 +132,9 @@ func (rp *RegisterClientPlugin) Execute(message *ty.Message) (*ty.Response, erro
 
 	fmt.Printf("\nnew client '%s' registered.", message.Content)
 
-	go client.Execute(rp.pr, &ty.Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s ist dem Chat beigetreten", client.Name), ClientId: client.ClientId})
+	go client.Execute(rp.pr, &ty.Message{ClientName: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s ist dem Chat beigetreten", client.Name), ClientId: client.ClientId})
 
-	return &ty.Response{Name: message.Name, Content: token}, nil
+	return &ty.Response{RspName: message.ClientName, Content: token}, nil
 }
 
 // BroadcaastPlugin distributes an incomming message abroad all client channels if
@@ -156,7 +155,7 @@ func (bp *BroadcastPlugin) Description() *Description {
 }
 
 func (bp *BroadcastPlugin) Execute(message *ty.Message) (*ty.Response, error) {
-	rsp := &ty.Response{Name: message.Name, Content: message.Content}
+	rsp := &ty.Response{RspName: message.ClientName, Content: message.Content}
 
 	if strings.TrimSpace(message.Content) == "" {
 		return rsp, nil
@@ -203,7 +202,7 @@ func (h *HelpPlugin) Execute(message *ty.Message) (*ty.Response, error) {
 		return nil, fmt.Errorf("%w: error parsing plugins to json", err)
 	}
 
-	return &ty.Response{Name: "Help", Content: string(jsonList)}, nil
+	return &ty.Response{RspName: "Help", Content: string(jsonList)}, nil
 }
 
 // ListUsersPlugin tells you information about all the current users
@@ -233,7 +232,7 @@ func (u *ListUsersPlugin) Execute(message *ty.Message) (*ty.Response, error) {
 		return nil, fmt.Errorf("%w: error parsing clients to json", err)
 	}
 
-	return &ty.Response{Name: "Users", Content: string(jsonList)}, nil
+	return &ty.Response{RspName: "Users", Content: string(jsonList)}, nil
 }
 
 // TimePlugin tells you the current time
@@ -251,5 +250,5 @@ func (t *TimePlugin) Description() *Description {
 }
 
 func (t *TimePlugin) Execute(message *ty.Message) (*ty.Response, error) {
-	return &ty.Response{Name: "Time", Content: time.Now().UTC().String()}, nil
+	return &ty.Response{RspName: "Time", Content: time.Now().UTC().String()}, nil
 }

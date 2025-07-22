@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server/types"
+	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -12,23 +12,23 @@ import (
 func TestHelpPlugin(t *testing.T) {
 	service := NewChatService(100)
 	registry := RegisterPlugins(service)
-	message := &ty.Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/help", ClientId: DummyClient.ClientId}
+	message := &ty.Message{ClientName: "Arndt", Content: "wubbalubbadubdub", Plugin: "/help", ClientId: DummyClient.ClientId}
 
 	rsp, err := registry.FindAndExecute(message)
 	assert.Nil(t, err)
-	assert.Equal(t, rsp.Name, "Help")
+	assert.Equal(t, rsp.RspName, "Help")
 }
 
 func TestUserPlugin(t *testing.T) {
 	service := NewChatService(100)
 	registry := RegisterPlugins(service)
-	message := &ty.Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/users", ClientId: DummyClient.ClientId}
+	message := &ty.Message{ClientName: "Arndt", Content: "wubbalubbadubdub", Plugin: "/users", ClientId: DummyClient.ClientId}
 
 	rsp, err := registry.FindAndExecute(message)
-	assert.Equal(t, rsp, &ty.Response{Name: "Users", Content: "[]"})
+	assert.Equal(t, rsp, &ty.Response{RspName: "Users", Content: "[]"})
 
 	service.clients[ClientId] = &Client{
-		Name:      Name,
+		Name:      ClientName,
 		ClientId:  ClientId,
 		clientCh:  make(chan *ty.Response, 100),
 		Active:    false,
@@ -36,7 +36,7 @@ func TestUserPlugin(t *testing.T) {
 		lastSign:  time.Now().UTC(),
 	}
 	service.clients[ClientId2] = &Client{
-		Name:      Name2,
+		Name:      ClientName2,
 		ClientId:  ClientId2,
 		clientCh:  make(chan *ty.Response, 100),
 		Active:    true,
@@ -46,7 +46,7 @@ func TestUserPlugin(t *testing.T) {
 
 	rsp, err = registry.FindAndExecute(message)
 	assert.Nil(t, err)
-	assert.Equal(t, rsp.Name, "Users")
+	assert.Equal(t, rsp.RspName, "Users")
 	assert.Contains(t, rsp.Content, "{\"Name\":\"Len\""+
 		",\"ClientId\":\"clientId2-yGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRw\",\"Active\":true}")
 	assert.Contains(t, rsp.Content, "{\"Name\":\"Arndt\",\"ClientId\""+
@@ -56,10 +56,10 @@ func TestUserPlugin(t *testing.T) {
 func TestRegisterPlugin(t *testing.T) {
 	service := NewChatService(100)
 	registry := RegisterPlugins(service)
-	message := &ty.Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/register", ClientId: DummyClient.ClientId}
+	message := &ty.Message{ClientName: "Arndt", Content: "wubbalubbadubdub", Plugin: "/register", ClientId: DummyClient.ClientId}
 
 	service.clients[ClientId] = &Client{
-		Name:      Name,
+		Name:      ClientName,
 		ClientId:  ClientId,
 		clientCh:  make(chan *ty.Response, 100),
 		Active:    false,
@@ -74,12 +74,12 @@ func TestRegisterPlugin(t *testing.T) {
 
 	rsp, err := registry.FindAndExecute(message)
 	assert.Nil(t, err)
-	assert.Equal(t, rsp.Name, "authToken")
+	assert.Equal(t, rsp.RspName, "authToken")
 	assert.NotEmpty(t, rsp.Content)
 }
 
 func TestQuitPlugin(t *testing.T) {
-	message := &ty.Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/quit", ClientId: DummyClient.ClientId}
+	message := &ty.Message{ClientName: "Arndt", Content: "wubbalubbadubdub", Plugin: "/quit", ClientId: DummyClient.ClientId}
 	service := NewChatService(100)
 	registry := RegisterPlugins(service)
 
@@ -87,7 +87,7 @@ func TestQuitPlugin(t *testing.T) {
 	assert.Error(t, err, ty.ErrNotAvailable)
 
 	service.clients[ClientId] = &Client{
-		Name:      Name,
+		Name:      ClientName,
 		ClientId:  ClientId,
 		clientCh:  make(chan *ty.Response, 100),
 		Active:    false,
@@ -98,19 +98,19 @@ func TestQuitPlugin(t *testing.T) {
 	rsp, err := registry.FindAndExecute(message)
 	assert.Equal(t, 0, len(service.clients))
 	assert.Nil(t, err)
-	assert.Equal(t, rsp, &ty.Response{Name: message.Name, Content: "logged out"})
+	assert.Equal(t, rsp, &ty.Response{RspName: message.ClientName, Content: "logged out"})
 }
 
 func TestBroadcastPlugin(t *testing.T) {
 	service := NewChatService(100)
 	registry := RegisterPlugins(service)
-	message := &ty.Message{Name: "Arndt", Content: "wubbalubbadubdub", Plugin: "/broadcast"}
+	message := &ty.Message{ClientName: "Arndt", Content: "wubbalubbadubdub", Plugin: "/broadcast"}
 
 	_, err := registry.FindAndExecute(message)
 	assert.ErrorIs(t, err, ty.ErrNotAvailable)
 
 	service.clients[ClientId] = &Client{
-		Name:      Name,
+		Name:      ClientName,
 		ClientId:  ClientId,
 		clientCh:  make(chan *ty.Response, 100),
 		Active:    false,
@@ -118,7 +118,7 @@ func TestBroadcastPlugin(t *testing.T) {
 		lastSign:  time.Now().UTC(),
 	}
 	service.clients[ClientId2] = &Client{
-		Name:      Name2,
+		Name:      ClientName2,
 		ClientId:  ClientId2,
 		clientCh:  make(chan *ty.Response, 100),
 		Active:    true,
@@ -138,6 +138,6 @@ func TestBroadcastPlugin(t *testing.T) {
 		}()
 	}
 
-	_, err = registry.FindAndExecute(&ty.Message{Name: "Arndt", Content: "", Plugin: "/broadcast"})
+	_, err = registry.FindAndExecute(&ty.Message{ClientName: "Arndt", Content: "", Plugin: "/broadcast"})
 	assert.ErrorIs(t, err, ty.ErrEmptyString)
 }

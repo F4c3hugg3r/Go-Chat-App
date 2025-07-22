@@ -7,8 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server/types"
-	"github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
+	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
 // GroupHelpPlugin
@@ -37,7 +36,7 @@ func (ghp *GroupHelpPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return nil, fmt.Errorf("%w: error parsing plugins to json", err)
 	}
 
-	return &ty.Response{Name: "Group Help", Content: string(jsonList)}, nil
+	return &ty.Response{RspName: "Group Help", Content: string(jsonList)}, nil
 }
 
 // GroupListPlugin
@@ -82,7 +81,7 @@ func (glp *GroupListPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return nil, fmt.Errorf("%w: error parsing clients to json", err)
 	}
 
-	return &ty.Response{Name: "Group List", Content: string(jsonList)}, nil
+	return &ty.Response{RspName: "Group List", Content: string(jsonList)}, nil
 }
 
 // GroupCreatePlugin
@@ -106,7 +105,7 @@ func (gcp *GroupCreatePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	defer gcp.s.mu.Unlock()
 
 	name := strings.TrimSpace(msg.Content)
-	id := shared.GenerateSecureToken(32)
+	id := ty.GenerateSecureToken(32)
 	clients := make(map[string]*Client)
 
 	client, exists := gcp.s.clients[msg.ClientId]
@@ -126,7 +125,7 @@ func (gcp *GroupCreatePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return nil, fmt.Errorf("%w: error parsing group to json", err)
 	}
 
-	return &ty.Response{Name: "Add Group", Content: string(jsonGroup)}, nil
+	return &ty.Response{RspName: ty.AddGroupFlag, Content: string(jsonGroup)}, nil
 }
 
 // TODO GroupInvitePlugin
@@ -185,11 +184,11 @@ func (glp *GroupLeavePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return &ty.Response{Err: fmt.Sprintf("%v: error while removing client from group", err)}, nil
 	}
 
-	client.Execute(glp.pr, &ty.Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s hat die Gruppe verlassen", msg.Name), ClientId: msg.ClientId, GroupId: msg.GroupId})
+	client.Execute(glp.pr, &ty.Message{ClientName: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s hat die Gruppe verlassen", msg.ClientName), ClientId: msg.ClientId, GroupId: msg.GroupId})
 
 	client.UnsetGroup()
 
-	return &ty.Response{Name: "Leave Group", Content: "Du hast die Gruppe verlassen"}, nil
+	return &ty.Response{RspName: ty.LeaveGroupFlag, Content: "Du hast die Gruppe verlassen"}, nil
 }
 
 // GroupUserPlugin
@@ -225,7 +224,7 @@ func (gup *GroupUsersPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return nil, fmt.Errorf("%w: error parsing groups to json", err)
 	}
 
-	return &ty.Response{Name: "Group Users", Content: string(jsonList)}, nil
+	return &ty.Response{RspName: "Group Users", Content: string(jsonList)}, nil
 }
 
 // GroupJoinPlugin
@@ -262,7 +261,7 @@ func (gjp *GroupJoinPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	}
 
 	if msg.GroupId != "" {
-		client.Execute(gjp.pr, &ty.Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s hat die Gruppe verlassen", msg.Name), ClientId: msg.ClientId, GroupId: msg.GroupId})
+		client.Execute(gjp.pr, &ty.Message{ClientName: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s hat die Gruppe verlassen", msg.ClientName), ClientId: msg.ClientId, GroupId: msg.GroupId})
 		client.UnsetGroup()
 		group.RemoveClient(client)
 	}
@@ -274,12 +273,12 @@ func (gjp *GroupJoinPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 
 	client.SetGroup(newGroupId)
 
-	client.Execute(gjp.pr, &ty.Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s ist der Gruppe beigetreten", msg.Name), ClientId: msg.ClientId, GroupId: newGroupId})
+	client.Execute(gjp.pr, &ty.Message{ClientName: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s ist der Gruppe beigetreten", msg.ClientName), ClientId: msg.ClientId, GroupId: newGroupId})
 
 	jsonGroup, err := json.Marshal(group)
 	if err != nil {
 		return nil, fmt.Errorf("%w: error parsing group to json", err)
 	}
 
-	return &ty.Response{Name: "Add Group", Content: string(jsonGroup)}, nil
+	return &ty.Response{RspName: ty.AddGroupFlag, Content: string(jsonGroup)}, nil
 }

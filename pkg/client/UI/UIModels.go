@@ -2,8 +2,8 @@ package UI
 
 import (
 	i "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/input"
-	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/types"
-	webrtc "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/webRTC"
+	wrtc "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/webRTC"
+	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -98,7 +98,7 @@ type model struct {
 	showSuggestions bool
 	title           string
 	inH             *InputHistory
-	peers           []*webrtc.Peer
+	peers           map[string]*wrtc.Peer
 }
 
 // InputHistory manageges the inputHistory

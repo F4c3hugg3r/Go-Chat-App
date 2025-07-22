@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	n "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/network"
-	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/types"
+	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
 const (

@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	n "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/network"
-	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/types"
+	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
 // GroupPlugin lets you participate in a group chat
@@ -25,10 +25,6 @@ func (lp *GroupPlugin) Execute(message *t.Message) (error, string) {
 	_, err := lp.c.PostMessage(message, t.PostPlugin)
 	return err, ""
 }
-
-//fmt.Sprintf("Du hast die Gruppe %s erstellt", name)
-// Content: "Du hast die Gruppe verlassen"
-// Content: "Du bist der Gruppe beigetreten"
 
 // PrivateMessage Plugin lets a client send a private message to another client identified by it's clientId
 type PrivateMessagePlugin struct {
@@ -54,7 +50,7 @@ func (pp *PrivateMessagePlugin) Execute(message *t.Message) (error, string) {
 		return fmt.Errorf("%w: prefix '%s ' not found", t.ErrParsing, opposingClientId), ""
 	}
 
-	_, err := pp.c.PostMessage(pp.c.CreateMessage(message.Name, message.Plugin, content, opposingClientId), t.PostPlugin)
+	_, err := pp.c.PostMessage(pp.c.CreateMessage(message.ClientName, message.Plugin, content, opposingClientId), t.PostPlugin)
 
 	return err, ""
 }
@@ -106,7 +102,7 @@ func (rp *RegisterClientPlugin) Execute(message *t.Message) (error, string) {
 		return fmt.Errorf("%w: error registering client", err), ""
 	}
 
-	return err, "- Du bist registriert -"
+	return err, t.RegisterFlag
 }
 
 // BroadcaastPlugin distributes an incomming message abroad all client channels if

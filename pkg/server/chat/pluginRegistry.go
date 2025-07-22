@@ -3,7 +3,7 @@ package chat
 import (
 	"fmt"
 
-	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/server/types"
+	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
 type PluginInterface interface {
