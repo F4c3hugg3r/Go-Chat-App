@@ -57,3 +57,9 @@ type JsonGroup struct {
 	Name    string `json:"name"`
 	Size    int    `json:"size"`
 }
+
+// logging
+type Logg struct {
+	Text   string
+	Method string
+}

@@ -27,6 +27,18 @@ func ListPlugins(plugins map[string]PluginInterface) []json.RawMessage {
 	return jsonSlice
 }
 
+func GroupClientIdsToJson(group *Group) (json.RawMessage, error) {
+	jsonSlice := json.RawMessage{}
+	stringSlice := group.GetClientIdsFromGroup()
+
+	jsonSlice, err := json.Marshal(stringSlice)
+	if err != nil {
+		return nil, err
+	}
+
+	return jsonSlice, nil
+}
+
 func GetCurrentGroup(clientId string, s *ChatService) (*Group, *Client, error) {
 	client, err := s.GetClient(clientId)
 	if err != nil {

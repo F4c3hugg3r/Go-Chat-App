@@ -18,16 +18,21 @@ type UserService struct {
 	typing     bool
 	mu         *sync.RWMutex
 	cond       *sync.Cond
+	// logging
+	LoggChan chan t.Logg
 }
 
 // NewUserService creates a UserService
 func NewUserService(c *n.ChatClient) *UserService {
 	u := &UserService{
 		ChatClient: c,
-		PlugReg:    p.RegisterPlugins(c),
 		poll:       false,
 		mu:         &sync.RWMutex{},
+		// logging
+		LoggChan: make(chan t.Logg, 10000),
 	}
+
+	u.PlugReg = p.RegisterPlugins(c, u.LoggChan)
 
 	u.cond = sync.NewCond(u.mu)
 

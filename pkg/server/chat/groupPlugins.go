@@ -169,7 +169,7 @@ func (glp *GroupLeavePlugin) Description() *Description {
 }
 
 func (glp *GroupLeavePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
-	group, client, err := GetCurrentGroup(msg.Name, glp.s)
+	group, client, err := GetCurrentGroup(msg.ClientId, glp.s)
 	if err != nil {
 		return &ty.Response{Err: fmt.Sprintf("%v: error getting current group", err)}, nil
 	}

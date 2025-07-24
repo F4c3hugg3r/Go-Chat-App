@@ -80,6 +80,18 @@ func (g *Group) RemoveClient(client *Client) error {
 	return fmt.Errorf("%w: you are not in this group", ty.ErrNoPermission)
 }
 
+func (g *Group) GetClientIdsFromGroup() []string {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	var clientIds []string
+	for key, _ := range g.clients {
+		clientIds = append(clientIds, key)
+	}
+
+	return clientIds
+}
+
 func (g *Group) GetClients() map[string]*Client {
 	g.mu.RLock()
 	defer g.mu.RUnlock()

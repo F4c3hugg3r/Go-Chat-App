@@ -26,8 +26,8 @@ type ChatClient struct {
 	HttpClient *http.Client
 	Endpoints  map[int]string
 
-	// TODO functionallity to cleer inactive peers
-	peers map[string]*Peer
+	// TODO functionallity to cleer inactive Peers
+	Peers map[string]*Peer
 }
 
 // NewClient generates a ChatClient and spawns a ResponseReceiver goroutine
@@ -137,7 +137,7 @@ func (c *ChatClient) GetAuthToken() (string, bool) {
 }
 
 // PostMessage marshals a Message and posts it the the given endpoint
-// returning the http response and an error
+// returning the response and an error
 func (c *ChatClient) PostMessage(msg *t.Message, endpoint int) (*t.Response, error) {
 	body, err := json.Marshal(&msg)
 	if err != nil {
@@ -188,7 +188,7 @@ func (c *ChatClient) PostDelete(msg *t.Message) error {
 	return nil
 }
 
-// getResponse sends a GET Request to the server, checks the http Response
+// getResponse sends a GET Request to the server, checks the Response
 // and returns the body
 func (c *ChatClient) GetResponse(url string) (*t.Response, error) {
 	res, err := c.GetRequest(c.Endpoints[t.Get])
@@ -242,22 +242,23 @@ func (c *ChatClient) CreateMessage(clientName string, plugin string, content str
 	return msg
 }
 
-func (c *ChatClient) HandleSignal(rsp *t.Response) error {
+func (c *ChatClient) HandleSignal(rsp *t.Response, loggChan chan t.Logg) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	peer, exists := c.peers[rsp.ClientId]
-	if exists {
-		peer.SignalChan <- rsp
+	peer, exists := c.Peers[rsp.ClientId]
+	if !exists {
+		peer = NewPeer(rsp.ClientId)
+		c.Peers[rsp.ClientId] = peer
+
+		err := peer.JoinSession(c, loggChan)
+		if err != nil {
+			return err
+		}
+
 		return nil
 	}
 
-	peer = NewPeer(rsp.ClientId)
-	c.peers[rsp.ClientId] = peer
-	err := peer.JoinSession(c)
-	if err != nil {
-		return err
-	}
 	peer.SignalChan <- rsp
 
 	return nil

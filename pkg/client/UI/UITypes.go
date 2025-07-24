@@ -86,8 +86,12 @@ type keyMap struct {
 // model contains every view-model and variables/structs needed for
 // the displaying and handling of the TUI
 type model struct {
-	viewport        viewport.Model
+	viewport viewport.Model
+	// logging
+	loggViewport    viewport.Model
+	loggs           []string
 	messages        []string
+	loggChan        chan t.Logg
 	title           string
 	textinput       textinput.Model
 	showSuggestions bool

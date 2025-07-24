@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -10,19 +11,33 @@ import (
 
 // CallPlugin lets you participate in a voice call
 type CallPlugin struct {
-	c *n.ChatClient
+	c       *n.ChatClient
+	logChan chan t.Logg
 }
 
-func NewCallPlugin(chatClient *n.ChatClient) *CallPlugin {
+func NewCallPlugin(chatClient *n.ChatClient, logChan chan t.Logg) *CallPlugin {
 	return &CallPlugin{c: chatClient}
 }
 
 func (cp *CallPlugin) CheckScope() int {
-	return InGroupOnly
+	return RegisteredOnly
 }
 
 func (cp *CallPlugin) Execute(message *t.Message) (error, string) {
-	_, err := cp.c.PostMessage(message, t.PostPlugin)
+	rsp, err := cp.c.PostMessage(message, t.PostPlugin)
+
+	// rsp in peers umwandeln
+	var Ids []string
+	dec := json.NewDecoder(strings.NewReader(rsp.Content))
+	dec.Decode(&Ids)
+	cp.logChan <- t.Logg{Text: fmt.Sprintf("Ids aus Response: %s", strings.Join(Ids, ", ")), Method: "NewCallPlugin.Execute()"}
+
+	// für jede Peer Handle Signal aufrufen
+	for _, clientId := range Ids {
+		cp.c.HandleSignal(&t.Response{ClientId: clientId}, cp.logChan)
+		cp.logChan <- t.Logg{Text: fmt.Sprintf("Handle Signal started für client %s", clientId), Method: "NewCallPlugin.Execute()"}
+	}
+
 	return err, ""
 }
 

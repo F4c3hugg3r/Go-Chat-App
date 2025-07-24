@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -148,9 +147,18 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 
 	rsp, err := client.Execute(handler.Plugins, &message)
 	if err != nil {
-		fmt.Println(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	body, err = json.Marshal(rsp)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	_, err = w.Write(body)
+	if err != nil {
+		http.Error(w, "couldn't write response", http.StatusInternalServerError)
 	}
 
 	err = handler.Service.Echo(clientId, rsp)

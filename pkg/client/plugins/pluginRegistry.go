@@ -10,7 +10,7 @@ import (
 const (
 	UnregisteredOnly = iota
 	RegisteredOnly
-	InGroupOnly
+	// InGroupOnly
 	Always
 )
 
@@ -26,8 +26,9 @@ type PluginRegistry struct {
 	chatClient *n.ChatClient
 }
 
+// logging
 // RegisterPlugins sets up all the plugins
-func RegisterPlugins(chatClient *n.ChatClient) *PluginRegistry {
+func RegisterPlugins(chatClient *n.ChatClient, logChan chan t.Logg) *PluginRegistry {
 	pr := PluginRegistry{Plugins: make(map[string]PluginInterface)}
 	pr.Plugins["/help"] = NewHelpPlugin(chatClient)
 	pr.Plugins["/time"] = NewTimePlugin(chatClient)
@@ -37,7 +38,7 @@ func RegisterPlugins(chatClient *n.ChatClient) *PluginRegistry {
 	pr.Plugins["/quit"] = NewLogOutPlugin(chatClient)
 	pr.Plugins["/private"] = NewPrivateMessagePlugin(chatClient)
 	pr.Plugins["/group"] = NewGroupPlugin(chatClient)
-	pr.Plugins["/call"] = NewCallPlugin(chatClient)
+	pr.Plugins["/call"] = NewCallPlugin(chatClient, logChan)
 
 	pr.chatClient = chatClient
 
@@ -62,10 +63,10 @@ func (pr *PluginRegistry) FindAndExecute(message *t.Message) (error, string) {
 		if !pr.chatClient.Registered {
 			return fmt.Errorf("%w: you are not registered yet", t.ErrNoPermission), ""
 		}
-	case InGroupOnly:
-		if pr.chatClient.GetGroupId() == "" {
-			return fmt.Errorf("%w: you are not in a group yet", t.ErrNoPermission), ""
-		}
+		// case InGroupOnly:
+		// 	if pr.chatClient.GetGroupId() == "" {
+		// 		return fmt.Errorf("%w: you are not in a group yet", t.ErrNoPermission), ""
+		// 	}
 	}
 
 	return plugin.Execute(message)

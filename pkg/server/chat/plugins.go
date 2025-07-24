@@ -26,19 +26,25 @@ func (cp *CallPlugin) Description() *Description {
 }
 
 func (cp *CallPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
+	// TODO bei offer alle Client ids der Gruppe als Json zurück geben
 	group, _, err := GetCurrentGroup(msg.ClientId, cp.chatService)
 	if err != nil {
 		return &ty.Response{Err: fmt.Sprintf("%v: error getting current group", err)}, nil
 	}
 
 	if group == nil {
-		return &ty.Response{Err: fmt.Sprintf("%v: you are not in a group yet", err)}, nil
+		return &ty.Response{Err: fmt.Sprintf("%v: you are not in a group yet", ty.ErrNoPermission)}, nil
+	}
+
+	groupClientIds, err := GroupClientIdsToJson(group)
+	if err != nil {
+		return nil, fmt.Errorf("%w: error encoding clientId to json", err)
 	}
 
 	rsp := &ty.Response{ClientId: msg.ClientId, RspName: msg.Name, Content: msg.Content}
-	cp.chatService.Broadcast(group.GetClients(), rsp, msg.ClientId)
+	cp.chatService.Broadcast(group.GetClients(), rsp)
 
-	return &ty.Response{RspName: ty.StartCallFlag, Content: "idk"}, nil
+	return &ty.Response{RspName: rsp.RspName, Content: string(groupClientIds)}, nil
 }
 
 // PrivateMessage Plugin lets a client send a private message to another client identified by it's clientId
@@ -102,13 +108,17 @@ func (lp *LogOutPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return nil, fmt.Errorf("%w: client (probably) already deleted", ty.ErrNotAvailable)
 	}
 
+	if client.groupId != "" {
+		delete(lp.chatService.groups[client.groupId].clients, client.ClientId)
+	}
+
 	fmt.Println("\nlogged out ", client.Name)
 	client.Close()
-	delete(lp.chatService.clients, msg.ClientId)
+	delete(lp.chatService.clients, client.ClientId)
 
-	go client.Execute(lp.pr, &ty.Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s hat den Chat verlassen", msg.Name), ClientId: msg.ClientId})
+	go lp.chatService.Broadcast(nil, &ty.Response{Content: fmt.Sprintf("%s hat den Chat verlassen", msg.Name), ClientId: msg.ClientId})
 
-	return &ty.Response{RspName: msg.Name, Content: "Du hast dich ausgeloggt"}, nil
+	return &ty.Response{RspName: msg.Name, Content: ty.UnregisterFlag}, nil
 }
 
 // RegisterClientPlugin safely registeres a client by creating a Client with the received values
@@ -159,7 +169,7 @@ func (rp *RegisterClientPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 
 	fmt.Printf("\nnew client '%s' registered.", msg.Content)
 
-	go client.Execute(rp.pr, &ty.Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s ist dem Chat beigetreten", client.Name), ClientId: client.ClientId})
+	go rp.chatService.Broadcast(nil, &ty.Response{Content: fmt.Sprintf("%s ist dem Chat beigetreten", client.Name), ClientId: msg.ClientId})
 
 	return &ty.Response{RspName: msg.Name, Content: token}, nil
 }
@@ -182,23 +192,23 @@ func (bp *BroadcastPlugin) Description() *Description {
 }
 
 func (bp *BroadcastPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
-	rsp := &ty.Response{RspName: msg.Name, Content: msg.Content}
+	rsp := &ty.Response{RspName: msg.Name, Content: msg.Content, ClientId: msg.ClientId}
 
 	if strings.TrimSpace(msg.Content) == "" {
 		return rsp, nil
 	}
 
-	group, _, err := GetCurrentGroup(msg.Name, bp.chatService)
+	group, _, err := GetCurrentGroup(msg.ClientId, bp.chatService)
 	if err != nil {
 		return &ty.Response{Err: fmt.Sprintf("%v: error getting current group", err)}, nil
 	}
 
 	if group != nil {
-		bp.chatService.Broadcast(group.GetClients(), rsp, msg.ClientId)
+		bp.chatService.Broadcast(group.GetClients(), rsp)
 		return rsp, nil
 	}
 
-	bp.chatService.Broadcast(nil, rsp, msg.ClientId)
+	bp.chatService.Broadcast(nil, rsp)
 	return rsp, nil
 }
 

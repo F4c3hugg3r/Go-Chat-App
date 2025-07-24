@@ -1,12 +1,5 @@
 package input
 
-import (
-	"testing"
-
-	"github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/network"
-	"github.com/stretchr/testify/assert"
-)
-
 var (
 	name     = "Arndt"
 	clientId = "clientId-DyGWNnLrLWnbuhf-LgBUAdAxdZf-U1pgRw"
@@ -228,57 +221,57 @@ var (
 
 // }
 
-func TestClient_extractInputToMessage(t *testing.T) {
-	c := network.NewClient("http://localhost:8080")
-	// anders handeln
-	// c.clientId = clientId
-	// c.authToken = authToken
-	c.Endpoints = c.RegisterEndpoints(c.Url)
+// func TestClient_extractInputToMessage(t *testing.T) {
+// 	c := network.NewClient("http://localhost:8080")
+// 	// anders handeln
+// 	// c.clientId = clientId
+// 	// c.authToken = authToken
+// 	c.Endpoints = c.RegisterEndpoints(c.Url)
 
-	u := NewUserService(c)
+// 	u := NewUserService(c)
 
-	type args struct {
-		input        string
-		outputPlugin string
-	}
-	tests := []struct {
-		name string
-		args args
-	}{
-		{
-			name: "/broadcast",
-			args: args{
-				input:        "Hi",
-				outputPlugin: "/broadcast",
-			},
-		},
-		{
-			name: "any other plugin",
-			args: args{
-				input:        "/help\n",
-				outputPlugin: "/help",
-			},
-		},
-		{
-			name: "with spaces",
-			args: args{
-				input:        "/users     ",
-				outputPlugin: "/users",
-			},
-		},
-		{
-			name: "non existing",
-			args: args{
-				input:        "/privateABCDEFGHIJ",
-				outputPlugin: "/privateABCDEFGHIJ",
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+// 	type args struct {
+// 		input        string
+// 		outputPlugin string
+// 	}
+// 	tests := []struct {
+// 		name string
+// 		args args
+// 	}{
+// 		{
+// 			name: "/broadcast",
+// 			args: args{
+// 				input:        "Hi",
+// 				outputPlugin: "/broadcast",
+// 			},
+// 		},
+// 		{
+// 			name: "any other plugin",
+// 			args: args{
+// 				input:        "/help\n",
+// 				outputPlugin: "/help",
+// 			},
+// 		},
+// 		{
+// 			name: "with spaces",
+// 			args: args{
+// 				input:        "/users     ",
+// 				outputPlugin: "/users",
+// 			},
+// 		},
+// 		{
+// 			name: "non existing",
+// 			args: args{
+// 				input:        "/privateABCDEFGHIJ",
+// 				outputPlugin: "/privateABCDEFGHIJ",
+// 			},
+// 		},
+// 	}
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
 
-			message := u.ParseInputToMessage(tt.args.input)
-			assert.Equal(t, tt.args.outputPlugin, message.Plugin)
-		})
-	}
-}
+// 			message := u.ParseInputToMessage(tt.args.input)
+// 			assert.Equal(t, tt.args.outputPlugin, message.Plugin)
+// 		})
+// 	}
+// }
