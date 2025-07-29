@@ -27,9 +27,9 @@ func ListPlugins(plugins map[string]PluginInterface) []json.RawMessage {
 	return jsonSlice
 }
 
-func GroupClientIdsToJson(group *Group) (json.RawMessage, error) {
+func GroupClientIdsToJson(group *Group, notIncludedId string) (json.RawMessage, error) {
 	jsonSlice := json.RawMessage{}
-	stringSlice := group.GetClientIdsFromGroup()
+	stringSlice := group.GetClientIdsFromGroup(notIncludedId)
 
 	jsonSlice, err := json.Marshal(stringSlice)
 	if err != nil {

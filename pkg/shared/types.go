@@ -4,6 +4,7 @@ import (
 	"errors"
 )
 
+// routes
 const (
 	PostPlugin = iota
 	PostRegister
@@ -14,12 +15,20 @@ const (
 
 const UnregisterFlag = "- Du bist nun vom Server getrennt -"
 const RegisterFlag = "- Du bist registriert -"
+
 const AddGroupFlag = "Add Group"
 const LeaveGroupFlag = "Leave Group"
-const ICECandidate = "ICE Candidate"
-const OfferSignal = "Offer Signal"
-const AnswerSignal = "Answer Signal"
-const StartCallFlag = "Call Started"
+
+const ICECandidateFlag = "ICE Candidate"
+const OfferSignalFlag = "Offer Signal"
+const AnswerSignalFlag = "Answer Signal"
+const RollbackSignalFlag = "Rollback Signal"
+const StableSignalFlag = "Stable Flag"
+const ConnectedFlag = "Connected"
+const FailedConnectionFlag = "Connection Failed"
+
+// const StartCallFlag = "Call Started"
+const IgnoreResponseTag = "Ignore Response"
 
 var (
 	ErrNotAvailable   error = errors.New("item is not available")
@@ -56,6 +65,11 @@ type JsonGroup struct {
 	GroupId string `json:"groupId"`
 	Name    string `json:"name"`
 	Size    int    `json:"size"`
+}
+
+type Connection struct {
+	CallState string
+	Connected bool
 }
 
 // logging

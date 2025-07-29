@@ -10,8 +10,8 @@ import (
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
-// ChatClient handles all network tasks
-type ChatClient struct {
+// Client handles all network tasks
+type Client struct {
 	clientName string
 	clientId   string
 	authToken  string
@@ -19,27 +19,34 @@ type ChatClient struct {
 	Registered bool
 	Output     chan *t.Response
 
-	mu   *sync.RWMutex
-	cond *sync.Cond
+	mu       *sync.RWMutex
+	cond     *sync.Cond
+	LoggChan chan t.Logg
 
 	Url        string
 	HttpClient *http.Client
 	Endpoints  map[int]string
 
 	// TODO functionallity to cleer inactive Peers
-	Peers map[string]*Peer
+	Peers map[string]*legacy_Peer
 }
 
 // NewClient generates a ChatClient and spawns a ResponseReceiver goroutine
-func NewClient(server string) *ChatClient {
-	chatClient := &ChatClient{
+func NewClient(server string) *Client {
+	chatClient := &Client{
 		clientId:   t.GenerateSecureToken(32),
+		clientName: "",
+		groupId:    "",
+		authToken:  "",
 		Output:     make(chan *t.Response, 10000),
 		HttpClient: &http.Client{},
 		Registered: false,
 
-		mu:  &sync.RWMutex{},
-		Url: server,
+		mu:       &sync.RWMutex{},
+		Url:      server,
+		LoggChan: make(chan t.Logg, 10000),
+
+		Peers: make(map[string]*legacy_Peer),
 	}
 
 	chatClient.Endpoints = chatClient.RegisterEndpoints(chatClient.Url)
@@ -51,7 +58,7 @@ func NewClient(server string) *ChatClient {
 }
 
 // RegisterEndpoints registeres endpoint urls to the corresponding enum values
-func (c *ChatClient) RegisterEndpoints(url string) map[int]string {
+func (c *Client) RegisterEndpoints(url string) map[int]string {
 	endpoints := make(map[int]string)
 	endpoints[t.PostRegister] = fmt.Sprintf("%s/users/%s", url, c.clientId)
 	endpoints[t.PostPlugin] = fmt.Sprintf("%s/users/%s/run", url, c.clientId)
@@ -63,7 +70,7 @@ func (c *ChatClient) RegisterEndpoints(url string) map[int]string {
 }
 
 // Interrupt sends a Delete to the server and closes idle connections
-func (c *ChatClient) Interrupt() {
+func (c *Client) Interrupt() {
 	if c.Registered {
 		err := c.PostDelete(c.CreateMessage("", "/quit", "", ""))
 		if err != nil {
@@ -71,12 +78,24 @@ func (c *ChatClient) Interrupt() {
 		}
 	}
 
+	c.DeletePeersSafely()
+
 	c.HttpClient.CloseIdleConnections()
+}
+
+func (c *Client) DeletePeersSafely() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for _, peer := range c.Peers {
+		peer.Close(true)
+		delete(c.Peers, peer.peerId)
+	}
 }
 
 // ResponseReceiver gets responses if client is registered
 // and sends then into the output channel
-func (c *ChatClient) ResponseReceiver(url string) {
+func (c *Client) ResponseReceiver(url string) {
 	for {
 		c.checkRegistered()
 
@@ -90,7 +109,7 @@ func (c *ChatClient) ResponseReceiver(url string) {
 }
 
 // checkRegistered blocks until the client is being registered
-func (c *ChatClient) checkRegistered() {
+func (c *Client) checkRegistered() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -101,7 +120,7 @@ func (c *ChatClient) checkRegistered() {
 
 // register puts values into the client flields and sends a signal
 // to unblock CheckRegister
-func (c *ChatClient) Register(rsp *t.Response) error {
+func (c *Client) Register(rsp *t.Response) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -115,7 +134,7 @@ func (c *ChatClient) Register(rsp *t.Response) error {
 }
 
 // unregister deletes client fields and sets the Registered field to false
-func (c *ChatClient) Unregister() {
+func (c *Client) Unregister() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -125,7 +144,7 @@ func (c *ChatClient) Unregister() {
 }
 
 // GetAuthToken returns the authToken and a bool if the token is set
-func (c *ChatClient) GetAuthToken() (string, bool) {
+func (c *Client) GetAuthToken() (string, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -138,7 +157,7 @@ func (c *ChatClient) GetAuthToken() (string, bool) {
 
 // PostMessage marshals a Message and posts it the the given endpoint
 // returning the response and an error
-func (c *ChatClient) PostMessage(msg *t.Message, endpoint int) (*t.Response, error) {
+func (c *Client) PostMessage(msg *t.Message, endpoint int) (*t.Response, error) {
 	body, err := json.Marshal(&msg)
 	if err != nil {
 		return nil, fmt.Errorf("%w: error parsing json", err)
@@ -170,7 +189,7 @@ func (c *ChatClient) PostMessage(msg *t.Message, endpoint int) (*t.Response, err
 
 // PostDelete sends a DELETE Request to the delete endpoint and
 // unregisteres the ChatClient
-func (c *ChatClient) PostDelete(msg *t.Message) error {
+func (c *Client) PostDelete(msg *t.Message) error {
 	body, err := json.Marshal(&msg)
 	if err != nil {
 		return fmt.Errorf("%w: error parsing json", err)
@@ -190,7 +209,7 @@ func (c *ChatClient) PostDelete(msg *t.Message) error {
 
 // getResponse sends a GET Request to the server, checks the Response
 // and returns the body
-func (c *ChatClient) GetResponse(url string) (*t.Response, error) {
+func (c *Client) GetResponse(url string) (*t.Response, error) {
 	res, err := c.GetRequest(c.Endpoints[t.Get])
 	if err != nil {
 		c.Unregister()
@@ -220,13 +239,13 @@ func (c *ChatClient) GetResponse(url string) (*t.Response, error) {
 
 // CreateMessage creates a Message with the given parameters or
 // if clientName/clientId are empty fills them with the global values of the client
-func (c *ChatClient) CreateMessage(clientName string, plugin string, content string, clientId string) *t.Message {
+func (c *Client) CreateMessage(name string, plugin string, content string, clientId string) *t.Message {
 	msg := &t.Message{}
 
-	if clientName == "" && c.Registered {
+	if name == "" && c.Registered {
 		msg.Name = c.GetName()
 	} else {
-		msg.Name = clientName
+		msg.Name = name
 	}
 
 	if clientId == "" {
@@ -242,50 +261,73 @@ func (c *ChatClient) CreateMessage(clientName string, plugin string, content str
 	return msg
 }
 
-func (c *ChatClient) HandleSignal(rsp *t.Response, loggChan chan t.Logg) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+func (c *Client) HandleSignal(rsp *t.Response, loggChan chan t.Logg) error {
+	loggChan <- t.Logg{Text: "Getting Peer"}
+	peer, err := c.GetPeer(rsp.ClientId)
+	if err != nil {
+		loggChan <- t.Logg{Text: "Peer existiert nicht"}
 
-	peer, exists := c.Peers[rsp.ClientId]
-	if !exists {
-		peer = NewPeer(rsp.ClientId)
-		c.Peers[rsp.ClientId] = peer
+		peer = legacy_NewPeer(rsp.ClientId, c.GetClientId(), loggChan, c)
+		c.SetPeer(peer)
+		loggChan <- t.Logg{Text: fmt.Sprintf("Peer mit id: %s angelegt", rsp.ClientId)}
 
-		err := peer.JoinSession(c, loggChan)
+		err := peer.JoinSession()
 		if err != nil {
 			return err
 		}
 
-		return nil
+		if rsp.RspName != t.AnswerSignalFlag && rsp.RspName != t.OfferSignalFlag && rsp.RspName != t.ICECandidateFlag {
+			return nil
+		}
 	}
+	loggChan <- t.Logg{Text: "Response wird in den Signalchannel gepusht"}
 
 	peer.SignalChan <- rsp
 
 	return nil
 }
 
-func (c *ChatClient) GetClientId() string {
+func (c *Client) SetPeer(peer *legacy_Peer) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.Peers[peer.peerId] = peer
+}
+
+func (c *Client) GetPeer(id string) (*legacy_Peer, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	peer, exists := c.Peers[id]
+	if !exists {
+		return nil, fmt.Errorf("%w: peer does not exist", t.ErrNotAvailable)
+	}
+
+	return peer, nil
+}
+
+func (c *Client) GetClientId() string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	return c.clientId
 }
 
-func (c *ChatClient) GetGroupId() string {
+func (c *Client) GetGroupId() string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	return c.groupId
 }
 
-func (c *ChatClient) SetGroupId(id string) {
+func (c *Client) SetGroupId(id string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	c.groupId = id
 }
 
-func (c *ChatClient) UnsetGroupId() {
+func (c *Client) UnsetGroupId() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -293,7 +335,7 @@ func (c *ChatClient) UnsetGroupId() {
 }
 
 // GetName returns the name of the client
-func (c *ChatClient) GetName() string {
+func (c *Client) GetName() string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 

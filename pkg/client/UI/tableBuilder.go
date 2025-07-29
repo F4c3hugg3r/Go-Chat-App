@@ -11,7 +11,7 @@ import (
 // JSONToTable converts JSON array to formatted table
 func JSONToTable(jsonStr string) (string, error) {
 	// Parse generic JSON
-	var data []map[string]interface{}
+	var data []map[string]any
 	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
 		return "", fmt.Errorf("invalid JSON: %w", err)
 	}

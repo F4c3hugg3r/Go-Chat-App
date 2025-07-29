@@ -32,7 +32,7 @@ func InitialModel(u *i.UserService) model {
 	vp.KeyMap = viewportKeys
 
 	// logging
-	logg := viewport.New(30, 2)
+	logg := viewport.New(30, 6)
 
 	inputManager := &InputHistory{
 		current: -1,
@@ -55,7 +55,7 @@ func InitialModel(u *i.UserService) model {
 		title:        UnregisterTitle,
 	}
 
-	model.loggChan = model.userService.LoggChan
+	model.loggChan = model.userService.ChatClient.LoggChan
 
 	return model
 }
@@ -241,9 +241,9 @@ func (m *model) HandleWindowResize(rsp *tea.WindowSizeMsg) {
 	m.help.Width = rsp.Width
 	// logging
 	m.loggViewport.Width = rsp.Width
-	m.loggViewport.Height = 3
+	m.loggViewport.Height = 10
 
-	m.viewport.Height = rsp.Height - (lipgloss.Height(Gap) * 2) - lipgloss.Height(m.title) - 2 - m.loggViewport.Height
+	m.viewport.Height = rsp.Height - (lipgloss.Height(Gap) * 2) - lipgloss.Height(m.title) - m.loggViewport.Height
 
 	m.renderTitle(m.title, []string{WindowResizeFlag})
 	m.refreshViewPort()
@@ -271,7 +271,9 @@ func (m *model) HandleMessage() {
 	m.refreshViewPort()
 }
 
-// (TODO) das in Interface bzw Plugins auslagern
+// TODO das in Interface bzw Plugins auslagern zB rsp in Plugin verarbeiten
+// und in error flag zurückgeben, dass es nicht geprinted werden soll
+
 // evaluateResponse evaluates an incoming Response and returns the
 // corresponding rendered string
 func (m *model) evaluateReponse(rsp *t.Response) string {
@@ -280,11 +282,20 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 	switch {
 	// error output
 	case rsp.Err != "":
+		if rsp.Err == t.IgnoreResponseTag {
+			return ""
+		}
 		return red.Render(rsp.Err)
 
 	// empty output
 	case rsp.Content == "":
 		return ""
+
+	// register output
+	case strings.Contains(rsp.Content, t.RegisterFlag):
+		m.renderTitle(t.RegisterFlag, []string{m.userService.ChatClient.GetName()})
+
+		return blue.Render("-> Du kannst nun Nachrichten schreiben oder Commands ausführen\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen")
 
 	// server output
 	case rsp.RspName == "":
@@ -294,6 +305,7 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 		if strings.Contains(rsp.Content, t.UnregisterFlag) {
 			m.renderTitle(t.UnregisterFlag, nil)
 		}
+		m.userService.ChatClient.DeletePeersSafely()
 
 		return rspString
 
@@ -312,15 +324,16 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 	case strings.Contains(rsp.RspName, t.LeaveGroupFlag):
 		m.userService.ChatClient.UnsetGroupId()
 		m.renderTitle(t.RegisterFlag, []string{m.userService.ChatClient.GetName()})
+		m.userService.ChatClient.DeletePeersSafely()
 
 		return blue.Render("Du hast die Gruppe verlassen!\n-> Du kannst nun Nachrichten schreiben oder Commands ausführen\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen")
 
 	// Receive webRTC signal (Offer SDP Signal, Answer SDP Signal or ICE Candidate)
-	case strings.Contains(rsp.RspName, t.OfferSignal),
-		strings.Contains(rsp.RspName, t.AnswerSignal),
-		strings.Contains(rsp.RspName, t.ICECandidate):
-		// logging
-		m.loggChan <- t.Logg{Text: "webrtc started"}
+	case strings.Contains(rsp.RspName, t.OfferSignalFlag),
+		strings.Contains(rsp.RspName, t.AnswerSignalFlag),
+		strings.Contains(rsp.RspName, t.ICECandidateFlag):
+
+		m.loggChan <- t.Logg{Text: "webrtc related response detected"}
 
 		err := m.userService.ChatClient.HandleSignal(rsp, m.loggChan)
 		if err != nil {
@@ -333,17 +346,10 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 	case strings.HasPrefix(rsp.Content, "["):
 		output, err := JSONToTable(rsp.Content)
 		if err != nil {
-
 			return red.Render(fmt.Sprintf("%v: error formatting json to table", err))
 		}
 
 		return output
-
-	// register output
-	case strings.Contains(rsp.Content, t.RegisterFlag):
-		m.renderTitle(t.RegisterFlag, []string{m.userService.ChatClient.GetName()})
-
-		return blue.Render("-> Du kannst nun Nachrichten schreiben oder Commands ausführen\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen")
 	}
 
 	// response output

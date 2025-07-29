@@ -11,11 +11,10 @@ import (
 
 // CallPlugin lets you participate in a voice call
 type CallPlugin struct {
-	c       *n.ChatClient
-	logChan chan t.Logg
+	c *n.Client
 }
 
-func NewCallPlugin(chatClient *n.ChatClient, logChan chan t.Logg) *CallPlugin {
+func NewCallPlugin(chatClient *n.Client) *CallPlugin {
 	return &CallPlugin{c: chatClient}
 }
 
@@ -24,29 +23,34 @@ func (cp *CallPlugin) CheckScope() int {
 }
 
 func (cp *CallPlugin) Execute(message *t.Message) (error, string) {
+	// gathering group clients
 	rsp, err := cp.c.PostMessage(message, t.PostPlugin)
+	if err != nil {
+		cp.c.LoggChan <- t.Logg{Text: fmt.Sprintf("%v: error posting or processing rsp", err)}
+		return err, ""
+	}
 
-	// rsp in peers umwandeln
+	// rsp in []string Ids umwandeln
 	var Ids []string
 	dec := json.NewDecoder(strings.NewReader(rsp.Content))
 	dec.Decode(&Ids)
-	cp.logChan <- t.Logg{Text: fmt.Sprintf("Ids aus Response: %s", strings.Join(Ids, ", ")), Method: "NewCallPlugin.Execute()"}
+	cp.c.LoggChan <- t.Logg{Text: fmt.Sprintf("Ids aus Response: %s", strings.Join(Ids, ", ")), Method: "NewCallPlugin.Execute()"}
 
 	// für jede Peer Handle Signal aufrufen
-	for _, clientId := range Ids {
-		cp.c.HandleSignal(&t.Response{ClientId: clientId}, cp.logChan)
-		cp.logChan <- t.Logg{Text: fmt.Sprintf("Handle Signal started für client %s", clientId), Method: "NewCallPlugin.Execute()"}
+	for _, oppClientId := range Ids {
+		go cp.c.HandleSignal(&t.Response{ClientId: oppClientId}, cp.c.LoggChan)
+		cp.c.LoggChan <- t.Logg{Text: fmt.Sprintf("Handle Signal started für client %s", oppClientId), Method: "NewCallPlugin.Execute()"}
 	}
 
-	return err, ""
+	return nil, ""
 }
 
 // GroupPlugin lets you participate in a group chat
 type GroupPlugin struct {
-	c *n.ChatClient
+	c *n.Client
 }
 
-func NewGroupPlugin(chatClient *n.ChatClient) *GroupPlugin {
+func NewGroupPlugin(chatClient *n.Client) *GroupPlugin {
 	return &GroupPlugin{c: chatClient}
 }
 
@@ -61,10 +65,10 @@ func (gp *GroupPlugin) Execute(message *t.Message) (error, string) {
 
 // PrivateMessage Plugin lets a client send a private message to another client identified by it's clientId
 type PrivateMessagePlugin struct {
-	c *n.ChatClient
+	c *n.Client
 }
 
-func NewPrivateMessagePlugin(chatClient *n.ChatClient) *PrivateMessagePlugin {
+func NewPrivateMessagePlugin(chatClient *n.Client) *PrivateMessagePlugin {
 	return &PrivateMessagePlugin{c: chatClient}
 }
 
@@ -90,10 +94,10 @@ func (pp *PrivateMessagePlugin) Execute(message *t.Message) (error, string) {
 
 // LogOutPlugin logs out a client by deleting it out of the clients map
 type LogOutPlugin struct {
-	c *n.ChatClient
+	c *n.Client
 }
 
-func NewLogOutPlugin(chatClient *n.ChatClient) *LogOutPlugin {
+func NewLogOutPlugin(chatClient *n.Client) *LogOutPlugin {
 	return &LogOutPlugin{c: chatClient}
 }
 
@@ -108,10 +112,10 @@ func (lp *LogOutPlugin) Execute(message *t.Message) (error, string) {
 // RegisterClientPlugin safely registeres a client by creating a Client with the received values
 // and putting it into the global clients map
 type RegisterClientPlugin struct {
-	c *n.ChatClient
+	c *n.Client
 }
 
-func NewRegisterClientPlugin(chatClient *n.ChatClient) *RegisterClientPlugin {
+func NewRegisterClientPlugin(chatClient *n.Client) *RegisterClientPlugin {
 	return &RegisterClientPlugin{c: chatClient}
 }
 
@@ -141,10 +145,10 @@ func (rp *RegisterClientPlugin) Execute(message *t.Message) (error, string) {
 // BroadcaastPlugin distributes an incomming message abroad all client channels if
 // a client can't receive, i'ts active status is set to false
 type BroadcastPlugin struct {
-	c *n.ChatClient
+	c *n.Client
 }
 
-func NewBroadcastPlugin(chatClient *n.ChatClient) *BroadcastPlugin {
+func NewBroadcastPlugin(chatClient *n.Client) *BroadcastPlugin {
 	return &BroadcastPlugin{c: chatClient}
 }
 
@@ -159,10 +163,10 @@ func (bp *BroadcastPlugin) Execute(message *t.Message) (error, string) {
 
 // HelpPlugin tells you information about available plugins
 type HelpPlugin struct {
-	c *n.ChatClient
+	c *n.Client
 }
 
-func NewHelpPlugin(chatClient *n.ChatClient) *HelpPlugin {
+func NewHelpPlugin(chatClient *n.Client) *HelpPlugin {
 	return &HelpPlugin{c: chatClient}
 }
 
@@ -177,10 +181,10 @@ func (h *HelpPlugin) Execute(message *t.Message) (error, string) {
 
 // UserPlugin tells you information about all the current users
 type UserPlugin struct {
-	c *n.ChatClient
+	c *n.Client
 }
 
-func NewUserPlugin(chatClient *n.ChatClient) *UserPlugin {
+func NewUserPlugin(chatClient *n.Client) *UserPlugin {
 	return &UserPlugin{c: chatClient}
 }
 
@@ -195,10 +199,10 @@ func (u *UserPlugin) Execute(message *t.Message) (error, string) {
 
 // TimePlugin tells you the current time
 type TimePlugin struct {
-	c *n.ChatClient
+	c *n.Client
 }
 
-func NewTimePlugin(chatClient *n.ChatClient) *TimePlugin {
+func NewTimePlugin(chatClient *n.Client) *TimePlugin {
 	return &TimePlugin{c: chatClient}
 }
 

@@ -59,6 +59,10 @@ func (s *ChatService) InactiveObjectDeleter(timeLimit time.Duration) {
 
 	for clientId, client := range s.clients {
 		if client.Idle(timeLimit) {
+			if client.groupId != "" {
+				s.groups[client.groupId].RemoveClient(client)
+			}
+
 			client.Close()
 			delete(s.clients, clientId)
 		}
@@ -77,6 +81,18 @@ func (s *ChatService) LogOutAllUsers() {
 	for _, client := range s.clients {
 		client.Send(&ty.Response{Content: ty.UnregisterFlag})
 	}
+}
+
+func (s *ChatService) ForwardMessage(msg ty.Message, senderId string) error {
+	oppClient, err := s.GetClient(msg.ClientId)
+	if err != nil {
+		return err
+	}
+
+	oppClient.Send(&ty.Response{RspName: msg.Name, ClientId: senderId, Content: msg.Content})
+
+	fmt.Printf("%s sent from %s -> %s", msg.Name, senderId, msg.ClientId)
+	return nil
 }
 
 // Echo sends a response to the request submitter

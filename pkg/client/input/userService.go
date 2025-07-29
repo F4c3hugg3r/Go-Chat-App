@@ -12,7 +12,7 @@ import (
 
 // UserService handles user inputs and outputs
 type UserService struct {
-	ChatClient *n.ChatClient
+	ChatClient *n.Client
 	PlugReg    *p.PluginRegistry
 	poll       bool
 	typing     bool
@@ -23,16 +23,13 @@ type UserService struct {
 }
 
 // NewUserService creates a UserService
-func NewUserService(c *n.ChatClient) *UserService {
+func NewUserService(c *n.Client) *UserService {
 	u := &UserService{
 		ChatClient: c,
 		poll:       false,
 		mu:         &sync.RWMutex{},
-		// logging
-		LoggChan: make(chan t.Logg, 10000),
+		PlugReg:    p.RegisterPlugins(c),
 	}
-
-	u.PlugReg = p.RegisterPlugins(c, u.LoggChan)
 
 	u.cond = sync.NewCond(u.mu)
 

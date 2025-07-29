@@ -23,12 +23,12 @@ type PluginInterface interface {
 // PluginRegistry contains the plugins and their methods
 type PluginRegistry struct {
 	Plugins    map[string]PluginInterface
-	chatClient *n.ChatClient
+	chatClient *n.Client
 }
 
 // logging
 // RegisterPlugins sets up all the plugins
-func RegisterPlugins(chatClient *n.ChatClient, logChan chan t.Logg) *PluginRegistry {
+func RegisterPlugins(chatClient *n.Client) *PluginRegistry {
 	pr := PluginRegistry{Plugins: make(map[string]PluginInterface)}
 	pr.Plugins["/help"] = NewHelpPlugin(chatClient)
 	pr.Plugins["/time"] = NewTimePlugin(chatClient)
@@ -38,7 +38,7 @@ func RegisterPlugins(chatClient *n.ChatClient, logChan chan t.Logg) *PluginRegis
 	pr.Plugins["/quit"] = NewLogOutPlugin(chatClient)
 	pr.Plugins["/private"] = NewPrivateMessagePlugin(chatClient)
 	pr.Plugins["/group"] = NewGroupPlugin(chatClient)
-	pr.Plugins["/call"] = NewCallPlugin(chatClient, logChan)
+	pr.Plugins["/call"] = NewCallPlugin(chatClient)
 
 	pr.chatClient = chatClient
 

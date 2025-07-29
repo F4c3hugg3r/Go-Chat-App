@@ -21,6 +21,8 @@ type Client struct {
 	mu        sync.RWMutex
 	chClosed  bool
 	groupId   string
+	// map of real time connections, where key represents opposing clientId
+	rtcs map[string]*ty.Connection
 }
 
 func (c *Client) Execute(handler *PluginRegistry, msg *ty.Message) (*ty.Response, error) {
@@ -137,4 +139,11 @@ func (c *Client) UnsetGroup() {
 	defer c.mu.Unlock()
 
 	c.groupId = ""
+}
+
+func (c *Client) GetName() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.Name
 }

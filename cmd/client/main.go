@@ -39,14 +39,11 @@ func main() {
 
 // interruptListener sends a cancel() signal and closes all connections and requests if a interruption like
 // os.Interrupt or syscall.SIGTERM is being triggered
-func interruptListener(interChan chan os.Signal, c *n.ChatClient) {
+func interruptListener(interChan chan os.Signal, c *n.Client) {
 	<-interChan
 
 	if c.Registered {
-		err := c.PostDelete(c.CreateMessage("", "/quit", "", ""))
-		if err != nil {
-			log.Print(err)
-		}
+		c.Interrupt()
 	}
 
 	c.HttpClient.CloseIdleConnections()

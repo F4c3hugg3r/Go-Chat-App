@@ -113,6 +113,38 @@ func (handler *ServerHandler) HandleRegistry(w http.ResponseWriter, r *http.Requ
 	}
 }
 
+func (handler *ServerHandler) HandleSignals(w http.ResponseWriter, r *http.Request) {
+	// SignalPlugin forwards webRTC signals (SDP, ICE Candidates) to the other group members
+	clientId := r.PathValue("clientId")
+	if clientId == "" {
+		http.Error(w, "missing path parameter clientId", http.StatusBadRequest)
+		return
+	}
+
+	bodyMax := http.MaxBytesReader(w, r.Body, 1<<20)
+	defer r.Body.Close()
+
+	body, err := io.ReadAll(bodyMax)
+
+	if err != nil {
+		http.Error(w, "error reading request body", http.StatusInternalServerError)
+		return
+	}
+
+	message, err := ty.DecodeToMessage(body)
+	if err != nil {
+		http.Error(w, "error decoding request body", http.StatusInternalServerError)
+		return
+	}
+
+	err = handler.Service.ForwardMessage(message, clientId)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+}
+
 // handleMessages takes an incoming POST request with a message in i'ts body and distributes it to all clients
 // should receive a Path Parameter with clientId in it
 // should receive the message in the request body
@@ -151,6 +183,11 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	err = handler.Service.Echo(clientId, rsp)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusRequestTimeout)
+	}
+
 	body, err = json.Marshal(rsp)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -159,11 +196,6 @@ func (handler *ServerHandler) HandleMessages(w http.ResponseWriter, r *http.Requ
 	_, err = w.Write(body)
 	if err != nil {
 		http.Error(w, "couldn't write response", http.StatusInternalServerError)
-	}
-
-	err = handler.Service.Echo(clientId, rsp)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusRequestTimeout)
 	}
 }
 

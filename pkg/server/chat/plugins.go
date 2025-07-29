@@ -9,7 +9,7 @@ import (
 	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
-// CallPlugin forwards webRTC signals (SDP, ICE Candidates) to the other group members
+// CallPlugin returns a slice of all the other group member ids
 type CallPlugin struct {
 	chatService *ChatService
 }
@@ -26,7 +26,6 @@ func (cp *CallPlugin) Description() *Description {
 }
 
 func (cp *CallPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
-	// TODO bei offer alle Client ids der Gruppe als Json zurück geben
 	group, _, err := GetCurrentGroup(msg.ClientId, cp.chatService)
 	if err != nil {
 		return &ty.Response{Err: fmt.Sprintf("%v: error getting current group", err)}, nil
@@ -36,15 +35,12 @@ func (cp *CallPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return &ty.Response{Err: fmt.Sprintf("%v: you are not in a group yet", ty.ErrNoPermission)}, nil
 	}
 
-	groupClientIds, err := GroupClientIdsToJson(group)
+	groupClientIds, err := GroupClientIdsToJson(group, msg.ClientId)
 	if err != nil {
 		return nil, fmt.Errorf("%w: error encoding clientId to json", err)
 	}
 
-	rsp := &ty.Response{ClientId: msg.ClientId, RspName: msg.Name, Content: msg.Content}
-	cp.chatService.Broadcast(group.GetClients(), rsp)
-
-	return &ty.Response{RspName: rsp.RspName, Content: string(groupClientIds)}, nil
+	return &ty.Response{RspName: msg.Name, Content: string(groupClientIds), Err: ty.IgnoreResponseTag}, nil
 }
 
 // PrivateMessage Plugin lets a client send a private message to another client identified by it's clientId
