@@ -3,6 +3,9 @@ package chat
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
+	"sort"
+	"strings"
 	"sync"
 
 	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
@@ -10,6 +13,8 @@ import (
 
 type Group struct {
 	clients map[string]*Client
+	// key: composite key from both clientIds, value: ICE Connected
+	rtcs    map[string]bool
 	GroupId string `json:"groupId"`
 	Name    string `json:"name"`
 	mu      *sync.RWMutex
@@ -28,12 +33,12 @@ func RegisterGroupPlugins(s *ChatService, pr *PluginRegistry) *GroupPluginRegist
 	gp.gPlugins["create"] = NewGroupCreatePlugin(s)
 	gp.gPlugins["leave"] = NewGroupLeavePlugin(s, pr)
 	gp.gPlugins["users"] = NewGroupUsersPlugin(s)
-	// gp.gPlugins["invite"] = NewGroupInvitePlugin(s)
-	// rules
 
-	// Für private:
+	// TODO
 	// kick
 	// admin
+	// invite
+	// rules
 
 	return gp
 }
@@ -80,13 +85,27 @@ func (g *Group) RemoveClient(client *Client) error {
 	return fmt.Errorf("%w: you are not in this group", ty.ErrNoPermission)
 }
 
-func (g *Group) GetClientIdsFromGroup(notIncludedId string) []string {
+// GetClientIdsFromGroup return every clientId which is not in a rtc with given clientId
+func (g *Group) GetClientIdsFromGroup(ownId string, onlyCallable bool) []string {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
+	var inCallOppKeys []string
+
+	if onlyCallable {
+		for compKey := range g.rtcs {
+			if strings.Contains(compKey, ownId) {
+				inCallOppKeys = append(inCallOppKeys, GetRTCPartnerFromKey(ownId, compKey))
+			}
+		}
+	}
+
 	var clientIds []string
-	for clientId := range g.clients {
-		if clientId != notIncludedId {
+	for clientId, _ := range g.clients {
+		if clientId != ownId {
+			if slices.Contains(inCallOppKeys, clientId) && onlyCallable {
+				continue
+			}
 			clientIds = append(clientIds, clientId)
 		}
 	}
@@ -114,4 +133,48 @@ func (g *Group) SafeGetGroupSlice() []json.RawMessage {
 	defer g.mu.RUnlock()
 
 	return GenericMapToJSONSlice(g.clients)
+}
+
+// CheckConnections returns every current rtc (doesn't have to be ICE connected)
+// of one user and returns the composite key
+// func (g *Group) CheckConnections(clientId string) []string {
+// 	g.mu.RLock()
+// 	defer g.mu.RUnlock()
+
+// 	var compKeysSlice []string
+
+// 	for compKey := range g.connections {
+// 		if strings.Contains(compKey, clientId) {
+// 			compKeysSlice = append(compKeysSlice, compKey)
+// 		}
+// 	}
+// 	return compKeysSlice
+// }
+
+func (g *Group) ConnectToGroupMembers(ownId string) []string {
+	stringSlice := g.GetClientIdsFromGroup(ownId, true)
+
+	for _, oppId := range stringSlice {
+		g.AddConnection(ownId, oppId)
+	}
+
+	return stringSlice
+}
+
+func (g *Group) AddConnection(ownId string, oppId string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	g.rtcs[CreateCompositeKey(ownId, oppId)] = false
+}
+
+func CreateCompositeKey(firstId string, secondId string) string {
+	ids := []string{firstId, secondId}
+	sort.Strings(ids)
+	return ids[0] + ":" + ids[1]
+}
+
+func GetRTCPartnerFromKey(ownId string, compKey string) string {
+	oppId := strings.Replace(compKey, ownId, "", -1)
+	return strings.Replace(oppId, ":", "", -1)
 }

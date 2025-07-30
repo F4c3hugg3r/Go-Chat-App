@@ -19,16 +19,16 @@ type Client struct {
 	Registered bool
 	Output     chan *t.Response
 
-	mu       *sync.RWMutex
-	cond     *sync.Cond
-	LoggChan chan t.Logg
+	mu      *sync.RWMutex
+	cond    *sync.Cond
+	LogChan chan t.Logg
 
 	Url        string
 	HttpClient *http.Client
 	Endpoints  map[int]string
 
-	// TODO functionallity to cleer inactive Peers
-	Peers map[string]*legacy_Peer
+	// TODO functionallity to clear inactive Peers
+	Peers map[string]*Peer
 }
 
 // NewClient generates a ChatClient and spawns a ResponseReceiver goroutine
@@ -42,11 +42,11 @@ func NewClient(server string) *Client {
 		HttpClient: &http.Client{},
 		Registered: false,
 
-		mu:       &sync.RWMutex{},
-		Url:      server,
-		LoggChan: make(chan t.Logg, 10000),
+		mu:      &sync.RWMutex{},
+		Url:     server,
+		LogChan: make(chan t.Logg, 10000),
 
-		Peers: make(map[string]*legacy_Peer),
+		Peers: make(map[string]*Peer),
 	}
 
 	chatClient.Endpoints = chatClient.RegisterEndpoints(chatClient.Url)
@@ -78,17 +78,24 @@ func (c *Client) Interrupt() {
 		}
 	}
 
-	c.DeletePeersSafely()
+	c.DeletePeersSafely("", true)
 
 	c.HttpClient.CloseIdleConnections()
 }
 
-func (c *Client) DeletePeersSafely() {
+// DeletePeersSafely deletes a Peer or all Peers out of the peers map
+func (c *Client) DeletePeersSafely(clientId string, wholeMap bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	if wholeMap == false {
+		c.Peers[clientId].CloseConnection()
+		delete(c.Peers, clientId)
+		return
+	}
+
 	for _, peer := range c.Peers {
-		peer.Close(true)
+		peer.CloseConnection()
 		delete(c.Peers, peer.peerId)
 	}
 }
@@ -261,40 +268,58 @@ func (c *Client) CreateMessage(name string, plugin string, content string, clien
 	return msg
 }
 
-func (c *Client) HandleSignal(rsp *t.Response, loggChan chan t.Logg) error {
-	loggChan <- t.Logg{Text: "Getting Peer"}
+func (c *Client) HandleSignal(rsp *t.Response, offerConnection bool) {
+	err := c.HandlePeer(rsp, offerConnection)
+	if err != nil {
+		// maybe TODO errorhandling verbessern indem content mitgeschickt wird für bspw retry
+		c.SendSignalingError(rsp.ClientId, "")
+	}
+}
+
+func (c *Client) SendSignalingError(oppId string, content string) {
+	msg := c.CreateMessage(t.FailedConnectionFlag, "/connection", content, oppId)
+	_, err := c.PostMessage(msg, t.SignalWebRTC)
+	if err != nil {
+		c.LogChan <- t.Logg{Text: fmt.Sprintf("WebRTC: Fehler beim senden des ConnectionFailedFlags %v", err)}
+	}
+}
+
+func (c *Client) HandlePeer(rsp *t.Response, offerConnection bool) error {
 	peer, err := c.GetPeer(rsp.ClientId)
 	if err != nil {
-		loggChan <- t.Logg{Text: "Peer existiert nicht"}
+		c.LogChan <- t.Logg{Text: "Peer existiert nicht"}
 
-		peer = legacy_NewPeer(rsp.ClientId, c.GetClientId(), loggChan, c)
-		c.SetPeer(peer)
-		loggChan <- t.Logg{Text: fmt.Sprintf("Peer mit id: %s angelegt", rsp.ClientId)}
-
-		err := peer.JoinSession()
+		peer, err := NewPeer(rsp.ClientId, c.LogChan, c)
 		if err != nil {
+			c.LogChan <- t.Logg{Text: fmt.Sprintf("Peer mit id: %s konnte nicht erstellt werden, server wird informiert", rsp.ClientId)}
+
 			return err
 		}
 
-		if rsp.RspName != t.AnswerSignalFlag && rsp.RspName != t.OfferSignalFlag && rsp.RspName != t.ICECandidateFlag {
-			return nil
+		c.SetPeer(peer)
+		c.LogChan <- t.Logg{Text: fmt.Sprintf("Peer mit id: %s angelegt", rsp.ClientId)}
+
+		if offerConnection {
+			c.LogChan <- t.Logg{Text: "OfferConnection gestartet"}
+
+			return peer.OfferConnection()
 		}
 	}
-	loggChan <- t.Logg{Text: "Response wird in den Signalchannel gepusht"}
 
+	c.LogChan <- t.Logg{Text: "Response wird in den Signalchannel gepusht"}
 	peer.SignalChan <- rsp
 
 	return nil
 }
 
-func (c *Client) SetPeer(peer *legacy_Peer) {
+func (c *Client) SetPeer(peer *Peer) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	c.Peers[peer.peerId] = peer
 }
 
-func (c *Client) GetPeer(id string) (*legacy_Peer, error) {
+func (c *Client) GetPeer(id string) (*Peer, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 

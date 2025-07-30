@@ -26,20 +26,24 @@ func (cp *CallPlugin) Execute(message *t.Message) (error, string) {
 	// gathering group clients
 	rsp, err := cp.c.PostMessage(message, t.PostPlugin)
 	if err != nil {
-		cp.c.LoggChan <- t.Logg{Text: fmt.Sprintf("%v: error posting or processing rsp", err)}
+		cp.c.LogChan <- t.Logg{Text: fmt.Sprintf("%v: error posting or processing rsp", err)}
 		return err, ""
 	}
 
-	// rsp in []string Ids umwandeln
-	var Ids []string
+	var callableClientIds []string
 	dec := json.NewDecoder(strings.NewReader(rsp.Content))
-	dec.Decode(&Ids)
-	cp.c.LoggChan <- t.Logg{Text: fmt.Sprintf("Ids aus Response: %s", strings.Join(Ids, ", ")), Method: "NewCallPlugin.Execute()"}
+	err = dec.Decode(&callableClientIds)
+	if err != nil {
+		cp.c.LogChan <- t.Logg{Text: fmt.Sprintf("Fehler beim Decoden: Ids aus Response: %s", rsp.Content), Method: "NewCallPlugin.Execute()"}
+		// TODO diesen Sonderfall im Server beachten -> keine oppId
+		cp.c.SendSignalingError("", "")
+		return err, ""
+	}
+	cp.c.LogChan <- t.Logg{Text: fmt.Sprintf("Ids aus Response: %s", strings.Join(callableClientIds, ", ")), Method: "NewCallPlugin.Execute()"}
 
-	// für jede Peer Handle Signal aufrufen
-	for _, oppClientId := range Ids {
-		go cp.c.HandleSignal(&t.Response{ClientId: oppClientId}, cp.c.LoggChan)
-		cp.c.LoggChan <- t.Logg{Text: fmt.Sprintf("Handle Signal started für client %s", oppClientId), Method: "NewCallPlugin.Execute()"}
+	for _, oppClientId := range callableClientIds {
+		go cp.c.HandleSignal(&t.Response{ClientId: oppClientId}, true)
+		cp.c.LogChan <- t.Logg{Text: fmt.Sprintf("Handle Signal started für client %s", oppClientId), Method: "NewCallPlugin.Execute()"}
 	}
 
 	return nil, ""

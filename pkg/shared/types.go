@@ -15,20 +15,20 @@ const (
 
 const UnregisterFlag = "- Du bist nun vom Server getrennt -"
 const RegisterFlag = "- Du bist registriert -"
+const IgnoreResponseTag = "Ignore Response"
 
 const AddGroupFlag = "Add Group"
 const LeaveGroupFlag = "Leave Group"
 
 const ICECandidateFlag = "ICE Candidate"
+
+// callStates
 const OfferSignalFlag = "Offer Signal"
 const AnswerSignalFlag = "Answer Signal"
 const RollbackSignalFlag = "Rollback Signal"
 const StableSignalFlag = "Stable Flag"
 const ConnectedFlag = "Connected"
 const FailedConnectionFlag = "Connection Failed"
-
-// const StartCallFlag = "Call Started"
-const IgnoreResponseTag = "Ignore Response"
 
 var (
 	ErrNotAvailable   error = errors.New("item is not available")
@@ -65,11 +65,6 @@ type JsonGroup struct {
 	GroupId string `json:"groupId"`
 	Name    string `json:"name"`
 	Size    int    `json:"size"`
-}
-
-type Connection struct {
-	CallState string
-	Connected bool
 }
 
 // logging

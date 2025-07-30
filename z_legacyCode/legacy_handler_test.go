@@ -1,4 +1,6 @@
-package api
+package legacy
+
+// package api
 
 // import (
 // 	"bytes"

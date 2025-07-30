@@ -9,6 +9,10 @@ import (
 	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
+type PluginHandler interface {
+	FindAndExecute(message *ty.Message) (*ty.Response, error)
+}
+
 // Client is a communication participant who has a name, unique id and
 // channel to receive messages
 type Client struct {
@@ -21,11 +25,11 @@ type Client struct {
 	mu        sync.RWMutex
 	chClosed  bool
 	groupId   string
-	// map of real time connections, where key represents opposing clientId
-	rtcs map[string]*ty.Connection
+	// key represents opposing clientId and value the current callState
+	rtcs map[string]string
 }
 
-func (c *Client) Execute(handler *PluginRegistry, msg *ty.Message) (*ty.Response, error) {
+func (c *Client) Execute(handler PluginHandler, msg *ty.Message) (*ty.Response, error) {
 	c.setActive(true)
 	defer c.setActive(false)
 
@@ -147,3 +151,22 @@ func (c *Client) GetName() string {
 
 	return c.Name
 }
+
+// func (c *Client) CheckRTC(oppId string) *ty.Connection {
+// 	c.mu.RLock()
+// 	defer c.mu.RUnlock()
+
+// 	rtc, ok := c.rtcs[oppId]
+// 	if !ok {
+// 		return nil
+// 	}
+
+// 	return rtc
+// }
+
+// func (c *Client) GetRTCs() map[string]*ty.Connection {
+// 	c.mu.RLock()
+// 	defer c.mu.RUnlock()
+
+// 	return c.rtcs
+// }

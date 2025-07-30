@@ -31,8 +31,7 @@ func InitialModel(u *i.UserService) model {
 	vp := viewport.New(30, 5)
 	vp.KeyMap = viewportKeys
 
-	// logging
-	logg := viewport.New(30, 6)
+	logg := viewport.New(30, 0)
 
 	inputManager := &InputHistory{
 		current: -1,
@@ -40,9 +39,8 @@ func InitialModel(u *i.UserService) model {
 	}
 
 	model := model{
-		messages: []string{},
-		viewport: vp,
-		// logging
+		messages:     []string{},
+		viewport:     vp,
 		loggViewport: logg,
 		loggs:        []string{},
 		err:          nil,
@@ -55,14 +53,13 @@ func InitialModel(u *i.UserService) model {
 		title:        UnregisterTitle,
 	}
 
-	model.loggChan = model.userService.ChatClient.LoggChan
+	model.loggChan = model.userService.ChatClient.LogChan
 
 	return model
 }
 
 // Init is being called before Update listenes and initializes required functions
 func (m model) Init() tea.Cmd {
-	// logging
 	return tea.Batch(textarea.Blink, m.waitForExternalResponse(), m.waitForLogg())
 }
 
@@ -76,7 +73,6 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 
 	m.viewport, vpCmd = m.viewport.Update(rsp)
 	m.textinput, tiCmd = m.textinput.Update(rsp)
-	//logging
 	m.loggViewport, loCmd = m.loggViewport.Update(rsp)
 
 	if m.textinput.Value() == "" {
@@ -84,7 +80,6 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch rsp := rsp.(type) {
-	// logging
 	case t.Logg:
 		m.PrintLogg(rsp)
 
@@ -97,7 +92,6 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.WindowSizeMsg:
 		m.HandleWindowResize(&rsp)
-		// logging
 		m.loggChan <- t.Logg{Text: "log started"}
 
 	case tea.KeyMsg:
@@ -114,6 +108,9 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 		switch {
 		case key.Matches(rsp, m.keyMap.Help):
 			m.help.ShowAll = !m.help.ShowAll
+
+		case key.Matches(rsp, m.keyMap.Logs):
+			m.HideLogs()
 
 		case key.Matches(rsp, m.keyMap.InputLeft), key.Matches(rsp, m.keyMap.InputRight):
 			input := m.SearchInputHistory(rsp)
@@ -145,7 +142,6 @@ func (m model) View() string {
 	)
 }
 
-// logging
 func (m *model) refreshLoggViewPort() {
 	if len(m.loggs) > 0 {
 		str, _ := strings.CutSuffix(strings.Join(m.loggs, "\n"), "\n")
@@ -163,6 +159,15 @@ func (m *model) refreshViewPort() {
 	}
 
 	m.viewport.GotoBottom()
+}
+
+func (m *model) HideLogs() {
+	switch m.loggViewport.Height {
+	case 0:
+		m.loggViewport.Height = 6
+	case 6:
+		m.loggViewport.Height = 0
+	}
 }
 
 // SearchInputHistory takes a keybind for left or right, if needed, sets the current index value
@@ -239,11 +244,16 @@ func (m *model) HandleWindowResize(rsp *tea.WindowSizeMsg) {
 	m.viewport.Width = rsp.Width
 	m.textinput.Width = rsp.Width
 	m.help.Width = rsp.Width
-	// logging
 	m.loggViewport.Width = rsp.Width
-	m.loggViewport.Height = 10
+	var logPortHeight int
+	switch m.loggViewport.Height {
+	case 0:
+		logPortHeight = 1
+	default:
+		logPortHeight = m.loggViewport.Height
+	}
 
-	m.viewport.Height = rsp.Height - (lipgloss.Height(Gap) * 2) - lipgloss.Height(m.title) - m.loggViewport.Height
+	m.viewport.Height = rsp.Height - (lipgloss.Height(Gap) * 2) - lipgloss.Height(m.title) - logPortHeight
 
 	m.renderTitle(m.title, []string{WindowResizeFlag})
 	m.refreshViewPort()
@@ -305,7 +315,7 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 		if strings.Contains(rsp.Content, t.UnregisterFlag) {
 			m.renderTitle(t.UnregisterFlag, nil)
 		}
-		m.userService.ChatClient.DeletePeersSafely()
+		m.userService.ChatClient.DeletePeersSafely("", true)
 
 		return rspString
 
@@ -324,9 +334,13 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 	case strings.Contains(rsp.RspName, t.LeaveGroupFlag):
 		m.userService.ChatClient.UnsetGroupId()
 		m.renderTitle(t.RegisterFlag, []string{m.userService.ChatClient.GetName()})
-		m.userService.ChatClient.DeletePeersSafely()
+		m.userService.ChatClient.DeletePeersSafely("", true)
 
 		return blue.Render("Du hast die Gruppe verlassen!\n-> Du kannst nun Nachrichten schreiben oder Commands ausführen\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen")
+
+	// Rollback/Delete Peer output
+	case strings.Contains(rsp.RspName, t.RollbackSignalFlag):
+		m.userService.ChatClient.DeletePeersSafely(rsp.ClientId, false)
 
 	// Receive webRTC signal (Offer SDP Signal, Answer SDP Signal or ICE Candidate)
 	case strings.Contains(rsp.RspName, t.OfferSignalFlag),
@@ -334,11 +348,7 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 		strings.Contains(rsp.RspName, t.ICECandidateFlag):
 
 		m.loggChan <- t.Logg{Text: "webrtc related response detected"}
-
-		err := m.userService.ChatClient.HandleSignal(rsp, m.loggChan)
-		if err != nil {
-			return red.Render(fmt.Sprintf("%v: error connecting to other peer", err))
-		}
+		m.userService.ChatClient.HandleSignal(rsp, false)
 
 		return ""
 
@@ -366,14 +376,12 @@ func (m *model) waitForExternalResponse() tea.Cmd {
 	}
 }
 
-// logging
 func (m *model) waitForLogg() tea.Cmd {
 	return func() tea.Msg {
 		return m.LoggPoller()
 	}
 }
 
-// logging
 func (m *model) LoggPoller() t.Logg {
 	logg, ok := <-m.loggChan
 	if !ok {
@@ -383,7 +391,6 @@ func (m *model) LoggPoller() t.Logg {
 	return logg
 }
 
-// logging
 func (m *model) PrintLogg(rsp t.Logg) {
 	m.loggs = append(m.loggs, fmt.Sprintf("%s: %s", rsp.Method, rsp.Text))
 	m.refreshLoggViewPort()
@@ -391,7 +398,7 @@ func (m *model) PrintLogg(rsp t.Logg) {
 
 // ShortHelp decides what to see in the short help window
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Help, k.Quit, k.Complete, k.NextSug, k.PrevSug}
+	return []key.Binding{k.Help, k.Quit, k.Complete, k.Logs, k.NextSug, k.PrevSug}
 }
 
 // ShortHelp decides what to see in the extended help window

@@ -53,6 +53,7 @@ var (
 		Help:         key.NewBinding(key.WithKeys("ctrl+h"), key.WithHelp("ctrl h", faint.Render("toggle help"))),
 		Complete:     key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", faint.Render("complete"))),
 		Quit:         key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", faint.Render("quit"))),
+		Logs:         key.NewBinding(key.WithKeys("ctrl+l"), key.WithHelp("ctrl l", faint.Render("toggle logs"))),
 		NextSug:      key.NewBinding(key.WithKeys("shift+right"), key.WithHelp("shift →", faint.Render("next suggestion"))),
 		PrevSug:      key.NewBinding(key.WithKeys("shift+left"), key.WithHelp("shift ←", faint.Render("previous suggestion"))),
 		HalfPageUp:   viewportKeys.HalfPageUp,
@@ -78,6 +79,7 @@ type keyMap struct {
 	HalfPageDown key.Binding
 	Help         key.Binding
 	Quit         key.Binding
+	Logs         key.Binding
 	Complete     key.Binding
 	NextSug      key.Binding
 	PrevSug      key.Binding

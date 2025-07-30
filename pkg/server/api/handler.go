@@ -137,12 +137,34 @@ func (handler *ServerHandler) HandleSignals(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	err = handler.Service.ForwardMessage(message, clientId)
+	client, err := handler.Service.GetClient(clientId)
+	if err != nil {
+		http.Error(w, "client not found ", http.StatusNotFound)
+		return
+	}
+
+	// TODO ändern zu handler.WebRTC
+	rsp, err := client.Execute(handler.Plugins, &message)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	// err = handler.Service.ForwardMessage(message, clientId)
+	// if err != nil {
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 	return
+	// }
+
+	body, err = json.Marshal(rsp)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	_, err = w.Write(body)
+	if err != nil {
+		http.Error(w, "couldn't write response", http.StatusInternalServerError)
+	}
 }
 
 // handleMessages takes an incoming POST request with a message in i'ts body and distributes it to all clients

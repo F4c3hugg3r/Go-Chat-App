@@ -35,12 +35,19 @@ func (cp *CallPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return &ty.Response{Err: fmt.Sprintf("%v: you are not in a group yet", ty.ErrNoPermission)}, nil
 	}
 
-	groupClientIds, err := GroupClientIdsToJson(group, msg.ClientId)
+	if group.SetSize() > 6 {
+		return &ty.Response{Err: fmt.Sprintf("%v: group is to big for a call (max 6 clients)", ty.ErrNoPermission)}, nil
+	}
+
+	groupClientIds := group.ConnectToGroupMembers(msg.ClientId)
+
+	jsonSlice := json.RawMessage{}
+	jsonSlice, err = json.Marshal(groupClientIds)
 	if err != nil {
 		return nil, fmt.Errorf("%w: error encoding clientId to json", err)
 	}
 
-	return &ty.Response{RspName: msg.Name, Content: string(groupClientIds), Err: ty.IgnoreResponseTag}, nil
+	return &ty.Response{RspName: msg.Name, Content: string(jsonSlice), Err: ty.IgnoreResponseTag}, nil
 }
 
 // PrivateMessage Plugin lets a client send a private message to another client identified by it's clientId
