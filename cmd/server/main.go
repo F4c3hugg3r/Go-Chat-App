@@ -27,7 +27,8 @@ func main() {
 	cfg := ParseFlags()
 	service := chat.NewChatService(cfg.maxUsers)
 	plugin := chat.RegisterPlugins(service)
-	handler := api.NewServerHandler(service, plugin)
+	webRTC := chat.RegisterCallPlugins(service)
+	handler := api.NewServerHandler(service, plugin, webRTC)
 	wg := &sync.WaitGroup{}
 
 	ctx, cancel := context.WithCancel(context.Background())

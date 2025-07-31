@@ -20,8 +20,6 @@ import (
 
 // TODO Darstellung des Anrufes in UI
 
-// TODO Schließen der Verbindung
-
 // InitialModel initializes the model struct, which is the main struct for the TUI
 func InitialModel(u *i.UserService) model {
 	ti := setUpTextInput(u)
@@ -339,7 +337,7 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 		return blue.Render("Du hast die Gruppe verlassen!\n-> Du kannst nun Nachrichten schreiben oder Commands ausführen\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen")
 
 	// Rollback/Delete Peer output
-	case strings.Contains(rsp.RspName, t.RollbackSignalFlag):
+	case strings.Contains(rsp.RspName, t.FailedConnectionFlag):
 		m.userService.ChatClient.DeletePeersSafely(rsp.ClientId, false)
 
 	// Receive webRTC signal (Offer SDP Signal, Answer SDP Signal or ICE Candidate)

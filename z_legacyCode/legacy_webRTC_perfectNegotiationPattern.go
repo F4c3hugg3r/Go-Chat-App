@@ -185,7 +185,7 @@ package legacy
 // 		p.logChannel <- t.Logg{Text: fmt.Sprintf("WebRTC: opus.NewDecoder error: %v", err)}
 // 		return
 // 	}
-// 	// (TODO) jitter buffer für stabilere Audioqualität
+// 	// legacy TODO jitter buffer für stabilere Audioqualität
 // 	p.logChannel <- t.Logg{Text: "WebRTC: Opus Decoder bereit"}
 
 // 	// RTP Pakete von Opus in PCM decodieren

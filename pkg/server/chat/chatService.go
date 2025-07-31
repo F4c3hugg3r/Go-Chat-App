@@ -83,15 +83,15 @@ func (s *ChatService) LogOutAllUsers() {
 	}
 }
 
-func (s *ChatService) ForwardMessage(msg ty.Message, senderId string) error {
+func (s *ChatService) ForwardSignal(msg *ty.Message, signal string) error {
 	oppClient, err := s.GetClient(msg.ClientId)
 	if err != nil {
 		return err
 	}
 
-	oppClient.Send(&ty.Response{RspName: msg.Name, ClientId: senderId, Content: msg.Content})
+	oppClient.Send(&ty.Response{RspName: signal, ClientId: msg.Name, Content: msg.Content})
 
-	fmt.Printf("%s sent from %s -> %s", msg.Name, senderId, msg.ClientId)
+	fmt.Printf("%s sent from %s -> %s", signal, msg.Name, msg.ClientId)
 	return nil
 }
 

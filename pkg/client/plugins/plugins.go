@@ -35,7 +35,6 @@ func (cp *CallPlugin) Execute(message *t.Message) (error, string) {
 	err = dec.Decode(&callableClientIds)
 	if err != nil {
 		cp.c.LogChan <- t.Logg{Text: fmt.Sprintf("Fehler beim Decoden: Ids aus Response: %s", rsp.Content), Method: "NewCallPlugin.Execute()"}
-		// TODO diesen Sonderfall im Server beachten -> keine oppId
 		cp.c.SendSignalingError("", "")
 		return err, ""
 	}

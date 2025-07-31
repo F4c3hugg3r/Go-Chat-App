@@ -128,7 +128,6 @@ func (gcp *GroupCreatePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	return &ty.Response{RspName: ty.AddGroupFlag, Content: string(jsonGroup)}, nil
 }
 
-// TODO GroupInvitePlugin
 // type GroupInvitePlugin struct {
 // 	s *ChatService
 // }
@@ -182,6 +181,8 @@ func (glp *GroupLeavePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	if err != nil {
 		return &ty.Response{Err: fmt.Sprintf("%v: error while removing client from group", err)}, nil
 	}
+
+	group.RemoveConnection(msg.ClientId, "", true)
 
 	client.Execute(glp.pr, &ty.Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s hat die Gruppe verlassen", msg.Name), ClientId: msg.ClientId, GroupId: msg.GroupId})
 
@@ -263,6 +264,7 @@ func (gjp *GroupJoinPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		client.Execute(gjp.pr, &ty.Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s hat die Gruppe verlassen", msg.Name), ClientId: msg.ClientId, GroupId: msg.GroupId})
 		client.UnsetGroup()
 		group.RemoveClient(client)
+		group.RemoveConnection(msg.ClientId, "", true)
 	}
 
 	err = group.AddClient(client)

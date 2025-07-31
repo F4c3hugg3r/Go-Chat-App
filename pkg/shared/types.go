@@ -20,12 +20,13 @@ const IgnoreResponseTag = "Ignore Response"
 const AddGroupFlag = "Add Group"
 const LeaveGroupFlag = "Leave Group"
 
+// signal flags
 const ICECandidateFlag = "ICE Candidate"
+const RollbackDoneFlag = "Rollback Done"
 
-// callStates
+// signalflags -> callStates
 const OfferSignalFlag = "Offer Signal"
 const AnswerSignalFlag = "Answer Signal"
-const RollbackSignalFlag = "Rollback Signal"
 const StableSignalFlag = "Stable Flag"
 const ConnectedFlag = "Connected"
 const FailedConnectionFlag = "Connection Failed"

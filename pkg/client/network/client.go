@@ -27,7 +27,8 @@ type Client struct {
 	HttpClient *http.Client
 	Endpoints  map[int]string
 
-	// TODO functionallity to clear inactive Peers
+	// maybe TODO functionallity to clear inactive Peers
+	// garbage collection if there are still leaks
 	Peers map[string]*Peer
 }
 
@@ -89,14 +90,20 @@ func (c *Client) DeletePeersSafely(clientId string, wholeMap bool) {
 	defer c.mu.Unlock()
 
 	if wholeMap == false {
+		if _, exists := c.Peers[clientId]; !exists {
+			return
+		}
+
 		c.Peers[clientId].CloseConnection()
 		delete(c.Peers, clientId)
+		c.SendSignalingError(clientId, t.RollbackDoneFlag)
 		return
 	}
 
 	for _, peer := range c.Peers {
 		peer.CloseConnection()
 		delete(c.Peers, peer.peerId)
+		c.SendSignalingError(clientId, t.RollbackDoneFlag)
 	}
 }
 
@@ -268,10 +275,9 @@ func (c *Client) CreateMessage(name string, plugin string, content string, clien
 	return msg
 }
 
-func (c *Client) HandleSignal(rsp *t.Response, offerConnection bool) {
-	err := c.HandlePeer(rsp, offerConnection)
+func (c *Client) HandleSignal(rsp *t.Response, offer bool) {
+	err := c.HandlePeer(rsp, offer)
 	if err != nil {
-		// maybe TODO errorhandling verbessern indem content mitgeschickt wird für bspw retry
 		c.SendSignalingError(rsp.ClientId, "")
 	}
 }
@@ -284,12 +290,12 @@ func (c *Client) SendSignalingError(oppId string, content string) {
 	}
 }
 
-func (c *Client) HandlePeer(rsp *t.Response, offerConnection bool) error {
+func (c *Client) HandlePeer(rsp *t.Response, offer bool) error {
 	peer, err := c.GetPeer(rsp.ClientId)
 	if err != nil {
 		c.LogChan <- t.Logg{Text: "Peer existiert nicht"}
 
-		peer, err := NewPeer(rsp.ClientId, c.LogChan, c)
+		peer, err := NewPeer(rsp.ClientId, c.LogChan, c, c.GetClientId())
 		if err != nil {
 			c.LogChan <- t.Logg{Text: fmt.Sprintf("Peer mit id: %s konnte nicht erstellt werden, server wird informiert", rsp.ClientId)}
 
@@ -299,7 +305,7 @@ func (c *Client) HandlePeer(rsp *t.Response, offerConnection bool) error {
 		c.SetPeer(peer)
 		c.LogChan <- t.Logg{Text: fmt.Sprintf("Peer mit id: %s angelegt", rsp.ClientId)}
 
-		if offerConnection {
+		if offer {
 			c.LogChan <- t.Logg{Text: "OfferConnection gestartet"}
 
 			return peer.OfferConnection()

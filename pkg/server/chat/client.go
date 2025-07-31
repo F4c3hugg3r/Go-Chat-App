@@ -89,6 +89,24 @@ func (c *Client) Idle(timeLimit time.Duration) bool {
 	return false
 }
 
+func (c *Client) RemoveUnconnectedRTCs() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for id, callState := range c.rtcs {
+		if callState != ty.ConnectedFlag {
+			delete(c.rtcs, id)
+		}
+	}
+}
+
+func (c *Client) RemoveRTC(clientId string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	delete(c.rtcs, clientId)
+}
+
 func (c *Client) setActive(active bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -138,6 +156,20 @@ func (c *Client) SetGroup(groupId string) {
 	c.groupId = groupId
 }
 
+func (c *Client) GetCallState(oppId string) string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.rtcs[oppId]
+}
+
+func (c *Client) SetCallState(oppId string, callState string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.rtcs[oppId] = callState
+}
+
 func (c *Client) UnsetGroup() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -152,21 +184,14 @@ func (c *Client) GetName() string {
 	return c.Name
 }
 
-// func (c *Client) CheckRTC(oppId string) *ty.Connection {
-// 	c.mu.RLock()
-// 	defer c.mu.RUnlock()
+func (c *Client) CheckRTC(oppId string) (string, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
-// 	rtc, ok := c.rtcs[oppId]
-// 	if !ok {
-// 		return nil
-// 	}
+	state, ok := c.rtcs[oppId]
+	if !ok {
+		return "", fmt.Errorf("%v: no connection with opposing Client %s", oppId, ty.ErrNotAvailable)
+	}
 
-// 	return rtc
-// }
-
-// func (c *Client) GetRTCs() map[string]*ty.Connection {
-// 	c.mu.RLock()
-// 	defer c.mu.RUnlock()
-
-// 	return c.rtcs
-// }
+	return state, nil
+}

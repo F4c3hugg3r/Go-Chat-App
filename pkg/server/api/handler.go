@@ -12,17 +12,17 @@ import (
 	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
-const authTokenString = "authToken"
-
 type ServerHandler struct {
 	Service *chat.ChatService
 	Plugins *chat.PluginRegistry
+	WebRTC  *chat.CallRegistry
 }
 
-func NewServerHandler(chatService *chat.ChatService, pluginReg *chat.PluginRegistry) *ServerHandler {
+func NewServerHandler(chatService *chat.ChatService, pluginReg *chat.PluginRegistry, callRegistry *chat.CallRegistry) *ServerHandler {
 	return &ServerHandler{
 		Service: chatService,
 		Plugins: pluginReg,
+		WebRTC:  callRegistry,
 	}
 }
 
@@ -143,18 +143,12 @@ func (handler *ServerHandler) HandleSignals(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// TODO ändern zu handler.WebRTC
-	rsp, err := client.Execute(handler.Plugins, &message)
+	rsp, err := client.Execute(handler.WebRTC, &message)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		handler.Service.Echo(message.Name, &ty.Response{ClientId: message.ClientId, RspName: ty.FailedConnectionFlag, Content: err.Error()})
+		handler.Service.Echo(message.ClientId, &ty.Response{ClientId: message.Name, RspName: ty.FailedConnectionFlag, Content: err.Error()})
 		return
 	}
-
-	// err = handler.Service.ForwardMessage(message, clientId)
-	// if err != nil {
-	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-	// 	return
-	// }
 
 	body, err = json.Marshal(rsp)
 	if err != nil {

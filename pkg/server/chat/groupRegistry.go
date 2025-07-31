@@ -34,7 +34,7 @@ func RegisterGroupPlugins(s *ChatService, pr *PluginRegistry) *GroupPluginRegist
 	gp.gPlugins["leave"] = NewGroupLeavePlugin(s, pr)
 	gp.gPlugins["users"] = NewGroupUsersPlugin(s)
 
-	// TODO
+	// maybe TODO:
 	// kick
 	// admin
 	// invite
@@ -95,7 +95,7 @@ func (g *Group) GetClientIdsFromGroup(ownId string, onlyCallable bool) []string 
 	if onlyCallable {
 		for compKey := range g.rtcs {
 			if strings.Contains(compKey, ownId) {
-				inCallOppKeys = append(inCallOppKeys, GetRTCPartnerFromKey(ownId, compKey))
+				inCallOppKeys = append(inCallOppKeys, GetPartnerIdFromCompositeKey(ownId, compKey))
 			}
 		}
 	}
@@ -155,26 +155,54 @@ func (g *Group) ConnectToGroupMembers(ownId string) []string {
 	stringSlice := g.GetClientIdsFromGroup(ownId, true)
 
 	for _, oppId := range stringSlice {
-		g.AddConnection(ownId, oppId)
+		g.SetConnection(ownId, oppId, false)
 	}
 
 	return stringSlice
 }
 
-func (g *Group) AddConnection(ownId string, oppId string) {
+func (g *Group) SetConnection(ownId string, oppId string, connected bool) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
-	g.rtcs[CreateCompositeKey(ownId, oppId)] = false
+	g.rtcs[CreateCompositeKey(ownId, oppId)] = connected
 }
 
+func (g *Group) RemoveConnection(ownId string, oppId string, all bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if all {
+		for compKey, _ := range g.rtcs {
+			if strings.Contains(compKey, ownId) {
+				delete(g.rtcs, compKey)
+			}
+		}
+	} else {
+		delete(g.rtcs, CreateCompositeKey(ownId, oppId))
+	}
+}
+
+func (g *Group) CheckConnection(ownId string, oppId string) bool {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	_, exists := g.rtcs[CreateCompositeKey(ownId, oppId)]
+	if exists {
+		return true
+	}
+
+	return false
+}
+
+// helper
 func CreateCompositeKey(firstId string, secondId string) string {
 	ids := []string{firstId, secondId}
 	sort.Strings(ids)
 	return ids[0] + ":" + ids[1]
 }
 
-func GetRTCPartnerFromKey(ownId string, compKey string) string {
+func GetPartnerIdFromCompositeKey(ownId string, compKey string) string {
 	oppId := strings.Replace(compKey, ownId, "", -1)
 	return strings.Replace(oppId, ":", "", -1)
 }
