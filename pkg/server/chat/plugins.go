@@ -267,7 +267,7 @@ func (u *ListUsersPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return nil, fmt.Errorf("%w: error parsing clients to json", err)
 	}
 
-	return &ty.Response{RspName: "Users", Content: string(jsonList)}, nil
+	return &ty.Response{RspName: ty.UsersFlag, Content: string(jsonList)}, nil
 }
 
 // TimePlugin tells you the current time

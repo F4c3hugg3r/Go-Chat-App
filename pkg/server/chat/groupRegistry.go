@@ -135,22 +135,6 @@ func (g *Group) SafeGetGroupSlice() []json.RawMessage {
 	return GenericMapToJSONSlice(g.clients)
 }
 
-// CheckConnections returns every current rtc (doesn't have to be ICE connected)
-// of one user and returns the composite key
-// func (g *Group) CheckConnections(clientId string) []string {
-// 	g.mu.RLock()
-// 	defer g.mu.RUnlock()
-
-// 	var compKeysSlice []string
-
-// 	for compKey := range g.connections {
-// 		if strings.Contains(compKey, clientId) {
-// 			compKeysSlice = append(compKeysSlice, compKey)
-// 		}
-// 	}
-// 	return compKeysSlice
-// }
-
 func (g *Group) ConnectToGroupMembers(ownId string) []string {
 	stringSlice := g.GetClientIdsFromGroup(ownId, true)
 
@@ -206,3 +190,19 @@ func GetPartnerIdFromCompositeKey(ownId string, compKey string) string {
 	oppId := strings.Replace(compKey, ownId, "", -1)
 	return strings.Replace(oppId, ":", "", -1)
 }
+
+// CheckConnections returns every current rtc (doesn't have to be ICE connected)
+// of one user and returns the composite key
+// func (g *Group) CheckConnections(clientId string) []string {
+// 	g.mu.RLock()
+// 	defer g.mu.RUnlock()
+
+// 	var compKeysSlice []string
+
+// 	for compKey := range g.connections {
+// 		if strings.Contains(compKey, clientId) {
+// 			compKeysSlice = append(compKeysSlice, compKey)
+// 		}
+// 	}
+// 	return compKeysSlice
+// }

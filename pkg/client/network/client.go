@@ -21,7 +21,7 @@ type Client struct {
 
 	mu      *sync.RWMutex
 	cond    *sync.Cond
-	LogChan chan t.Logg
+	LogChan chan t.Log
 
 	Url        string
 	HttpClient *http.Client
@@ -45,7 +45,7 @@ func NewClient(server string) *Client {
 
 		mu:      &sync.RWMutex{},
 		Url:     server,
-		LogChan: make(chan t.Logg, 10000),
+		LogChan: make(chan t.Log, 10000),
 
 		Peers: make(map[string]*Peer),
 	}
@@ -286,33 +286,33 @@ func (c *Client) SendSignalingError(oppId string, content string) {
 	msg := c.CreateMessage(t.FailedConnectionFlag, "/connection", content, oppId)
 	_, err := c.PostMessage(msg, t.SignalWebRTC)
 	if err != nil {
-		c.LogChan <- t.Logg{Text: fmt.Sprintf("WebRTC: Fehler beim senden des ConnectionFailedFlags %v", err)}
+		c.LogChan <- t.Log{Text: fmt.Sprintf("WebRTC: Fehler beim senden des ConnectionFailedFlags %v", err)}
 	}
 }
 
 func (c *Client) HandlePeer(rsp *t.Response, offer bool) error {
 	peer, err := c.GetPeer(rsp.ClientId)
 	if err != nil {
-		c.LogChan <- t.Logg{Text: "Peer existiert nicht"}
+		c.LogChan <- t.Log{Text: "Peer existiert nicht"}
 
 		peer, err := NewPeer(rsp.ClientId, c.LogChan, c, c.GetClientId())
 		if err != nil {
-			c.LogChan <- t.Logg{Text: fmt.Sprintf("Peer mit id: %s konnte nicht erstellt werden, server wird informiert", rsp.ClientId)}
+			c.LogChan <- t.Log{Text: fmt.Sprintf("Peer mit id: %s konnte nicht erstellt werden, server wird informiert", rsp.ClientId)}
 
 			return err
 		}
 
 		c.SetPeer(peer)
-		c.LogChan <- t.Logg{Text: fmt.Sprintf("Peer mit id: %s angelegt", rsp.ClientId)}
+		c.LogChan <- t.Log{Text: fmt.Sprintf("Peer mit id: %s angelegt", rsp.ClientId)}
 
 		if offer {
-			c.LogChan <- t.Logg{Text: "OfferConnection gestartet"}
+			c.LogChan <- t.Log{Text: "OfferConnection gestartet"}
 
 			return peer.OfferConnection()
 		}
 	}
 
-	c.LogChan <- t.Logg{Text: "Response wird in den Signalchannel gepusht"}
+	c.LogChan <- t.Log{Text: "Response wird in den Signalchannel gepusht"}
 	peer.SignalChan <- rsp
 
 	return nil

@@ -15,14 +15,14 @@ import (
 type ServerHandler struct {
 	Service *chat.ChatService
 	Plugins *chat.PluginRegistry
-	WebRTC  *chat.CallRegistry
+	WebRTC  *chat.WebRTCRegistry
 }
 
-func NewServerHandler(chatService *chat.ChatService, pluginReg *chat.PluginRegistry, callRegistry *chat.CallRegistry) *ServerHandler {
+func NewServerHandler(chatService *chat.ChatService, pluginReg *chat.PluginRegistry, webRTCRegistry *chat.WebRTCRegistry) *ServerHandler {
 	return &ServerHandler{
 		Service: chatService,
 		Plugins: pluginReg,
-		WebRTC:  callRegistry,
+		WebRTC:  webRTCRegistry,
 	}
 }
 

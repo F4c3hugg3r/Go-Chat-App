@@ -19,7 +19,7 @@ type UserService struct {
 	mu         *sync.RWMutex
 	cond       *sync.Cond
 	// logging
-	LoggChan chan t.Logg
+	LoggChan chan t.Log
 }
 
 // NewUserService creates a UserService

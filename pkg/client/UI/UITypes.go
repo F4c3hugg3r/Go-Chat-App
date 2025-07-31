@@ -1,10 +1,14 @@
 package UI
 
 import (
+	"encoding/json"
+	"strings"
+
 	i "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/input"
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
@@ -21,13 +25,19 @@ var (
 	blue   lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#3571bfff"))
 	purple lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
 	turkis lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#35BFBC"))
-	green  lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("##53BF35"))
+	// green  lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#53BF35"))
 
 	titleStyle lipgloss.Style = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("63")).
 			PaddingLeft(5).
 			PaddingRight(5)
+	TableHeaderStyle = table.DefaultStyles().Header.
+				BorderBottom(true).
+				Bold(false)
+	TableSelectedStyle = table.DefaultStyles().Selected.
+				Background(lipgloss.Color("64")).
+				Bold(false)
 	centered lipgloss.Style = lipgloss.NewStyle().Align(lipgloss.Center)
 	faint    lipgloss.Style = lipgloss.NewStyle().Faint(true)
 
@@ -90,15 +100,17 @@ type keyMap struct {
 type model struct {
 	viewport viewport.Model
 	// logging
-	loggViewport    viewport.Model
-	loggs           []string
+	logViewport     viewport.Model
+	table           table.Model
+	logs            []string
 	messages        []string
-	loggChan        chan t.Logg
+	logChan         chan t.Log
 	title           string
 	textinput       textinput.Model
 	showSuggestions bool
 	help            help.Model
 	keyMap          keyMap
+	tableValues     *Table
 	err             error
 
 	userService *i.UserService
@@ -107,9 +119,48 @@ type model struct {
 	inH *InputHistory
 }
 
+type UIClient struct {
+	Name      string
+	CallState string
+	ClientId  string
+	Active    bool
+}
+
 // InputHistory manageges the inputHistory
 type InputHistory struct {
 	current int
 	inputs  []string
 	first   bool
+}
+
+// helper functions
+func ParseJsonToUIClients(jsonSlice string) ([]*UIClient, error) {
+	var clients []*UIClient
+	dec := json.NewDecoder(strings.NewReader(jsonSlice))
+
+	err := dec.Decode(&clients)
+	if err != nil {
+		return nil, err
+	}
+
+	return clients, nil
+}
+
+// setUpTexInput sets up a textinput.Model with every needed setting
+func SetUpTextInput(u *i.UserService) textinput.Model {
+	ti := textinput.New()
+	ti.Placeholder = "Send a message..."
+	ti.Prompt = "┃ "
+	ti.PromptStyle, ti.Cursor.Style = purple, purple
+	ti.Focus()
+	ti.CharLimit = 280
+	ti.Width = 30
+	ti.ShowSuggestions = true
+	//überschreiben, da ctrl+h sonst char löscht
+	ti.KeyMap.DeleteCharacterBackward = key.NewBinding(key.WithKeys("backspace"))
+	ti.KeyMap.NextSuggestion = helpKeys.NextSug
+	ti.KeyMap.PrevSuggestion = helpKeys.PrevSug
+	ti.SetSuggestions(u.InitializeSuggestions())
+
+	return ti
 }

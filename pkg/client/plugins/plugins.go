@@ -26,7 +26,7 @@ func (cp *CallPlugin) Execute(message *t.Message) (error, string) {
 	// gathering group clients
 	rsp, err := cp.c.PostMessage(message, t.PostPlugin)
 	if err != nil {
-		cp.c.LogChan <- t.Logg{Text: fmt.Sprintf("%v: error posting or processing rsp", err)}
+		cp.c.LogChan <- t.Log{Text: fmt.Sprintf("%v: error posting or processing rsp", err)}
 		return err, ""
 	}
 
@@ -34,15 +34,15 @@ func (cp *CallPlugin) Execute(message *t.Message) (error, string) {
 	dec := json.NewDecoder(strings.NewReader(rsp.Content))
 	err = dec.Decode(&callableClientIds)
 	if err != nil {
-		cp.c.LogChan <- t.Logg{Text: fmt.Sprintf("Fehler beim Decoden: Ids aus Response: %s", rsp.Content), Method: "NewCallPlugin.Execute()"}
+		cp.c.LogChan <- t.Log{Text: fmt.Sprintf("Fehler beim Decoden: Ids aus Response: %s", rsp.Content), Method: "NewCallPlugin.Execute()"}
 		cp.c.SendSignalingError("", "")
 		return err, ""
 	}
-	cp.c.LogChan <- t.Logg{Text: fmt.Sprintf("Ids aus Response: %s", strings.Join(callableClientIds, ", ")), Method: "NewCallPlugin.Execute()"}
+	cp.c.LogChan <- t.Log{Text: fmt.Sprintf("Ids aus Response: %s", strings.Join(callableClientIds, ", ")), Method: "NewCallPlugin.Execute()"}
 
 	for _, oppClientId := range callableClientIds {
 		go cp.c.HandleSignal(&t.Response{ClientId: oppClientId}, true)
-		cp.c.LogChan <- t.Logg{Text: fmt.Sprintf("Handle Signal started für client %s", oppClientId), Method: "NewCallPlugin.Execute()"}
+		cp.c.LogChan <- t.Log{Text: fmt.Sprintf("Handle Signal started für client %s", oppClientId), Method: "NewCallPlugin.Execute()"}
 	}
 
 	return nil, ""

@@ -15,6 +15,7 @@ const (
 
 const UnregisterFlag = "- Du bist nun vom Server getrennt -"
 const RegisterFlag = "- Du bist registriert -"
+const UsersFlag = "Users"
 const IgnoreResponseTag = "Ignore Response"
 
 const AddGroupFlag = "Add Group"
@@ -69,7 +70,7 @@ type JsonGroup struct {
 }
 
 // logging
-type Logg struct {
+type Log struct {
 	Text   string
 	Method string
 }

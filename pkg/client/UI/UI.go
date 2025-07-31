@@ -10,7 +10,6 @@ import (
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textarea"
-	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -22,14 +21,16 @@ import (
 
 // InitialModel initializes the model struct, which is the main struct for the TUI
 func InitialModel(u *i.UserService) model {
-	ti := setUpTextInput(u)
+	ti := SetUpTextInput(u)
 
 	h := help.New()
+
+	ta, tV := setUpTable()
 
 	vp := viewport.New(30, 5)
 	vp.KeyMap = viewportKeys
 
-	logg := viewport.New(30, 0)
+	logVp := viewport.New(30, 0)
 
 	inputManager := &InputHistory{
 		current: -1,
@@ -37,28 +38,30 @@ func InitialModel(u *i.UserService) model {
 	}
 
 	model := model{
-		messages:     []string{},
-		viewport:     vp,
-		loggViewport: logg,
-		loggs:        []string{},
-		err:          nil,
-		userService:  u,
-		outputChan:   u.ChatClient.Output,
-		textinput:    ti,
-		help:         h,
-		keyMap:       helpKeys,
-		inH:          inputManager,
-		title:        UnregisterTitle,
+		messages:    []string{},
+		viewport:    vp,
+		logViewport: logVp,
+		logs:        []string{},
+		err:         nil,
+		userService: u,
+		outputChan:  u.ChatClient.Output,
+		textinput:   ti,
+		help:        h,
+		keyMap:      helpKeys,
+		inH:         inputManager,
+		title:       UnregisterTitle,
+		table:       ta,
+		tableValues: tV,
 	}
 
-	model.loggChan = model.userService.ChatClient.LogChan
+	model.logChan = model.userService.ChatClient.LogChan
 
 	return model
 }
 
 // Init is being called before Update listenes and initializes required functions
 func (m model) Init() tea.Cmd {
-	return tea.Batch(textarea.Blink, m.waitForExternalResponse(), m.waitForLogg())
+	return tea.Batch(textarea.Blink, m.waitForExternalResponse(), m.waitForLog())
 }
 
 // Update handles every input
@@ -71,17 +74,17 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 
 	m.viewport, vpCmd = m.viewport.Update(rsp)
 	m.textinput, tiCmd = m.textinput.Update(rsp)
-	m.loggViewport, loCmd = m.loggViewport.Update(rsp)
+	m.logViewport, loCmd = m.logViewport.Update(rsp)
 
 	if m.textinput.Value() == "" {
 		m.inH.SaveInput("")
 	}
 
 	switch rsp := rsp.(type) {
-	case t.Logg:
-		m.PrintLogg(rsp)
+	case t.Log:
+		m.PrintLog(rsp)
 
-		return m, tea.Batch(tiCmd, vpCmd, loCmd, m.waitForLogg())
+		return m, tea.Batch(tiCmd, vpCmd, loCmd, m.waitForLog())
 
 	case *t.Response:
 		m.HandleResponse(rsp)
@@ -90,7 +93,7 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.WindowSizeMsg:
 		m.HandleWindowResize(&rsp)
-		m.loggChan <- t.Logg{Text: "log started"}
+		m.logChan <- t.Log{Text: "log started"}
 
 	case tea.KeyMsg:
 		switch rsp.Type {
@@ -130,23 +133,36 @@ func (m model) View() string {
 		"%s%s%s%s%s%s%s%s%s",
 		m.title,
 		Gap,
-		m.viewport.View(),
+		lipgloss.JoinHorizontal(lipgloss.Center, m.viewport.View(), m.table.View()),
 		Gap,
 		m.textinput.View(),
 		Gap,
 		m.help.View(m.keyMap),
 		Gap,
-		m.loggViewport.View(),
+		m.logViewport.View(),
 	)
 }
 
-func (m *model) refreshLoggViewPort() {
-	if len(m.loggs) > 0 {
-		str, _ := strings.CutSuffix(strings.Join(m.loggs, "\n"), "\n")
-		m.loggViewport.SetContent(lipgloss.NewStyle().Width(m.loggViewport.Width).Render(str))
+func (m *model) refreshLogViewPort() {
+	if len(m.logs) > 0 {
+		str, _ := strings.CutSuffix(strings.Join(m.logs, "\n"), "\n")
+		m.logViewport.SetContent(lipgloss.NewStyle().Width(m.logViewport.Width).Render(str))
 	}
 
-	m.loggViewport.GotoBottom()
+	m.logViewport.GotoBottom()
+}
+
+func (m *model) refreshTable() {
+	m.tableValues.ConvertClientsToRows()
+	m.table.SetRows(m.tableValues.rows)
+
+	// TODO wenn table nicht focussed ist, das styling ändern, sodass
+	// die zeile nicht hervorsticht
+
+	// TODO call events anzeigen lassen und evtl automatische Aktualisierung
+
+	// TODO focussing anpassen
+	// m.table.SetCursor(-1)
 }
 
 // refreshViewPort refreshes the size of the viewport
@@ -160,11 +176,12 @@ func (m *model) refreshViewPort() {
 }
 
 func (m *model) HideLogs() {
-	switch m.loggViewport.Height {
+	switch m.logViewport.Height {
 	case 0:
-		m.loggViewport.Height = 6
+		m.logViewport.Height = 6
+		m.refreshLogViewPort()
 	case 6:
-		m.loggViewport.Height = 0
+		m.logViewport.Height = 0
 	}
 }
 
@@ -195,25 +212,6 @@ func (m *model) SearchInputHistory(rsp tea.KeyMsg) string {
 	return m.inH.inputs[m.inH.current]
 }
 
-// setUpTexInput sets up a textinput.Model with every needed setting
-func setUpTextInput(u *i.UserService) textinput.Model {
-	ti := textinput.New()
-	ti.Placeholder = "Send a message..."
-	ti.Prompt = "┃ "
-	ti.PromptStyle, ti.Cursor.Style = purple, purple
-	ti.Focus()
-	ti.CharLimit = 280
-	ti.Width = 30
-	ti.ShowSuggestions = true
-	//überschreiben, da ctrl+h sonst char löscht
-	ti.KeyMap.DeleteCharacterBackward = key.NewBinding(key.WithKeys("backspace"))
-	ti.KeyMap.NextSuggestion = helpKeys.NextSug
-	ti.KeyMap.PrevSuggestion = helpKeys.PrevSug
-	ti.SetSuggestions(u.InitializeSuggestions())
-
-	return ti
-}
-
 // renderTitle decides between the registered and unregistered title sets it into the viewport
 // and return the heightDiff of the old and new title
 func (m *model) renderTitle(title string, param []string) {
@@ -232,26 +230,28 @@ func (m *model) renderTitle(title string, param []string) {
 	}
 
 	heightDiff := lipgloss.Height(title) - lipgloss.Height(m.title)
-	m.title = centered.Width(m.viewport.Width).Bold(true).Render(title)
+	m.title = centered.Width(m.viewport.Width + m.table.Width()).Bold(true).Render(title)
 	m.viewport.Height = m.viewport.Height - heightDiff
-	// m.viewport.Height = rsp.Height - lipgloss.Height(gap) - lipgloss.Height(m.title) - lipgloss.Height(gap)
+	m.table.SetHeight(m.table.Height() - heightDiff)
 }
 
 // HandleWindowResize handles rezising of the terminal window by updating all models sizes
 func (m *model) HandleWindowResize(rsp *tea.WindowSizeMsg) {
-	m.viewport.Width = rsp.Width
+	m.viewport.Width = rsp.Width / 5 * 4
+	m.table.SetWidth(rsp.Width / 5)
 	m.textinput.Width = rsp.Width
 	m.help.Width = rsp.Width
-	m.loggViewport.Width = rsp.Width
+	m.logViewport.Width = rsp.Width
 	var logPortHeight int
-	switch m.loggViewport.Height {
+	switch m.logViewport.Height {
 	case 0:
 		logPortHeight = 1
 	default:
-		logPortHeight = m.loggViewport.Height
+		logPortHeight = m.logViewport.Height
 	}
 
 	m.viewport.Height = rsp.Height - (lipgloss.Height(Gap) * 2) - lipgloss.Height(m.title) - logPortHeight
+	m.table.SetHeight(rsp.Height - (lipgloss.Height(Gap) * 2) - lipgloss.Height(m.title) - logPortHeight)
 
 	m.renderTitle(m.title, []string{WindowResizeFlag})
 	m.refreshViewPort()
@@ -345,7 +345,7 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 		strings.Contains(rsp.RspName, t.AnswerSignalFlag),
 		strings.Contains(rsp.RspName, t.ICECandidateFlag):
 
-		m.loggChan <- t.Logg{Text: "webrtc related response detected"}
+		m.logChan <- t.Log{Text: "webrtc related response detected"}
 		m.userService.ChatClient.HandleSignal(rsp, false)
 
 		return ""
@@ -355,6 +355,18 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 		output, err := JSONToTable(rsp.Content)
 		if err != nil {
 			return red.Render(fmt.Sprintf("%v: error formatting json to table", err))
+		}
+
+		if strings.Contains(rsp.RspName, t.UsersFlag) {
+			clients, err := ParseJsonToUIClients(rsp.Content)
+			if err != nil {
+				return red.Render(fmt.Sprintf("%v: error formatting json to clients", err))
+			}
+
+			// m.logChan <- t.Log{Text: fmt.Sprint("length clientslice after parsing: ", len(clients))}
+
+			m.tableValues.SetClients(clients, nil)
+			m.refreshTable()
 		}
 
 		return output
@@ -374,24 +386,24 @@ func (m *model) waitForExternalResponse() tea.Cmd {
 	}
 }
 
-func (m *model) waitForLogg() tea.Cmd {
+func (m *model) waitForLog() tea.Cmd {
 	return func() tea.Msg {
-		return m.LoggPoller()
+		return m.LogPoller()
 	}
 }
 
-func (m *model) LoggPoller() t.Logg {
-	logg, ok := <-m.loggChan
+func (m *model) LogPoller() t.Log {
+	log, ok := <-m.logChan
 	if !ok {
-		return t.Logg{Text: "logging channel is closed", Method: "LoggPoller"}
+		return t.Log{Text: "logging channel is closed", Method: "LogPoller"}
 	}
 
-	return logg
+	return log
 }
 
-func (m *model) PrintLogg(rsp t.Logg) {
-	m.loggs = append(m.loggs, fmt.Sprintf("%s: %s", rsp.Method, rsp.Text))
-	m.refreshLoggViewPort()
+func (m *model) PrintLog(rsp t.Log) {
+	m.logs = append(m.logs, fmt.Sprintf("%s: %s", rsp.Method, rsp.Text))
+	m.refreshLogViewPort()
 }
 
 // ShortHelp decides what to see in the short help window

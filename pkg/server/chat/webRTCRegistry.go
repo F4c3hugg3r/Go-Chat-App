@@ -6,17 +6,17 @@ import (
 	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
-type CallInterface interface {
+type WebRTCInterface interface {
 	Execute(message *ty.Message) (*ty.Response, error)
 }
 
-type CallRegistry struct {
-	plugins map[string]CallInterface
+type WebRTCRegistry struct {
+	plugins map[string]WebRTCInterface
 }
 
 // RegisterPlugins sets up all the plugins
-func RegisterCallPlugins(chatService *ChatService) *CallRegistry {
-	cr := &CallRegistry{plugins: make(map[string]CallInterface)}
+func RegisterCallPlugins(chatService *ChatService) *WebRTCRegistry {
+	cr := &WebRTCRegistry{plugins: make(map[string]WebRTCInterface)}
 	cr.plugins[fmt.Sprint("/", ty.OfferSignalFlag)] = NewOfferSignalPlugin(chatService)
 	cr.plugins[fmt.Sprint("/", ty.AnswerSignalFlag)] = NewAnswerSignalPlugin(chatService)
 	cr.plugins[fmt.Sprint("/", ty.ICECandidateFlag)] = NewICECandidatePlugin(chatService)
@@ -27,7 +27,7 @@ func RegisterCallPlugins(chatService *ChatService) *CallRegistry {
 	return cr
 }
 
-func (pr *CallRegistry) FindAndExecute(message *ty.Message) (*ty.Response, error) {
+func (pr *WebRTCRegistry) FindAndExecute(message *ty.Message) (*ty.Response, error) {
 	plugin, ok := pr.plugins[message.Plugin]
 	if !ok {
 		return &ty.Response{Err: fmt.Sprintf("%v: no such call plugin found: %s", ty.ErrNoPermission, message.Plugin)}, nil

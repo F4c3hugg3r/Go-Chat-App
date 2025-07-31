@@ -128,25 +128,6 @@ func (gcp *GroupCreatePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	return &ty.Response{RspName: ty.AddGroupFlag, Content: string(jsonGroup)}, nil
 }
 
-// type GroupInvitePlugin struct {
-// 	s *ChatService
-// }
-
-// func NewGroupInvitePlugin(s *ChatService) *GroupInvitePlugin {
-// 	return &GroupInvitePlugin{s: s}
-// }
-
-// func (gip *GroupInvitePlugin) Description() *Description {
-// 	return &Description{
-// 		Description: "invites someone to your group",
-// 		Template:    "/group invite {clientId}",
-// 	}
-// }
-
-// func (gip *GroupInvitePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
-
-// }
-
 // GrouLeavePlugin
 type GroupLeavePlugin struct {
 	s  *ChatService
@@ -224,7 +205,7 @@ func (gup *GroupUsersPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return nil, fmt.Errorf("%w: error parsing groups to json", err)
 	}
 
-	return &ty.Response{RspName: "Group Users", Content: string(jsonList)}, nil
+	return &ty.Response{RspName: ty.UsersFlag, Content: string(jsonList)}, nil
 }
 
 // GroupJoinPlugin
@@ -283,3 +264,22 @@ func (gjp *GroupJoinPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 
 	return &ty.Response{RspName: ty.AddGroupFlag, Content: string(jsonGroup)}, nil
 }
+
+// type GroupInvitePlugin struct {
+// 	s *ChatService
+// }
+
+// func NewGroupInvitePlugin(s *ChatService) *GroupInvitePlugin {
+// 	return &GroupInvitePlugin{s: s}
+// }
+
+// func (gip *GroupInvitePlugin) Description() *Description {
+// 	return &Description{
+// 		Description: "invites someone to your group",
+// 		Template:    "/group invite {clientId}",
+// 	}
+// }
+
+// func (gip *GroupInvitePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
+
+// }
