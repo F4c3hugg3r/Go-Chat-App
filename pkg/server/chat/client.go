@@ -16,10 +16,11 @@ type PluginHandler interface {
 // Client is a communication participant who has a name, unique id and
 // channel to receive messages
 type Client struct {
-	Name      string
-	ClientId  string
+	Name      string `json:"name"`
+	ClientId  string `json:"clientId"`
+	GroupName string `json:"groupName"`
 	clientCh  chan *ty.Response
-	Active    bool
+	active    bool
 	authToken string
 	lastSign  time.Time
 	mu        sync.RWMutex
@@ -81,7 +82,7 @@ func (c *Client) Idle(timeLimit time.Duration) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if !c.Active && time.Since(c.lastSign) >= timeLimit {
+	if !c.active && time.Since(c.lastSign) >= timeLimit {
 		c.closeChannelRequireLock()
 		return true
 	}
@@ -111,7 +112,7 @@ func (c *Client) setActive(active bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.Active = active
+	c.active = active
 }
 
 func (c *Client) updateLastSign() {
@@ -149,25 +150,36 @@ func (c *Client) GetGroupId() string {
 	return c.groupId
 }
 
-func (c *Client) SetGroup(groupId string) {
+func (c *Client) SetGroup(g *Group) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.groupId = groupId
+	c.groupId = g.GroupId
+	c.GroupName = g.Name
 }
 
 func (c *Client) GetCallState(oppId string) string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	return c.rtcs[oppId]
+	callState, exists := c.rtcs[oppId]
+	if !exists {
+		return ""
+	}
+	return callState
 }
 
-func (c *Client) SetCallState(oppId string, callState string) {
+func (c *Client) SetCallState(oppId string, callState string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	callState, exists := c.rtcs[oppId]
+	if exists {
+		return fmt.Errorf("%w: setCallState failed for %s -> %s", ty.ErrNotAvailable, c.ClientId, oppId)
+	}
+
 	c.rtcs[oppId] = callState
+	return nil
 }
 
 func (c *Client) UnsetGroup() {
@@ -175,6 +187,7 @@ func (c *Client) UnsetGroup() {
 	defer c.mu.Unlock()
 
 	c.groupId = ""
+	c.GroupName = ""
 }
 
 func (c *Client) GetName() string {

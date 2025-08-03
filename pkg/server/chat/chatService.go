@@ -63,6 +63,7 @@ func (s *ChatService) InactiveObjectDeleter(timeLimit time.Duration) {
 				s.groups[client.groupId].RemoveClient(client)
 			}
 
+			fmt.Printf("\nlogging out inactive client %s", clientId)
 			client.Close()
 			delete(s.clients, clientId)
 		}
@@ -70,6 +71,7 @@ func (s *ChatService) InactiveObjectDeleter(timeLimit time.Duration) {
 
 	for groupId, group := range s.groups {
 		if group.SetSize() < 1 {
+			fmt.Printf("\ndeleting empty group %s", groupId)
 			delete(s.groups, groupId)
 		}
 	}

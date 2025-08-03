@@ -26,8 +26,8 @@ func (cp *OfferSignalPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	}
 
 	if msg.Content == "" {
-		ownClient.SetCallState(msg.ClientId, ty.OfferSignalFlag)
-		return nil, nil
+		err = ownClient.SetCallState(msg.ClientId, ty.OfferSignalFlag)
+		return nil, err
 	}
 
 	oppClient, err := cp.chatService.GetClient(msg.ClientId)
@@ -50,17 +50,17 @@ func (cp *OfferSignalPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	// check if connection is already established in group
 	if group.CheckConnection(msg.Name, msg.ClientId) {
 		cp.chatService.ForwardSignal(msg, ty.OfferSignalFlag)
-		oppClient.SetCallState(msg.Name, ty.AnswerSignalFlag)
+		err = oppClient.SetCallState(msg.Name, ty.AnswerSignalFlag)
 
-		return nil, nil
+		return nil, err
 	}
 
 	// no current connection so connection is established in group
 	group.SetConnection(msg.Name, msg.ClientId, false)
 	cp.chatService.ForwardSignal(msg, ty.OfferSignalFlag)
-	oppClient.SetCallState(msg.Name, ty.AnswerSignalFlag)
+	err = oppClient.SetCallState(msg.Name, ty.AnswerSignalFlag)
 
-	return nil, nil
+	return nil, err
 }
 
 // AnswerSignalPlugin forwards rtc signals
@@ -82,8 +82,8 @@ func (cp *AnswerSignalPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	}
 
 	if msg.Content == "" {
-		ownClient.SetCallState(msg.ClientId, ty.AnswerSignalFlag)
-		return nil, nil
+		err = ownClient.SetCallState(msg.ClientId, ty.AnswerSignalFlag)
+		return nil, err
 	}
 
 	oppClient, err := cp.chatService.GetClient(msg.ClientId)
@@ -151,8 +151,8 @@ func (cp *StableSignalPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return nil, fmt.Errorf("%w: error getting current group", err)
 	}
 
-	ownClient.SetCallState(msg.ClientId, ty.StableSignalFlag)
-	return nil, nil
+	err = ownClient.SetCallState(msg.ClientId, ty.StableSignalFlag)
+	return nil, err
 }
 
 // ConnectedPlugin forwards rtc signals
@@ -174,10 +174,10 @@ func (cp *ConnectedPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return nil, fmt.Errorf("%w: error getting current group", err)
 	}
 
-	ownClient.SetCallState(msg.ClientId, ty.ConnectedFlag)
+	err = ownClient.SetCallState(msg.ClientId, ty.ConnectedFlag)
 	group.SetConnection(msg.Name, msg.ClientId, true)
 
-	return nil, nil
+	return nil, err
 }
 
 // FailedConnectionPlugin forwards rtc signals

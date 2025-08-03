@@ -117,3 +117,23 @@ func DecodeStringToJsonGroup(jsonGroup string) (*JsonGroup, error) {
 
 	return group, err
 }
+
+func ParseJsonToJsonClients(jsonSlice string) ([]*JsonClient, error) {
+	var clients []*JsonClient
+	dec := json.NewDecoder(strings.NewReader(jsonSlice))
+
+	err := dec.Decode(&clients)
+	if err != nil {
+		return nil, err
+	}
+
+	return clients, nil
+}
+
+func DecodeStringToJsonClient(jsonClient string) (*JsonClient, error) {
+	var client *JsonClient
+	dec := json.NewDecoder(strings.NewReader(jsonClient))
+	err := dec.Decode(&client)
+
+	return client, err
+}

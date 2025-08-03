@@ -116,7 +116,7 @@ func (gcp *GroupCreatePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	clients[msg.ClientId] = client
 	group := &Group{GroupId: id, Name: name, clients: clients, mu: &sync.RWMutex{}}
 	gcp.s.groups[id] = group
-	client.SetGroup(id)
+	client.SetGroup(group)
 
 	fmt.Printf("\nnew group %s created", group.Name)
 
@@ -165,7 +165,7 @@ func (glp *GroupLeavePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 
 	group.RemoveConnection(msg.ClientId, "", true)
 
-	client.Execute(glp.pr, &ty.Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s hat die Gruppe verlassen", msg.Name), ClientId: msg.ClientId, GroupId: msg.GroupId})
+	client.Execute(glp.pr, &ty.Message{Name: ty.UserRemoveFlag, Plugin: "/broadcast", Content: fmt.Sprintf("%s hat die Gruppe verlassen", msg.Name), ClientId: msg.ClientId, GroupId: msg.GroupId})
 
 	client.UnsetGroup()
 
@@ -194,11 +194,14 @@ func (gup *GroupUsersPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return &ty.Response{Err: fmt.Sprintf("%v: error finding group", err)}, nil
 	}
 
+	group.mu.RLock()
+	defer group.mu.RUnlock()
+
 	if group == nil {
 		return &ty.Response{Err: fmt.Sprintf("%v: you are not in a group", ty.ErrNoPermission)}, nil
 	}
 
-	groupsSlice := group.SafeGetGroupSlice()
+	groupsSlice := ClientsToJsonSliceRequireLock(group.clients, msg.ClientId)
 
 	jsonList, err := json.Marshal(groupsSlice)
 	if err != nil {
@@ -253,9 +256,9 @@ func (gjp *GroupJoinPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return &ty.Response{Err: fmt.Sprintf("%v: error while adding client to group", err)}, nil
 	}
 
-	client.SetGroup(newGroupId)
+	client.SetGroup(group)
 
-	client.Execute(gjp.pr, &ty.Message{Name: "", Plugin: "/broadcast", Content: fmt.Sprintf("%s ist der Gruppe beigetreten", msg.Name), ClientId: msg.ClientId, GroupId: newGroupId})
+	client.Execute(gjp.pr, &ty.Message{Name: ty.UserAddFlag, Plugin: "/broadcast", Content: fmt.Sprintf("%s ist der Gruppe beigetreten", msg.Name), ClientId: msg.ClientId, GroupId: newGroupId})
 
 	jsonGroup, err := json.Marshal(group)
 	if err != nil {

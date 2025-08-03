@@ -46,21 +46,6 @@ func GetCurrentGroup(clientId string, s *ChatService) (*Group, *Client, error) {
 	return group, client, nil
 }
 
-func GenericMapToJSONSlice[T any](items map[string]T) []json.RawMessage {
-	var result []json.RawMessage
-
-	for _, item := range items {
-		jsonBytes, err := json.Marshal(item)
-		if err != nil {
-			log.Printf("error parsing item %T to json", item)
-			continue
-		}
-		result = append(result, jsonBytes)
-	}
-
-	return result
-}
-
 func extractIdentifierMessage(msg *ty.Message) (*ty.Message, error) {
 	if strings.TrimSpace(msg.Content) == "" {
 		return nil, fmt.Errorf("%v: missing identifier", ty.ErrNotAvailable)
@@ -72,4 +57,28 @@ func extractIdentifierMessage(msg *ty.Message) (*ty.Message, error) {
 	msg.Content = content
 
 	return msg, nil
+}
+
+func ClientsToJsonSliceRequireLock(clientsToIterate map[string]*Client, ownId string) []json.RawMessage {
+	var result []json.RawMessage
+
+	for _, item := range clientsToIterate {
+		client := ty.JsonClient{
+			Name:      item.Name,
+			ClientId:  item.ClientId,
+			GroupName: item.GroupName,
+			CallState: item.GetCallState(ownId),
+			GroupId:   item.GetGroupId(),
+		}
+
+		jsonBytes, err := json.Marshal(client)
+		if err != nil {
+			log.Printf("error parsing item %T to json", item)
+			continue
+		}
+
+		result = append(result, jsonBytes)
+	}
+
+	return result
 }

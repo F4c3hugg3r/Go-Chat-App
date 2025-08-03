@@ -19,7 +19,8 @@ var (
 		Name:      ClientName,
 		ClientId:  ClientId,
 		clientCh:  make(chan *ty.Response, 100),
-		Active:    false,
+		GroupName: "",
+		active:    false,
 		authToken: AuthToken,
 		lastSign:  time.Now(),
 	}

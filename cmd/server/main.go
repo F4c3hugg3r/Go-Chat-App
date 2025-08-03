@@ -119,7 +119,7 @@ func ParseFlags() Config {
 
 	flag.IntVar(&cfg.Port, "port", 8080, "HTTP Server Port")
 	flag.IntVar(&cfg.maxUsers, "maxUsers", 100, "Maximum number of active users allowed")
-	flag.DurationVar(&cfg.TimeLimit, "timeLimit", 30*time.Minute, "Time limit for inactive clients in minutes")
+	flag.DurationVar(&cfg.TimeLimit, "timeLimit", 10*time.Second, "Time limit for inactive clients in seconds")
 	flag.Parse()
 
 	return cfg

@@ -115,11 +115,11 @@ func (lp *LogOutPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		delete(lp.chatService.groups[client.groupId].clients, client.ClientId)
 	}
 
-	fmt.Println("\nlogged out ", client.Name)
+	fmt.Printf("\nlogged out %s", client.Name)
 	client.Close()
 	delete(lp.chatService.clients, client.ClientId)
 
-	go lp.chatService.Broadcast(nil, &ty.Response{Content: fmt.Sprintf("%s hat den Chat verlassen", msg.Name), ClientId: msg.ClientId})
+	go lp.chatService.Broadcast(nil, &ty.Response{RspName: ty.UserRemoveFlag, Content: msg.Name, ClientId: msg.ClientId})
 
 	return &ty.Response{RspName: msg.Name, Content: ty.UnregisterFlag}, nil
 }
@@ -162,8 +162,9 @@ func (rp *RegisterClientPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	client := &Client{
 		Name:      msg.Name,
 		ClientId:  msg.ClientId,
+		GroupName: "",
 		clientCh:  clientCh,
-		Active:    true,
+		active:    true,
 		authToken: token,
 		lastSign:  time.Now().UTC(),
 		chClosed:  false,
@@ -172,7 +173,7 @@ func (rp *RegisterClientPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 
 	fmt.Printf("\nnew client '%s' registered.", msg.Content)
 
-	go rp.chatService.Broadcast(nil, &ty.Response{Content: fmt.Sprintf("%s ist dem Chat beigetreten", client.Name), ClientId: msg.ClientId})
+	go rp.chatService.Broadcast(nil, &ty.Response{RspName: ty.UserAddFlag, Content: client.Name, ClientId: msg.ClientId})
 
 	return &ty.Response{RspName: msg.Name, Content: token}, nil
 }
@@ -260,7 +261,7 @@ func (u *ListUsersPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	u.chatService.mu.RLock()
 	defer u.chatService.mu.RUnlock()
 
-	clientsSlice := GenericMapToJSONSlice(u.chatService.clients)
+	clientsSlice := ClientsToJsonSliceRequireLock(u.chatService.clients, msg.ClientId)
 
 	jsonList, err := json.Marshal(clientsSlice)
 	if err != nil {

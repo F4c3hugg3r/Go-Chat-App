@@ -1,9 +1,6 @@
 package UI
 
 import (
-	"encoding/json"
-	"strings"
-
 	i "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/input"
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 	"github.com/charmbracelet/bubbles/help"
@@ -63,6 +60,7 @@ var (
 		Help:         key.NewBinding(key.WithKeys("ctrl+h"), key.WithHelp("ctrl h", faint.Render("toggle help"))),
 		Complete:     key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", faint.Render("complete"))),
 		Quit:         key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", faint.Render("quit"))),
+		SelectUser:   key.NewBinding(key.WithKeys("ctrl+u"), key.WithHelp("ctrl u", faint.Render("select userId"))),
 		Logs:         key.NewBinding(key.WithKeys("ctrl+l"), key.WithHelp("ctrl l", faint.Render("toggle logs"))),
 		NextSug:      key.NewBinding(key.WithKeys("shift+right"), key.WithHelp("shift →", faint.Render("next suggestion"))),
 		PrevSug:      key.NewBinding(key.WithKeys("shift+left"), key.WithHelp("shift ←", faint.Render("previous suggestion"))),
@@ -90,6 +88,7 @@ type keyMap struct {
 	Help         key.Binding
 	Quit         key.Binding
 	Logs         key.Binding
+	SelectUser   key.Binding
 	Complete     key.Binding
 	NextSug      key.Binding
 	PrevSug      key.Binding
@@ -108,7 +107,7 @@ type model struct {
 	title           string
 	textinput       textinput.Model
 	showSuggestions bool
-	help            help.Model
+	helpModel       help.Model
 	keyMap          keyMap
 	tableValues     *Table
 	err             error
@@ -119,31 +118,11 @@ type model struct {
 	inH *InputHistory
 }
 
-type UIClient struct {
-	Name      string
-	CallState string
-	ClientId  string
-	Active    bool
-}
-
 // InputHistory manageges the inputHistory
 type InputHistory struct {
 	current int
 	inputs  []string
 	first   bool
-}
-
-// helper functions
-func ParseJsonToUIClients(jsonSlice string) ([]*UIClient, error) {
-	var clients []*UIClient
-	dec := json.NewDecoder(strings.NewReader(jsonSlice))
-
-	err := dec.Decode(&clients)
-	if err != nil {
-		return nil, err
-	}
-
-	return clients, nil
 }
 
 // setUpTexInput sets up a textinput.Model with every needed setting

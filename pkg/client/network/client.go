@@ -17,11 +17,12 @@ type Client struct {
 	authToken  string
 	groupId    string
 	Registered bool
-	Output     chan *t.Response
 
-	mu      *sync.RWMutex
-	cond    *sync.Cond
-	LogChan chan t.Log
+	mu           *sync.RWMutex
+	cond         *sync.Cond
+	Output       chan *t.Response
+	LogChan      chan t.Log
+	OnChangeChan chan t.ClientsChangeSignal
 
 	Url        string
 	HttpClient *http.Client
@@ -35,13 +36,14 @@ type Client struct {
 // NewClient generates a ChatClient and spawns a ResponseReceiver goroutine
 func NewClient(server string) *Client {
 	chatClient := &Client{
-		clientId:   t.GenerateSecureToken(32),
-		clientName: "",
-		groupId:    "",
-		authToken:  "",
-		Output:     make(chan *t.Response, 10000),
-		HttpClient: &http.Client{},
-		Registered: false,
+		clientId:     t.GenerateSecureToken(32),
+		clientName:   "",
+		groupId:      "",
+		authToken:    "",
+		Output:       make(chan *t.Response, 10000),
+		OnChangeChan: make(chan t.ClientsChangeSignal, 10000),
+		HttpClient:   &http.Client{},
+		Registered:   false,
 
 		mu:      &sync.RWMutex{},
 		Url:     server,
@@ -295,7 +297,7 @@ func (c *Client) HandlePeer(rsp *t.Response, offer bool) error {
 	if err != nil {
 		c.LogChan <- t.Log{Text: "Peer existiert nicht"}
 
-		peer, err := NewPeer(rsp.ClientId, c.LogChan, c, c.GetClientId())
+		peer, err := NewPeer(rsp.ClientId, c.LogChan, c, c.GetClientId(), c.OnChangeChan)
 		if err != nil {
 			c.LogChan <- t.Log{Text: fmt.Sprintf("Peer mit id: %s konnte nicht erstellt werden, server wird informiert", rsp.ClientId)}
 

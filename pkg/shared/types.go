@@ -15,11 +15,13 @@ const (
 
 const UnregisterFlag = "- Du bist nun vom Server getrennt -"
 const RegisterFlag = "- Du bist registriert -"
-const UsersFlag = "Users"
-const IgnoreResponseTag = "Ignore Response"
-
 const AddGroupFlag = "Add Group"
 const LeaveGroupFlag = "Leave Group"
+
+const UsersFlag = "Users"
+const IgnoreResponseTag = "Ignore Response"
+const UserAddFlag = "Add User"
+const UserRemoveFlag = "Remove User"
 
 // signal flags
 const ICECandidateFlag = "ICE Candidate"
@@ -67,6 +69,21 @@ type JsonGroup struct {
 	GroupId string `json:"groupId"`
 	Name    string `json:"name"`
 	Size    int    `json:"size"`
+}
+
+type JsonClient struct {
+	Name      string `json:"name"`
+	CallState string `json:"callState"`
+	ClientId  string `json:"clientId"`
+	GroupName string `json:"groupName"`
+	GroupId   string `json:"groupId"`
+}
+
+// signals, that a state of a client or the list of clients has changed
+type ClientsChangeSignal struct {
+	ClientsJson string
+	CallState   string
+	OppId       string
 }
 
 // logging

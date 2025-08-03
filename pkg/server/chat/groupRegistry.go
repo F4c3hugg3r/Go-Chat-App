@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"encoding/json"
 	"fmt"
 	"slices"
 	"sort"
@@ -126,13 +125,6 @@ func (g *Group) SetSize() int {
 
 	g.Size = len(g.clients)
 	return g.Size
-}
-
-func (g *Group) SafeGetGroupSlice() []json.RawMessage {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-
-	return GenericMapToJSONSlice(g.clients)
 }
 
 func (g *Group) ConnectToGroupMembers(ownId string) []string {

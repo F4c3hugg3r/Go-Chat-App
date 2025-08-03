@@ -14,7 +14,6 @@ import (
 )
 
 type Peer struct {
-	CallState    string
 	ICEConnected bool
 	peerId       string
 	ownId        string
@@ -23,6 +22,7 @@ type Peer struct {
 	Cancel       context.CancelFunc
 	chatClient   *Client
 	logChannel   chan t.Log
+	OnChangeChan chan t.ClientsChangeSignal
 	mu           *sync.RWMutex
 
 	peerConn      *webrtc.PeerConnection
@@ -35,7 +35,7 @@ type Peer struct {
 }
 
 // initializer function
-func NewPeer(opposingId string, logChannel chan t.Log, chatClient *Client, ownId string) (*Peer, error) {
+func NewPeer(opposingId string, logChannel chan t.Log, chatClient *Client, ownId string, clientsSingalChan chan t.ClientsChangeSignal) (*Peer, error) {
 	var err error
 	p := &Peer{
 		SignalChan:    make(chan *t.Response, 100),
@@ -44,7 +44,7 @@ func NewPeer(opposingId string, logChannel chan t.Log, chatClient *Client, ownId
 		logChannel:    logChannel,
 		chatClient:    chatClient,
 		mu:            &sync.RWMutex{},
-		CallState:     t.StableSignalFlag,
+		OnChangeChan:  clientsSingalChan,
 		iceCandidates: []webrtc.ICECandidateInit{},
 	}
 
@@ -118,7 +118,7 @@ func (p *Peer) OnICEConnectionStateChangeHandler(connectionState webrtc.ICEConne
 
 	p.logChannel <- t.Log{Text: fmt.Sprintf("WebRTC: ICE connection state has changed %s", connectionState.String())}
 	if connectionState == webrtc.ICEConnectionStateConnected {
-		p.ICEConnected = true
+		p.OnChangeChan <- t.ClientsChangeSignal{CallState: t.ConnectedFlag, OppId: p.peerId}
 		msg := p.chatClient.CreateMessage(p.ownId, fmt.Sprint("/", t.ConnectedFlag), "", p.peerId)
 		_, err = p.chatClient.PostMessage(msg, t.SignalWebRTC)
 		if err != nil {
@@ -339,7 +339,7 @@ func (p *Peer) ReceiveICECandidate(ICECandidate string) {
 
 // helper functions
 func (p *Peer) SetSignalingState(state string, sendToServer bool) error {
-	p.CallState = state
+	p.OnChangeChan <- t.ClientsChangeSignal{CallState: state, OppId: p.peerId}
 
 	if sendToServer {
 		msg := p.chatClient.CreateMessage(p.ownId, fmt.Sprint("/", state), "", p.peerId)
