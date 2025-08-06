@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
@@ -26,6 +27,8 @@ func (cp *CallPlugin) Description() *Description {
 }
 
 func (cp *CallPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
+	fmt.Printf("\n[CallPlugin] Client '%s' (%s) requested to start a call", msg.Name, msg.ClientId)
+
 	group, _, err := GetCurrentGroup(msg.ClientId, cp.chatService)
 	if err != nil {
 		return &ty.Response{Err: fmt.Sprintf("%v: error getting current group", err)}, nil
@@ -39,7 +42,8 @@ func (cp *CallPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return &ty.Response{Err: fmt.Sprintf("%v: group is to big for a call (max 6 clients)", ty.ErrNoPermission)}, nil
 	}
 
-	groupClientIds := group.ConnectToGroupMembers(msg.ClientId)
+	groupClientIds := group.GetClientIdsFromGroup(msg.ClientId, true)
+	fmt.Printf("\n[CallPlugin] Group members for call (excluding caller): %v", groupClientIds)
 
 	jsonSlice := json.RawMessage{}
 	jsonSlice, err = json.Marshal(groupClientIds)
@@ -72,7 +76,7 @@ func (pp *PrivateMessagePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		return &ty.Response{Err: fmt.Sprintf("%v: client with id: %s not found", err, msg.ClientId)}, nil
 	}
 
-	rsp := &ty.Response{RspName: fmt.Sprintf("[Private] - %s", msg.Name), Content: msg.Content}
+	rsp := &ty.Response{RspName: fmt.Sprintf("[%s]", msg.Name), Content: msg.Content}
 
 	err = client.Send(rsp)
 	if err != nil {
@@ -163,11 +167,14 @@ func (rp *RegisterClientPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 		Name:      msg.Name,
 		ClientId:  msg.ClientId,
 		GroupName: "",
+		groupId:   "",
 		clientCh:  clientCh,
 		active:    true,
 		authToken: token,
 		lastSign:  time.Now().UTC(),
 		chClosed:  false,
+		rtcs:      make(map[string]string),
+		mu:        sync.RWMutex{},
 	}
 	rp.chatService.clients[msg.ClientId] = client
 

@@ -21,6 +21,18 @@ type Table struct {
 	mu      *sync.RWMutex
 }
 
+type MuteTable struct {
+	cols        []table.Column
+	rows        []table.Row
+	focused     bool
+	height      int
+	width       int
+	ts          table.Styles
+	micMute     bool
+	speakerMute bool
+	// mu      *sync.RWMutex
+}
+
 func setUpTable() (table.Model, *Table) {
 	tV := &Table{
 		cols: []table.Column{
@@ -58,6 +70,42 @@ func setUpTable() (table.Model, *Table) {
 	tV.ts = ts
 
 	return ta, tV
+}
+
+func setUpMuteTable() (table.Model, *MuteTable) {
+	mTV := &MuteTable{
+		cols: []table.Column{
+			{Title: "Mic", Width: 3},
+			{Title: "Speaker", Width: 3},
+		},
+		rows:    []table.Row{},
+		focused: false,
+		height:  2,
+
+		// mu:      &sync.RWMutex{},
+	}
+
+	mTa := table.New(
+		table.WithColumns(mTV.cols),
+		table.WithRows(mTV.rows),
+		table.WithHeight(mTV.height),
+		table.WithFocused(mTV.focused),
+	)
+
+	ts := table.DefaultStyles()
+	ts.Header = ts.Header.
+		BorderBottom(true).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(purple.GetForeground()).
+		Bold(false)
+	ts.Selected = ts.Selected.
+		Foreground(lipgloss.NoColor{}).
+		Background(lipgloss.NoColor{}).
+		Bold(false)
+	mTa.SetStyles(ts)
+	mTV.ts = ts
+
+	return mTa, mTV
 }
 
 func (t *Table) SetClients(clients []*ty.JsonClient, client *ty.JsonClient) {
@@ -124,10 +172,6 @@ func (t *Table) RemoveClient(clientId string, all bool) error {
 	if all {
 		clear(t.clients)
 		return nil
-	}
-
-	if _, exists := t.clients[clientId]; !exists {
-		return fmt.Errorf("%w: client does not exist", ty.ErrNotAvailable)
 	}
 
 	delete(t.clients, clientId)

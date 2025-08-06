@@ -2,7 +2,6 @@ package chat
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -36,7 +35,7 @@ func (s *ChatService) Broadcast(clientsToIterate map[string]*Client, rsp *ty.Res
 			if client.ClientId != rsp.ClientId && client.GetGroupId() == "" {
 				err := client.Send(rsp)
 				if err != nil {
-					log.Printf("\n%v: %s -> %s", err, rsp.RspName, client.Name)
+					fmt.Printf("\n%v: %s -> %s", err, rsp.RspName, client.Name)
 				}
 			}
 		}
@@ -45,7 +44,7 @@ func (s *ChatService) Broadcast(clientsToIterate map[string]*Client, rsp *ty.Res
 			if client.ClientId != rsp.ClientId {
 				err := client.Send(rsp)
 				if err != nil {
-					log.Printf("\n%v: %s -> %s", err, rsp.RspName, client.Name)
+					fmt.Printf("\n%v: %s -> %s", err, rsp.RspName, client.Name)
 				}
 			}
 		}
@@ -93,7 +92,7 @@ func (s *ChatService) ForwardSignal(msg *ty.Message, signal string) error {
 
 	oppClient.Send(&ty.Response{RspName: signal, ClientId: msg.Name, Content: msg.Content})
 
-	fmt.Printf("%s sent from %s -> %s", signal, msg.Name, msg.ClientId)
+	fmt.Printf("\n%s sent from %s -> %s", signal, msg.Name, msg.ClientId)
 	return nil
 }
 

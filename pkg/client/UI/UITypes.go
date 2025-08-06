@@ -27,8 +27,8 @@ var (
 	titleStyle lipgloss.Style = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("63")).
-			PaddingLeft(5).
-			PaddingRight(5)
+			PaddingLeft(10).
+			PaddingRight(10)
 	TableHeaderStyle = table.DefaultStyles().Header.
 				BorderBottom(true).
 				Bold(false)
@@ -60,7 +60,7 @@ var (
 		Help:         key.NewBinding(key.WithKeys("ctrl+h"), key.WithHelp("ctrl h", faint.Render("toggle help"))),
 		Complete:     key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", faint.Render("complete"))),
 		Quit:         key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", faint.Render("quit"))),
-		SelectUser:   key.NewBinding(key.WithKeys("ctrl+u"), key.WithHelp("ctrl u", faint.Render("select userId"))),
+		SelectUser:   key.NewBinding(key.WithKeys("ctrl+u"), key.WithHelp("ctrl u", faint.Render("select user"))),
 		Logs:         key.NewBinding(key.WithKeys("ctrl+l"), key.WithHelp("ctrl l", faint.Render("toggle logs"))),
 		NextSug:      key.NewBinding(key.WithKeys("shift+right"), key.WithHelp("shift →", faint.Render("next suggestion"))),
 		PrevSug:      key.NewBinding(key.WithKeys("shift+left"), key.WithHelp("shift ←", faint.Render("previous suggestion"))),
@@ -100,7 +100,6 @@ type model struct {
 	viewport viewport.Model
 	// logging
 	logViewport     viewport.Model
-	table           table.Model
 	logs            []string
 	messages        []string
 	logChan         chan t.Log
@@ -109,8 +108,12 @@ type model struct {
 	showSuggestions bool
 	helpModel       help.Model
 	keyMap          keyMap
-	tableValues     *Table
 	err             error
+
+	table           table.Model
+	tableValues     *Table
+	muteTable       table.Model
+	muteTableValues *MuteTable
 
 	userService *i.UserService
 	outputChan  chan *t.Response
@@ -123,23 +126,4 @@ type InputHistory struct {
 	current int
 	inputs  []string
 	first   bool
-}
-
-// setUpTexInput sets up a textinput.Model with every needed setting
-func SetUpTextInput(u *i.UserService) textinput.Model {
-	ti := textinput.New()
-	ti.Placeholder = "Send a message..."
-	ti.Prompt = "┃ "
-	ti.PromptStyle, ti.Cursor.Style = purple, purple
-	ti.Focus()
-	ti.CharLimit = 280
-	ti.Width = 30
-	ti.ShowSuggestions = true
-	//überschreiben, da ctrl+h sonst char löscht
-	ti.KeyMap.DeleteCharacterBackward = key.NewBinding(key.WithKeys("backspace"))
-	ti.KeyMap.NextSuggestion = helpKeys.NextSug
-	ti.KeyMap.PrevSuggestion = helpKeys.PrevSug
-	ti.SetSuggestions(u.InitializeSuggestions())
-
-	return ti
 }

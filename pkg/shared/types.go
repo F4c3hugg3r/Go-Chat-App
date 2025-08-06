@@ -26,6 +26,7 @@ const UserRemoveFlag = "Remove User"
 // signal flags
 const ICECandidateFlag = "ICE Candidate"
 const RollbackDoneFlag = "Rollback Done"
+const InitializeSignalFlag = "Initialize Call"
 
 // signalflags -> callStates
 const OfferSignalFlag = "Offer Signal"
@@ -33,6 +34,9 @@ const AnswerSignalFlag = "Answer Signal"
 const StableSignalFlag = "Stable Flag"
 const ConnectedFlag = "Connected"
 const FailedConnectionFlag = "Connection Failed"
+
+// finished flags for synchronization
+const OfferSignalFinished = "Offer finished"
 
 var (
 	ErrNotAvailable   error = errors.New("item is not available")
@@ -85,6 +89,12 @@ type ClientsChangeSignal struct {
 	CallState   string
 	OppId       string
 }
+
+// // FinishedSignal signals the client that a certain server process was finished
+// type FinishedSignal struct {
+// 	Name   string
+// 	PeerId string
+// }
 
 // logging
 type Log struct {

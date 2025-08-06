@@ -127,16 +127,6 @@ func (g *Group) SetSize() int {
 	return g.Size
 }
 
-func (g *Group) ConnectToGroupMembers(ownId string) []string {
-	stringSlice := g.GetClientIdsFromGroup(ownId, true)
-
-	for _, oppId := range stringSlice {
-		g.SetConnection(ownId, oppId, false)
-	}
-
-	return stringSlice
-}
-
 func (g *Group) SetConnection(ownId string, oppId string, connected bool) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -165,8 +155,11 @@ func (g *Group) CheckConnection(ownId string, oppId string) bool {
 
 	_, exists := g.rtcs[CreateCompositeKey(ownId, oppId)]
 	if exists {
+		fmt.Printf("\n[CheckConnection] there is a connection between %s - %s", ownId, oppId)
 		return true
 	}
+
+	fmt.Printf("\n[CheckConnection] no connection between %s - %s", ownId, oppId)
 
 	return false
 }

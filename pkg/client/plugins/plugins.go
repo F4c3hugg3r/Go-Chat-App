@@ -9,6 +9,8 @@ import (
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
+// TODO /call quit Plugin
+
 // CallPlugin lets you participate in a voice call
 type CallPlugin struct {
 	c *n.Client
@@ -23,28 +25,34 @@ func (cp *CallPlugin) CheckScope() int {
 }
 
 func (cp *CallPlugin) Execute(message *t.Message) (error, string) {
+	cp.c.LogChan <- t.Log{Text: "CallPlugin.Execute: Initiating call plugin execution", Method: "CallPlugin.Execute"}
+
 	// gathering group clients
+	cp.c.LogChan <- t.Log{Text: fmt.Sprintf("Posting message to server: %+v", message), Method: "CallPlugin.Execute"}
 	rsp, err := cp.c.PostMessage(message, t.PostPlugin)
 	if err != nil {
-		cp.c.LogChan <- t.Log{Text: fmt.Sprintf("%v: error posting or processing rsp", err)}
+		cp.c.LogChan <- t.Log{Text: fmt.Sprintf("Error posting or processing response: %v", err), Method: "CallPlugin.Execute"}
 		return err, ""
 	}
+
+	cp.c.LogChan <- t.Log{Text: fmt.Sprintf("Received response: %s", rsp.Content), Method: "CallPlugin.Execute"}
 
 	var callableClientIds []string
 	dec := json.NewDecoder(strings.NewReader(rsp.Content))
 	err = dec.Decode(&callableClientIds)
 	if err != nil {
-		cp.c.LogChan <- t.Log{Text: fmt.Sprintf("Fehler beim Decoden: Ids aus Response: %s", rsp.Content), Method: "NewCallPlugin.Execute()"}
+		cp.c.LogChan <- t.Log{Text: fmt.Sprintf("Error decoding client IDs from response: %s", rsp.Content), Method: "CallPlugin.Execute"}
 		cp.c.SendSignalingError("", "")
 		return err, ""
 	}
-	cp.c.LogChan <- t.Log{Text: fmt.Sprintf("Ids aus Response: %s", strings.Join(callableClientIds, ", ")), Method: "NewCallPlugin.Execute()"}
+	cp.c.LogChan <- t.Log{Text: fmt.Sprintf("Decoded client IDs: %s", strings.Join(callableClientIds, ", ")), Method: "CallPlugin.Execute"}
 
 	for _, oppClientId := range callableClientIds {
+		cp.c.LogChan <- t.Log{Text: fmt.Sprintf("Starting HandleSignal for client %s", oppClientId), Method: "CallPlugin.Execute"}
 		go cp.c.HandleSignal(&t.Response{ClientId: oppClientId}, true)
-		cp.c.LogChan <- t.Log{Text: fmt.Sprintf("Handle Signal started für client %s", oppClientId), Method: "NewCallPlugin.Execute()"}
 	}
 
+	cp.c.LogChan <- t.Log{Text: "CallPlugin.Execute: Finished initiating calls", Method: "CallPlugin.Execute"}
 	return nil, ""
 }
 

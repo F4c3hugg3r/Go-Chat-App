@@ -11,12 +11,17 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textarea"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
 // TODO ALLGEMEIN
+
+// TODO table für mute speaker/mic
+
+// TODO mute in server speichern und übergeben -> rot faint => mic, rot => mic + speaker
 
 // InitialModel initializes the model struct, which is the main struct for the TUI
 func InitialModel(u *i.UserService) model {
@@ -25,6 +30,7 @@ func InitialModel(u *i.UserService) model {
 	h := help.New()
 
 	ta, tV := setUpTable()
+	mTa, mTV := setUpMuteTable()
 
 	vp := viewport.New(30, 5)
 	vp.KeyMap = viewportKeys
@@ -37,20 +43,22 @@ func InitialModel(u *i.UserService) model {
 	}
 
 	model := model{
-		messages:    []string{},
-		viewport:    vp,
-		logViewport: logVp,
-		logs:        []string{},
-		err:         nil,
-		userService: u,
-		outputChan:  u.ChatClient.Output,
-		textinput:   ti,
-		helpModel:   h,
-		keyMap:      helpKeys,
-		inH:         inputManager,
-		title:       UnregisterTitle,
-		table:       ta,
-		tableValues: tV,
+		messages:        []string{},
+		viewport:        vp,
+		logViewport:     logVp,
+		logs:            []string{},
+		err:             nil,
+		userService:     u,
+		outputChan:      u.ChatClient.Output,
+		textinput:       ti,
+		helpModel:       h,
+		keyMap:          helpKeys,
+		inH:             inputManager,
+		title:           UnregisterTitle,
+		table:           ta,
+		tableValues:     tV,
+		muteTable:       mTa,
+		muteTableValues: mTV,
 	}
 
 	model.logChan = model.userService.ChatClient.LogChan
@@ -111,9 +119,10 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyEnter:
 			if m.table.Focused() {
 				// maybe TODO ausgewähltes Feld in zwischenablage oder in textinput
-				// mit zB zuvor eingegebenen Text kopieren
+				// mit zB zuvor eingegebenen Text kopieren oder automatisch suggesten
 				message := fmt.Sprintf("%s\n%s%s\n%s%s",
-					turkis.Bold(true).Render(m.table.SelectedRow()[0]),
+					//maybe TODO align center funktioniert nicht
+					turkis.Bold(true).AlignHorizontal(lipgloss.Center).Render(fmt.Sprintf("- %s -", m.table.SelectedRow()[0])),
 					blue.Render("ClientId: "),
 					m.table.SelectedRow()[3],
 					blue.Render("GroupId: "),
@@ -145,7 +154,7 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 			m.SwitchFocus()
 
 		case key.Matches(rsp, m.keyMap.Logs):
-			m.HideLogs()
+			m.ToggleLogs()
 
 		case key.Matches(rsp, m.keyMap.InputLeft), key.Matches(rsp, m.keyMap.InputRight):
 			input := m.SearchInputHistory(rsp)
@@ -239,10 +248,10 @@ func (m *model) renderTitle(title string, param []string) {
 
 		case strings.Contains(title, t.RegisterFlag):
 			title = titleStyle.Render(fmt.Sprintf(RegisterTitle,
-				turkis.Render(param[0])))
+				turkis.Bold(true).Render(param[0])))
 
 		case strings.Contains(title, t.AddGroupFlag):
-			title = titleStyle.Render(fmt.Sprintf(GroupTitle, turkis.Render(param[0]), turkis.Render(param[1])))
+			title = titleStyle.Render(fmt.Sprintf(GroupTitle, turkis.Bold(true).Render(param[0]), turkis.Bold(true).Render(param[1])))
 		}
 	}
 
@@ -276,7 +285,8 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 		m.renderTitle(t.RegisterFlag, []string{m.userService.ChatClient.GetName()})
 		m.userService.Executor("/users")
 
-		return blue.Render("-> Du kannst nun Nachrichten schreiben oder Commands ausführen\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen")
+		return blue.Render("-> Du kannst nun Nachrichten schreiben oder Commands ausführen" +
+			"\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen\n'/users' → Tabelle aktualisieren")
 
 	// server output
 	case rsp.RspName == "":
@@ -311,7 +321,12 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 		m.renderTitle(t.AddGroupFlag, []string{m.userService.ChatClient.GetName(), group.Name})
 		m.userService.Executor("/group users")
 
-		return blue.Render(fmt.Sprintf("-> Du bist nun Teil der Gruppe %s und kannst Nachrichten in ihr schreiben\nPrivate Nachrichten kannst du weiterhin außerhalb verschicken", group.Name))
+		return fmt.Sprintf("%s %s %s\n%s",
+			blue.Render("-> Du bist nun Teil der Gruppe"),
+			turkis.Render(group.Name),
+			blue.Render("und kannst Nachrichten in ihr schreiben"),
+			blue.Faint(true).Render("Private Nachrichten kannst du weiterhin außerhalb verschicken"),
+		)
 
 	// leaveGroup output
 	case strings.Contains(rsp.RspName, t.LeaveGroupFlag):
@@ -336,20 +351,25 @@ func (m *model) evaluateReponse(rsp *t.Response) string {
 
 		return ""
 
+	// // FinishedSignal output
+	// case strings.Contains(rsp.RspName, t.OfferSignalFinished):
+	// 	m.userService.ChatClient.PushIntoFinishedSignalChan(rsp.ClientId, rsp, t.OfferSignalFinished)
+
 	// slice output
 	case strings.HasPrefix(rsp.Content, "["):
-		// output, err := JSONToTable(rsp.Content)
-		// if err != nil {
-		// 	return red.Render(fmt.Sprintf("%v: error formatting json to table", err))
-		// }
-
 		if strings.Contains(rsp.RspName, t.UsersFlag) {
 			m.userService.ChatClient.OnChangeChan <- t.ClientsChangeSignal{
 				ClientsJson: rsp.Content,
 			}
+			return ""
 		}
 
-		return ""
+		output, err := JSONToTable(rsp.Content)
+		if err != nil {
+			return red.Render(fmt.Sprintf("%v: error formatting json to table", err))
+		}
+
+		return output
 	}
 
 	// response output
@@ -381,7 +401,7 @@ func (m *model) refreshTable() {
 	m.table.SetRows(m.tableValues.rows)
 	m.table.SetStyles(m.tableValues.ts)
 
-	// TODO wenn callState connected ist grün machen
+	// maybe TODO wenn callState connected ist, grün machen
 }
 
 // refreshViewPort refreshes the size of the viewport
@@ -445,11 +465,19 @@ func (m *model) HandleClientsChangeSignal(rsp t.ClientsChangeSignal) error {
 
 // HandleWindowResize handles rezising of the terminal window by updating all models sizes
 func (m *model) HandleWindowResize(rsp *tea.WindowSizeMsg) {
-	m.viewport.Width = rsp.Width / 5 * 4
-	m.table.SetWidth(rsp.Width / 5)
+	m.viewport.Width = rsp.Width / 6 * 4
+
+	m.table.SetWidth(rsp.Width / 6 * 2)
+	columns := m.table.Columns()
+	columns[0].Width = m.table.Width() / 3
+	columns[1].Width = m.table.Width() / 3
+	columns[2].Width = m.table.Width() / 3
+	m.table.SetColumns(columns)
+
 	m.textinput.Width = rsp.Width
 	m.helpModel.Width = rsp.Width
 	m.logViewport.Width = rsp.Width
+
 	var logPortHeight int
 	switch m.logViewport.Height {
 	case 0:
@@ -463,6 +491,7 @@ func (m *model) HandleWindowResize(rsp *tea.WindowSizeMsg) {
 
 	m.renderTitle(m.title, []string{WindowResizeFlag})
 	m.refreshViewPort()
+	m.refreshTable()
 }
 
 // HandleResponse handles an incoming Response by evaluating it and refreshing
@@ -539,7 +568,7 @@ func (m *model) AddMessageToViewport(message string) {
 	m.refreshViewPort()
 }
 
-func (m *model) HideLogs() {
+func (m *model) ToggleLogs() {
 	switch m.logViewport.Height {
 	case 0:
 		m.logViewport.Height = 8
@@ -553,6 +582,7 @@ func (m *model) HideLogs() {
 		m.viewport.KeyMap = viewportKeys
 		m.table.KeyMap = table.DefaultKeyMap()
 	}
+	m.refreshViewPort()
 }
 
 func (m *model) PrintLog(rsp t.Log) {
@@ -568,5 +598,26 @@ func (k keyMap) ShortHelp() []key.Binding {
 // ShortHelp decides what to see in the extended help window
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{{k.Up, k.Down, k.HalfPageUp, k.HalfPageDown, k.InputRight, k.InputLeft},
-		{k.Help, k.Quit, k.Complete, k.SelectUser, k.Logs, k.NextSug, k.PrevSug}}
+		{k.Help, k.SelectUser, k.Logs, k.Quit, k.Complete, k.NextSug, k.PrevSug}}
+}
+
+// setUpTexInput sets up a textinput.Model with every needed setting
+func SetUpTextInput(u *i.UserService) textinput.Model {
+	ti := textinput.New()
+	ti.Placeholder = "Send a message..."
+	ti.Prompt = "┃ "
+	ti.PromptStyle, ti.Cursor.Style = purple, purple
+	ti.Focus()
+	ti.CharLimit = 280
+	ti.Width = 30
+	ti.ShowSuggestions = true
+
+	//überschreiben, da ctrl+h sonst char löscht
+	ti.KeyMap.DeleteCharacterBackward = key.NewBinding(key.WithKeys("backspace"))
+	ti.KeyMap.NextSuggestion = helpKeys.NextSug
+	ti.KeyMap.PrevSuggestion = helpKeys.PrevSug
+
+	ti.SetSuggestions(u.InitializeSuggestions())
+
+	return ti
 }

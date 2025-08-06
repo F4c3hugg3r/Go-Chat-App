@@ -164,7 +164,7 @@ func (c *Client) GetCallState(oppId string) string {
 
 	callState, exists := c.rtcs[oppId]
 	if !exists {
-		return ""
+		return "no call"
 	}
 	return callState
 }
@@ -172,11 +172,6 @@ func (c *Client) GetCallState(oppId string) string {
 func (c *Client) SetCallState(oppId string, callState string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
-	callState, exists := c.rtcs[oppId]
-	if exists {
-		return fmt.Errorf("%w: setCallState failed for %s -> %s", ty.ErrNotAvailable, c.ClientId, oppId)
-	}
 
 	c.rtcs[oppId] = callState
 	return nil

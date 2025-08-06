@@ -277,27 +277,29 @@ func (c *Client) CreateMessage(name string, plugin string, content string, clien
 	return msg
 }
 
-func (c *Client) HandleSignal(rsp *t.Response, offer bool) {
-	err := c.HandlePeer(rsp, offer)
+func (c *Client) HandleSignal(rsp *t.Response, initialSignal bool) {
+	err := c.HandlePeer(rsp, initialSignal)
 	if err != nil {
 		c.SendSignalingError(rsp.ClientId, "")
 	}
 }
 
 func (c *Client) SendSignalingError(oppId string, content string) {
-	msg := c.CreateMessage(t.FailedConnectionFlag, "/connection", content, oppId)
+	msg := c.CreateMessage(t.FailedConnectionFlag, fmt.Sprintf("/"+t.FailedConnectionFlag), content, oppId)
 	_, err := c.PostMessage(msg, t.SignalWebRTC)
 	if err != nil {
 		c.LogChan <- t.Log{Text: fmt.Sprintf("WebRTC: Fehler beim senden des ConnectionFailedFlags %v", err)}
 	}
 }
 
-func (c *Client) HandlePeer(rsp *t.Response, offer bool) error {
+func (c *Client) HandlePeer(rsp *t.Response, initialSignal bool) error {
 	peer, err := c.GetPeer(rsp.ClientId)
-	if err != nil {
-		c.LogChan <- t.Log{Text: "Peer existiert nicht"}
+	c.LogChan <- t.Log{Text: "Getting Peer"}
 
-		peer, err := NewPeer(rsp.ClientId, c.LogChan, c, c.GetClientId(), c.OnChangeChan)
+	if err != nil || peer == nil {
+		c.LogChan <- t.Log{Text: "Peer existiert noch nicht, lege peer an"}
+
+		peer, err = NewPeer(rsp.ClientId, c.LogChan, c, c.GetClientId(), c.OnChangeChan)
 		if err != nil {
 			c.LogChan <- t.Log{Text: fmt.Sprintf("Peer mit id: %s konnte nicht erstellt werden, server wird informiert", rsp.ClientId)}
 
@@ -307,8 +309,13 @@ func (c *Client) HandlePeer(rsp *t.Response, offer bool) error {
 		c.SetPeer(peer)
 		c.LogChan <- t.Log{Text: fmt.Sprintf("Peer mit id: %s angelegt", rsp.ClientId)}
 
-		if offer {
-			c.LogChan <- t.Log{Text: "OfferConnection gestartet"}
+		if initialSignal {
+			c.LogChan <- t.Log{Text: "starte OfferConnection"}
+
+			err = peer.InitializeConnection()
+			if err != nil {
+				return err
+			}
 
 			return peer.OfferConnection()
 		}
@@ -319,6 +326,13 @@ func (c *Client) HandlePeer(rsp *t.Response, offer bool) error {
 
 	return nil
 }
+
+// func (c *Client) PushIntoFinishedSignalChan(oppId string, rsp *t.Response, flag string) {
+// 	c.mu.RLock()
+// 	defer c.mu.RUnlock()
+
+// 	// c.Peers[oppId].OfferSignalFinishedChan <- rsp
+// }
 
 func (c *Client) SetPeer(peer *Peer) {
 	c.mu.Lock()
@@ -332,9 +346,11 @@ func (c *Client) GetPeer(id string) (*Peer, error) {
 	defer c.mu.RUnlock()
 
 	peer, exists := c.Peers[id]
-	if !exists {
+	if !exists || peer == nil {
 		return nil, fmt.Errorf("%w: peer does not exist", t.ErrNotAvailable)
 	}
+
+	c.LogChan <- t.Log{Text: fmt.Sprintf("peer was found %s", peer.peerId)}
 
 	return peer, nil
 }

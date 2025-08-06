@@ -114,7 +114,7 @@ func (gcp *GroupCreatePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	}
 
 	clients[msg.ClientId] = client
-	group := &Group{GroupId: id, Name: name, clients: clients, mu: &sync.RWMutex{}}
+	group := &Group{GroupId: id, Name: name, clients: clients, mu: &sync.RWMutex{}, rtcs: make(map[string]bool)}
 	gcp.s.groups[id] = group
 	client.SetGroup(group)
 
@@ -258,7 +258,7 @@ func (gjp *GroupJoinPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 
 	client.SetGroup(group)
 
-	client.Execute(gjp.pr, &ty.Message{Name: ty.UserAddFlag, Plugin: "/broadcast", Content: fmt.Sprintf("%s ist der Gruppe beigetreten", msg.Name), ClientId: msg.ClientId, GroupId: newGroupId})
+	client.Execute(gjp.pr, &ty.Message{Name: ty.UserAddFlag, Plugin: "/broadcast", Content: msg.Name, ClientId: msg.ClientId, GroupId: newGroupId})
 
 	jsonGroup, err := json.Marshal(group)
 	if err != nil {

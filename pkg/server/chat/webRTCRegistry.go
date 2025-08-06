@@ -17,6 +17,7 @@ type WebRTCRegistry struct {
 // RegisterPlugins sets up all the plugins
 func RegisterCallPlugins(chatService *ChatService) *WebRTCRegistry {
 	cr := &WebRTCRegistry{plugins: make(map[string]WebRTCInterface)}
+	cr.plugins[fmt.Sprint("/", ty.InitializeSignalFlag)] = NewInitializeSignalPluginPlugin(chatService)
 	cr.plugins[fmt.Sprint("/", ty.OfferSignalFlag)] = NewOfferSignalPlugin(chatService)
 	cr.plugins[fmt.Sprint("/", ty.AnswerSignalFlag)] = NewAnswerSignalPlugin(chatService)
 	cr.plugins[fmt.Sprint("/", ty.ICECandidateFlag)] = NewICECandidatePlugin(chatService)
