@@ -9,8 +9,6 @@ import (
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
-// TODO /call quit Plugin
-
 // CallPlugin lets you participate in a voice call
 type CallPlugin struct {
 	c *n.Client
@@ -27,10 +25,15 @@ func (cp *CallPlugin) CheckScope() int {
 func (cp *CallPlugin) Execute(message *t.Message) (error, string) {
 	cp.c.LogChan <- t.Log{Text: "CallPlugin.Execute: Initiating call plugin execution", Method: "CallPlugin.Execute"}
 
+	if strings.Contains(message.Content, "quit") {
+		cp.c.DeletePeersSafely(cp.c.GetClientId(), true, true)
+		return nil, ""
+	}
+
 	// gathering group clients
 	cp.c.LogChan <- t.Log{Text: fmt.Sprintf("Posting message to server: %+v", message), Method: "CallPlugin.Execute"}
 	rsp, err := cp.c.PostMessage(message, t.PostPlugin)
-	if err != nil {
+	if err != nil || rsp.Err != t.IgnoreResponseTag {
 		cp.c.LogChan <- t.Log{Text: fmt.Sprintf("Error posting or processing response: %v", err), Method: "CallPlugin.Execute"}
 		return err, ""
 	}
@@ -42,7 +45,7 @@ func (cp *CallPlugin) Execute(message *t.Message) (error, string) {
 	err = dec.Decode(&callableClientIds)
 	if err != nil {
 		cp.c.LogChan <- t.Log{Text: fmt.Sprintf("Error decoding client IDs from response: %s", rsp.Content), Method: "CallPlugin.Execute"}
-		cp.c.SendSignalingError("", "")
+		cp.c.SendSignalingError("", message.ClientId, "")
 		return err, ""
 	}
 	cp.c.LogChan <- t.Log{Text: fmt.Sprintf("Decoded client IDs: %s", strings.Join(callableClientIds, ", ")), Method: "CallPlugin.Execute"}
@@ -70,6 +73,10 @@ func (gp *GroupPlugin) CheckScope() int {
 }
 
 func (gp *GroupPlugin) Execute(message *t.Message) (error, string) {
+	// wird im responeEvaluator gemacht
+	// if strings.Contains(message.Content, t.LeaveGroupFlag) {
+	// 	gp.c.DeletePeersSafely(message.ClientId, true, true)
+	// }
 	_, err := gp.c.PostMessage(message, t.PostPlugin)
 	return err, ""
 }
@@ -117,6 +124,8 @@ func (lp *LogOutPlugin) CheckScope() int {
 }
 
 func (lp *LogOutPlugin) Execute(message *t.Message) (error, string) {
+	// wird im responeEvaluator gemacht
+	//lp.c.DeletePeersSafely(message.ClientId, true, true)
 	return lp.c.PostDelete(message), t.UnregisterFlag
 }
 

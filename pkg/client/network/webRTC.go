@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"sync"
 
+	a "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/audio"
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 	"github.com/ebitengine/oto/v3"
-	"github.com/pion/mediadevices"
-	"github.com/pion/mediadevices/pkg/codec/opus"
 	_ "github.com/pion/mediadevices/pkg/driver/microphone"
 	"github.com/pion/webrtc/v4"
 	"golang.org/x/net/context"
@@ -21,30 +20,27 @@ import (
 type Peer struct {
 	peerId                  string
 	ownId                   string
+	isMuted                 bool
 	SignalChan              chan *t.Response
 	ClientsChangeSignalChan chan t.ClientsChangeSignal
-	// OfferSignalFinishedChan chan *t.Response
-	Ctx        context.Context
-	Cancel     context.CancelFunc
-	chatClient *Client
-	logChannel chan t.Log
-	mu         *sync.RWMutex
-
-	peerConn      *webrtc.PeerConnection
-	otoContext    *oto.Context
-	players       []*oto.Player
-	mediaStream   mediadevices.MediaStream
-	codecSelector *mediadevices.CodecSelector
-	api           *webrtc.API
-	iceCandidates []webrtc.ICECandidateInit
+	logChannel              chan t.Log
+	Ctx                     context.Context
+	Cancel                  context.CancelFunc
+	chatClient              *Client
+	peerConn                *webrtc.PeerConnection
+	api                     *webrtc.API
+	iceCandidates           []webrtc.ICECandidateInit
+	audioTransceiver        *webrtc.RTPTransceiver
+	players                 []*oto.Player
+	mu                      *sync.RWMutex
+	Decoder                 *opusDec.Decoder
 }
 
 // initializer functions
 func NewPeer(opposingId string, logChannel chan t.Log, chatClient *Client, ownId string, clientsSingalChan chan t.ClientsChangeSignal) (*Peer, error) {
 	var err error
 	p := &Peer{
-		SignalChan: make(chan *t.Response, 100),
-		// OfferSignalFinishedChan: make(chan *t.Response, 100),
+		SignalChan:              make(chan *t.Response, 100),
 		peerId:                  opposingId,
 		ownId:                   ownId,
 		logChannel:              logChannel,
@@ -52,6 +48,7 @@ func NewPeer(opposingId string, logChannel chan t.Log, chatClient *Client, ownId
 		mu:                      &sync.RWMutex{},
 		ClientsChangeSignalChan: clientsSingalChan,
 		iceCandidates:           []webrtc.ICECandidateInit{},
+		isMuted:                 false,
 	}
 
 	p.Ctx, p.Cancel = context.WithCancel(context.Background())
@@ -117,16 +114,9 @@ func (p *Peer) CreatePeerConnection() error {
 
 func (p *Peer) InitWebRTCAPI() error {
 	p.logChannel <- t.Log{Text: "WebRTC: InitWebRTCAPI gestartet"}
-	// opus audio codec konfiguration
-	opusParams, err := opus.NewParams()
-	if err != nil {
-		p.logChannel <- t.Log{Text: fmt.Sprintf("WebRTC: Fehler bei opus.NewParams: %v", err)}
-		return err
-	}
 
-	p.codecSelector = mediadevices.NewCodecSelector(mediadevices.WithAudioEncoders(&opusParams))
 	mediaEngine := webrtc.MediaEngine{}
-	p.codecSelector.Populate(&mediaEngine)
+	p.chatClient.MicrophoneInput.CodecSelector.Populate(&mediaEngine)
 	// einheitliche API Instanz damit alle Peers die gleichen Codecs nutzen
 	p.api = webrtc.NewAPI(webrtc.WithMediaEngine(&mediaEngine))
 
@@ -137,35 +127,16 @@ func (p *Peer) InitWebRTCAPI() error {
 
 func (p *Peer) AddTracksToPeerConnection(logChannel chan t.Log) error {
 	var err error
-	p.mediaStream, err = mediadevices.GetUserMedia(mediadevices.MediaStreamConstraints{
-		Audio: func(c *mediadevices.MediaTrackConstraints) {},
-		Codec: p.codecSelector,
-	})
+	p.audioTransceiver, err = p.peerConn.AddTransceiverFromTrack(p.chatClient.MicrophoneInput.OriginalAudioTrack,
+		webrtc.RTPTransceiverInit{
+			Direction: webrtc.RTPTransceiverDirectionSendrecv,
+		},
+	)
 	if err != nil {
-		logChannel <- t.Log{Text: fmt.Sprintf("WebRTC: Fehler bei GetUserMedia: %v", err)}
+		logChannel <- t.Log{Text: fmt.Sprintf("WebRTC: Fehler bei AddTransceiverFromTrack: %v", err)}
 		return err
 	}
 
-	logChannel <- t.Log{Text: "WebRTC: MediaStream erhalten"}
-
-	// !!! TODO gleichen Mediastream für alle Peers nutzen (evtl auch bei ausgabe)
-	// Mediastream auslagern damit alle peers den selben haben. Dann müsste auch perfectr negotiation pattern gehen.. (+ p.peerConn.GetLocalDescription().SDP verschicken)
-	for _, track := range p.mediaStream.GetTracks() {
-		logChannel <- t.Log{Text: fmt.Sprintf("WebRTC: Füge Track hinzu: ID=%s, Kind=%s", track.ID(), track.Kind())}
-		track.OnEnded(func(err error) {
-			logChannel <- t.Log{Text: fmt.Sprintf("WebRTC: Track (ID: %s) beendet mit Fehler: %v", track.ID(), err)}
-		})
-
-		_, err = p.peerConn.AddTransceiverFromTrack(track,
-			webrtc.RTPTransceiverInit{
-				Direction: webrtc.RTPTransceiverDirectionSendrecv,
-			},
-		)
-		if err != nil {
-			logChannel <- t.Log{Text: fmt.Sprintf("WebRTC: Fehler bei AddTransceiverFromTrack: %v", err)}
-			return err
-		}
-	}
 	return nil
 }
 
@@ -176,28 +147,14 @@ func (p *Peer) OnICEGatheringStateChangeHandler(state webrtc.ICEGatheringState) 
 }
 
 func (p *Peer) OnTrackHandler(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
+	var err error
 	p.logChannel <- t.Log{Text: fmt.Sprintf("WebRTC: Empfange Track: ID=%s, Kind=%s", track.ID(), track.Kind())}
 	if track.Kind() != webrtc.RTPCodecTypeAudio {
 		p.logChannel <- t.Log{Text: "WebRTC: Track ist kein Audio, ignoriere"}
 		return
 	}
 
-	otoCtx, ready, err := oto.NewContext(&oto.NewContextOptions{
-		SampleRate:   48000,
-		ChannelCount: 1,
-		Format:       oto.FormatSignedInt16LE,
-		BufferSize:   0,
-	})
-	if err != nil {
-		p.logChannel <- t.Log{Text: fmt.Sprintf("WebRTC: oto.NewContext error: %v", err)}
-		return
-	}
-
-	p.otoContext = otoCtx
-	<-ready
-	p.logChannel <- t.Log{Text: fmt.Sprintf("WebRTC: oto.Context bereit err = %v", err)}
-
-	decoder, err := opusDec.NewDecoder(48000, 1)
+	p.Decoder, err = opusDec.NewDecoder(48000, 1)
 	if err != nil {
 		p.logChannel <- t.Log{Text: fmt.Sprintf("WebRTC: opus.NewDecoder error: %v", err)}
 		return
@@ -206,8 +163,8 @@ func (p *Peer) OnTrackHandler(track *webrtc.TrackRemote, receiver *webrtc.RTPRec
 	p.logChannel <- t.Log{Text: "WebRTC: Opus Decoder bereit"}
 
 	// RTP Pakete von Opus in PCM decodieren
-	reader := t.NewOpusRTPReader(track, decoder)
-	player := otoCtx.NewPlayer(reader)
+	reader := a.NewOpusRTPReader(track, p.Decoder)
+	player := p.chatClient.SpeakerOutput.OtoContext.NewPlayer(reader)
 	p.players = append(p.players, player)
 	p.logChannel <- t.Log{Text: "WebRTC: starte Audio Player"}
 	go player.Play()
@@ -228,7 +185,7 @@ func (p *Peer) OnICEConnectionStateChangeHandler(connectionState webrtc.ICEConne
 	}
 
 	if connectionState == webrtc.ICEConnectionStateFailed {
-		p.chatClient.SendSignalingError(p.peerId, "")
+		p.chatClient.SendSignalingError(p.peerId, p.ownId, "")
 	}
 }
 
@@ -236,13 +193,13 @@ func (p *Peer) OnSignalingStateChangeHandler(signalingState webrtc.SignalingStat
 	switch signalingState {
 	case webrtc.SignalingStateStable:
 		p.SetSignalingState(t.StableSignalFlag, true)
-		p.ClientsChangeSignalChan <- t.ClientsChangeSignal{CallState: t.ConnectedFlag, OppId: p.ownId}
+		p.ClientsChangeSignalChan <- t.ClientsChangeSignal{CallState: t.StableSignalFlag, OppId: p.ownId}
 	case webrtc.SignalingStateHaveLocalOffer:
 		p.SetSignalingState(t.OfferSignalFlag, true)
-		p.ClientsChangeSignalChan <- t.ClientsChangeSignal{CallState: t.ConnectedFlag, OppId: p.ownId}
+		p.ClientsChangeSignalChan <- t.ClientsChangeSignal{CallState: t.OfferSignalFlag, OppId: p.ownId}
 	case webrtc.SignalingStateHaveRemoteOffer:
 		p.SetSignalingState(t.AnswerSignalFlag, true)
-		p.ClientsChangeSignalChan <- t.ClientsChangeSignal{CallState: t.ConnectedFlag, OppId: p.ownId}
+		p.ClientsChangeSignalChan <- t.ClientsChangeSignal{CallState: t.AnswerSignalFlag, OppId: p.ownId}
 	}
 }
 
@@ -259,18 +216,18 @@ func (p *Peer) OnICECandidateHandler(candidate *webrtc.ICECandidate) {
 	}
 }
 
-func (p *Peer) OnNegotiationNeededHandler() {
-	// Wenn Connection besteht und Signaling State Stable ist
-	if p.peerConn.ICEConnectionState() == webrtc.ICEConnectionStateConnected && p.peerConn.SignalingState() == webrtc.SignalingStateStable {
-		p.logChannel <- t.Log{Text: "WebRTC: Negotiation needed: sending offer"}
-		err := p.OfferConnection()
-		if err != nil {
-			p.logChannel <- t.Log{Text: "WebRTC: Negotiation needed: failed sending offer"}
-		}
-	} else {
-		p.logChannel <- t.Log{Text: "WebRTC: Negotiation needed: ignore"}
-	}
-}
+// func (p *Peer) OnNegotiationNeededHandler() {
+// 	// Wenn Connection besteht und Signaling State Stable ist
+// 	if p.peerConn.ICEConnectionState() == webrtc.ICEConnectionStateConnected && p.peerConn.SignalingState() == webrtc.SignalingStateStable {
+// 		p.logChannel <- t.Log{Text: "WebRTC: Negotiation needed: sending offer"}
+// 		err := p.OfferConnection()
+// 		if err != nil {
+// 			p.logChannel <- t.Log{Text: "WebRTC: Negotiation needed: failed sending offer"}
+// 		}
+// 	} else {
+// 		p.logChannel <- t.Log{Text: "WebRTC: Negotiation needed: ignore"}
+// 	}
+// }
 
 // connection functions
 func (p *Peer) InitializeConnection() error {
@@ -290,12 +247,6 @@ func (p *Peer) OfferConnection() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// err := p.WaitForFinishedSignal(p.OfferSignalFinishedChan, time.Second)
-	// if err != nil {
-	// 	p.logChannel <- t.Log{Text: "WebRTC: Kein finished Offer Signal angekommen"}
-	// 	return err
-	// }
-
 	p.logChannel <- t.Log{Text: "WebRTC: Erstelle SDP Offer"}
 
 	offer, err := p.peerConn.CreateOffer(nil)
@@ -313,8 +264,6 @@ func (p *Peer) OfferConnection() error {
 	}
 
 	p.logChannel <- t.Log{Text: "WebRTC: LocalDescription gesetzt, waiting for ICE gathering to start"}
-	// p.WaitForIceGathering()
-	// p.logChannel <- t.Log{Text: "WebRTC: ICE Gathering started, sending Offer"}
 
 	msg := p.chatClient.CreateMessage(p.ownId, fmt.Sprint("/", t.OfferSignalFlag), p.peerConn.LocalDescription().SDP, p.peerId)
 	_, err = p.chatClient.PostMessage(msg, t.SignalWebRTC)
@@ -326,9 +275,32 @@ func (p *Peer) OfferConnection() error {
 	return nil
 }
 
-func (p *Peer) MuteMic() {
-	// TODO
-	// Mikrofon stummschalten, indem alle lokalen Audio-Tracks deaktiviert werden
+func (p *Peer) MuteMic() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	switch p.isMuted {
+	case false:
+		err := p.audioTransceiver.Sender().ReplaceTrack(p.chatClient.MicrophoneInput.SilentAudioTrack)
+		if err != nil {
+			p.logChannel <- t.Log{Text: fmt.Sprintf("Failed to replace track: %v", err)}
+			return err
+		}
+
+		p.isMuted = true
+		p.logChannel <- t.Log{Text: "Microphone muted"}
+
+	case true:
+		err := p.audioTransceiver.Sender().ReplaceTrack(p.chatClient.MicrophoneInput.OriginalAudioTrack)
+		if err != nil {
+			p.logChannel <- t.Log{Text: fmt.Sprintf("Failed to replace track: %v", err)}
+			return err
+		}
+
+		p.isMuted = false
+		p.logChannel <- t.Log{Text: "Microphone unmuted"}
+	}
+
+	return nil
 }
 
 func (p *Peer) MuteSpeaker() {
@@ -342,39 +314,38 @@ func (p *Peer) MuteSpeaker() {
 			p.logChannel <- t.Log{Text: "WebRTC: Speaker aktiviert"}
 		}
 	}
+	p.MuteMic()
 }
 
-// func (p *Peer) UnmuteSpeaker() {
-//     // Alle Player wieder abspielen (Audioausgabe aktivieren)
-//     for _, player := range p.players {
-//         if player != nil && !player.IsPlaying() {
-//             player.Play()
-//             p.logChannel <- t.Log{Text: "WebRTC: Speaker aktiviert"}
-// 		}
-// 	}
-// }
-
 func (p *Peer) CloseConnection() {
-	p.chatClient.SendSignalingError(p.peerId, "")
+	p.logChannel <- t.Log{Text: "WebRTC: CloseConnection gestartet"}
 	if p.Cancel != nil {
+		p.logChannel <- t.Log{Text: "WebRTC: Cancel context"}
 		p.Cancel()
 	}
-	if p.peerConn != nil {
-		p.peerConn.Close()
-	}
-	if p.mediaStream != nil {
-		for _, track := range p.mediaStream.GetTracks() {
-			track.Close()
-		}
-	}
-	for _, player := range p.players {
+
+	p.logChannel <- t.Log{Text: "WebRTC: Closing SignalChan"}
+	close(p.SignalChan)
+
+	for i, player := range p.players {
 		if player != nil {
+			p.logChannel <- t.Log{Text: fmt.Sprintf("WebRTC: Closing Player #%d", i)}
 			player.Close()
+			p.logChannel <- t.Log{Text: fmt.Sprintf("WebRTC: Player #%d geschlossen", i)}
 		}
 	}
-	if p.otoContext != nil {
-		p.otoContext.Suspend()
+
+	if p.peerConn != nil {
+		p.logChannel <- t.Log{Text: "WebRTC: Closing PeerConnection"}
+		err := p.peerConn.Close()
+		if err != nil {
+			p.logChannel <- t.Log{Text: fmt.Sprintf("WebRTC: Fehler beim Schließen der PeerConnection: %v", err)}
+		} else {
+			p.logChannel <- t.Log{Text: "WebRTC: PeerConnection erfolgreich geschlossen"}
+		}
 	}
+
+	p.logChannel <- t.Log{Text: "WebRTC: CloseConnection abgeschlossen"}
 }
 
 // signaling
@@ -398,19 +369,19 @@ func (p *Peer) pollSignals() {
 				err = p.ReceiveOffer(rsp)
 				if err != nil {
 					p.logChannel <- t.Log{Text: fmt.Sprintf("WebRTC: Fehler in ReceiveOffer: %v", err)}
-					p.chatClient.SendSignalingError(p.peerId, "")
+					p.chatClient.SendSignalingError(p.peerId, p.ownId, "")
 				}
 			case t.AnswerSignalFlag:
 				p.logChannel <- t.Log{Text: "WebRTC: ReceiveAnswer wird ausgeführt"}
 				err = p.ReceiveAnswer(rsp)
 				if err != nil {
 					p.logChannel <- t.Log{Text: fmt.Sprintf("WebRTC: Fehler in ReceiveAnswer: %v", err)}
-					p.chatClient.SendSignalingError(p.peerId, "")
+					p.chatClient.SendSignalingError(p.peerId, p.ownId, "")
 				}
 			}
 		case <-p.Ctx.Done():
-			p.logChannel <- t.Log{Text: "WebRTC: pollSignals - Kontext beendet, Channel wird geschlossen"}
-			close(p.SignalChan)
+			// p.logChannel <- t.Log{Text: "WebRTC: pollSignals - Kontext beendet, Channel wird geschlossen"}
+			// close(p.SignalChan)
 			p.logChannel <- t.Log{Text: "WebRTC: pollSignals - Kontext beendet"}
 			return
 		}
@@ -448,8 +419,6 @@ func (p *Peer) ReceiveOffer(rsp *t.Response) error {
 	}
 
 	p.logChannel <- t.Log{Text: "WebRTC: LocalDescription (Answer) gesetzt"}
-	// p.WaitForIceGathering()
-	// p.logChannel <- t.Log{Text: "WebRTC: ICE Gathering started, sending Annswer"}
 
 	msg := p.chatClient.CreateMessage(p.ownId, fmt.Sprint("/", t.AnswerSignalFlag), p.peerConn.LocalDescription().SDP, p.peerId)
 	_, err = p.chatClient.PostMessage(msg, t.SignalWebRTC)
@@ -523,7 +492,7 @@ func (p *Peer) processPendingICECandidates() {
 		}
 	}
 
-	p.iceCandidates = p.iceCandidates[:0]
+	clear(p.iceCandidates)
 }
 
 // Funktion kann wahrscheinlich gelöscht werden, da kein rollback bei fehler sondern kompletter Abbruch

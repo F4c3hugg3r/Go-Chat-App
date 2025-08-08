@@ -13,6 +13,10 @@ const (
 	SignalWebRTC
 )
 
+// muteable device
+const Microphone = "Mic"
+const Speaker = "Speaker"
+
 const UnregisterFlag = "- Du bist nun vom Server getrennt -"
 const RegisterFlag = "- Du bist registriert -"
 const AddGroupFlag = "Add Group"
@@ -34,9 +38,7 @@ const AnswerSignalFlag = "Answer Signal"
 const StableSignalFlag = "Stable Flag"
 const ConnectedFlag = "Connected"
 const FailedConnectionFlag = "Connection Failed"
-
-// finished flags for synchronization
-const OfferSignalFinished = "Offer finished"
+const NoCallFlag = "No Call"
 
 var (
 	ErrNotAvailable   error = errors.New("item is not available")

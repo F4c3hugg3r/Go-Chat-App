@@ -3,63 +3,9 @@ package shared
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/binary"
 	"encoding/json"
-	"io"
 	"strings"
-
-	"github.com/pion/webrtc/v4"
-	opusDec "gopkg.in/hraban/opus.v2"
 )
-
-// Reader für empfangene RTP/Opus-Pakete
-type opusRTPReader struct {
-	track   *webrtc.TrackRemote
-	decoder *opusDec.Decoder
-	pcmBuf  []int16
-	byteBuf []byte
-	offset  int
-}
-
-func NewOpusRTPReader(track *webrtc.TrackRemote, decoder *opusDec.Decoder) *opusRTPReader {
-	return &opusRTPReader{
-		track:   track,
-		decoder: decoder,
-		pcmBuf:  make([]int16, 960),
-		byteBuf: make([]byte, 960*2),
-		offset:  0,
-	}
-}
-
-func (r *opusRTPReader) Read(p []byte) (int, error) {
-	// Wenn byteBuf leer, neues RTP-Paket lesen und dekodieren
-	if r.offset == 0 {
-		pkt, _, err := r.track.ReadRTP()
-		if err != nil {
-			return 0, io.EOF
-		}
-
-		n, err := r.decoder.Decode(pkt.Payload, r.pcmBuf)
-		if err != nil {
-			return 0, io.EOF
-		}
-
-		for i := 0; i < n; i++ {
-			binary.LittleEndian.PutUint16(r.byteBuf[i*2:], uint16(r.pcmBuf[i]))
-		}
-
-		r.byteBuf = r.byteBuf[:n*2]
-	}
-
-	n := copy(p, r.byteBuf[r.offset:])
-
-	r.offset += n
-	if r.offset >= len(r.byteBuf) {
-		r.offset = 0
-	}
-
-	return n, nil
-}
 
 // generateSecureToken generates a token containing random chars
 func GenerateSecureToken(length int) string {

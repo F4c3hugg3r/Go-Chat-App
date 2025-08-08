@@ -13,12 +13,18 @@ import (
 
 const Gap = "\n\n"
 const RegisterTitle = "Du bist registriert %s!"
-const UnregisterTitle = "Willkommen im Chatraum! \nSchreibe '/register {name}' oder '/help'"
+const UnregisterTitle = "Willkommen im Chatraum! \nSchreibe '/register {name}' und '/help'"
 const GroupTitle = "%s, du bist in der Gruppe %s!"
 const WindowResizeFlag = "windowResize"
+const RegisterOutput = "-> Du kannst nun Nachrichten schreiben oder Commands ausführen" +
+	"\n		'/help' → Befehle anzeigen" +
+	"\n		'/quit' → Chat verlassen" +
+	"\n		'/users' → Tabelle aktualisieren"
 
 var (
 	red    lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#BF3535"))
+	redBg  lipgloss.Style = lipgloss.NewStyle().Background(lipgloss.Color("#BF3535"))
+	noCol  lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.NoColor{})
 	blue   lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#3571bfff"))
 	purple lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
 	turkis lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#35BFBC"))
@@ -62,14 +68,16 @@ var (
 		Quit:         key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", faint.Render("quit"))),
 		SelectUser:   key.NewBinding(key.WithKeys("ctrl+u"), key.WithHelp("ctrl u", faint.Render("select user"))),
 		Logs:         key.NewBinding(key.WithKeys("ctrl+l"), key.WithHelp("ctrl l", faint.Render("toggle logs"))),
+		MuteMic:      key.NewBinding(key.WithKeys("alt+m"), key.WithHelp("alt m", faint.Render("mute microphone"))),
+		MuteSpeaker:  key.NewBinding(key.WithKeys("alt+s"), key.WithHelp("alt s", faint.Render("mute speaker & mic"))),
 		NextSug:      key.NewBinding(key.WithKeys("shift+right"), key.WithHelp("shift →", faint.Render("next suggestion"))),
 		PrevSug:      key.NewBinding(key.WithKeys("shift+left"), key.WithHelp("shift ←", faint.Render("previous suggestion"))),
 		HalfPageUp:   viewportKeys.HalfPageUp,
 		HalfPageDown: viewportKeys.HalfPageDown,
 		Down:         viewportKeys.Down,
 		Up:           viewportKeys.Up,
-		InputLeft:    key.NewBinding(key.WithKeys("alt+n"), key.WithHelp("alt n", faint.Render("left previous input"))),
-		InputRight:   key.NewBinding(key.WithKeys("alt+m"), key.WithHelp("alt m", faint.Render("right previous input"))),
+		InputLeft:    key.NewBinding(key.WithKeys("alt+c"), key.WithHelp("alt c", faint.Render("left previous input"))),
+		InputRight:   key.NewBinding(key.WithKeys("alt+v"), key.WithHelp("alt v", faint.Render("right previous input"))),
 	}
 )
 
@@ -92,6 +100,8 @@ type keyMap struct {
 	Complete     key.Binding
 	NextSug      key.Binding
 	PrevSug      key.Binding
+	MuteMic      key.Binding
+	MuteSpeaker  key.Binding
 }
 
 // model contains every view-model and variables/structs needed for

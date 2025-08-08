@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"sync"
 
+	a "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/audio"
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
@@ -18,32 +19,35 @@ type Client struct {
 	groupId    string
 	Registered bool
 
-	mu           *sync.RWMutex
-	cond         *sync.Cond
-	Output       chan *t.Response
-	LogChan      chan t.Log
-	OnChangeChan chan t.ClientsChangeSignal
+	mu                     *sync.RWMutex
+	cond                   *sync.Cond
+	Output                 chan *t.Response
+	LogChan                chan t.Log
+	ClientChangeSignalChan chan t.ClientsChangeSignal
 
 	Url        string
 	HttpClient *http.Client
 	Endpoints  map[int]string
 
-	// maybe TODO functionallity to clear inactive Peers
-	// garbage collection if there are still leaks
+	MicrophoneInput *a.MicrophoneInput
+	SpeakerOutput   *a.SpeakerOutput
+
+	// maybe TODO functionallity to clear inactive Peers garbage collection if there are still leaks
 	Peers map[string]*Peer
 }
 
 // NewClient generates a ChatClient and spawns a ResponseReceiver goroutine
 func NewClient(server string) *Client {
+	var err error
 	chatClient := &Client{
-		clientId:     t.GenerateSecureToken(32),
-		clientName:   "",
-		groupId:      "",
-		authToken:    "",
-		Output:       make(chan *t.Response, 10000),
-		OnChangeChan: make(chan t.ClientsChangeSignal, 10000),
-		HttpClient:   &http.Client{},
-		Registered:   false,
+		clientId:               t.GenerateSecureToken(32),
+		clientName:             "",
+		groupId:                "",
+		authToken:              "",
+		Output:                 make(chan *t.Response, 10000),
+		ClientChangeSignalChan: make(chan t.ClientsChangeSignal, 10000),
+		HttpClient:             &http.Client{},
+		Registered:             false,
 
 		mu:      &sync.RWMutex{},
 		Url:     server,
@@ -54,6 +58,16 @@ func NewClient(server string) *Client {
 
 	chatClient.Endpoints = chatClient.RegisterEndpoints(chatClient.Url)
 	chatClient.cond = sync.NewCond(chatClient.mu)
+
+	chatClient.MicrophoneInput, err = a.NewMicrophoneInput(chatClient.LogChan)
+	if err != nil {
+		chatClient.LogChan <- t.Log{Text: fmt.Sprintf("%v: Microphone couldn't be initialized", err)}
+	}
+
+	chatClient.SpeakerOutput, err = a.NewSpeakerOutput(chatClient.LogChan)
+	if err != nil {
+		chatClient.LogChan <- t.Log{Text: fmt.Sprintf("%v: Speaker Output couldn't be initialized", err)}
+	}
 
 	go chatClient.ResponseReceiver(server)
 
@@ -81,32 +95,63 @@ func (c *Client) Interrupt() {
 		}
 	}
 
-	c.DeletePeersSafely("", true)
+	c.DeletePeersSafely("", true, true)
+	c.MicrophoneInput.OriginalAudioTrack.Close()
+	c.MicrophoneInput.SilentAudioTrack.Close()
 
 	c.HttpClient.CloseIdleConnections()
 }
 
 // DeletePeersSafely deletes a Peer or all Peers out of the peers map
-func (c *Client) DeletePeersSafely(clientId string, wholeMap bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+func (c *Client) DeletePeersSafely(oppId string, wholeMap bool, selfInitialized bool) {
+	// TODO untersuchen wo der deadlock zustande kommt
+	// c.mu.Lock()
+	// defer c.mu.Unlock()
 
+	c.LogChan <- t.Log{Text: "DeletePeersSafely gestartet"}
 	if wholeMap == false {
-		if _, exists := c.Peers[clientId]; !exists {
+		c.LogChan <- t.Log{Text: fmt.Sprintf("Versuche Peer mit ID %s zu löschen", oppId)}
+		peer, exists := c.Peers[oppId]
+		if !exists {
+			c.LogChan <- t.Log{Text: fmt.Sprintf("Peer mit ID %s existiert nicht, Abbruch", oppId)}
 			return
 		}
 
-		c.Peers[clientId].CloseConnection()
-		delete(c.Peers, clientId)
-		c.SendSignalingError(clientId, t.RollbackDoneFlag)
+		if selfInitialized {
+			c.SendSignalingError(oppId, c.GetClientId(), t.FailedConnectionFlag)
+		}
+		c.LogChan <- t.Log{Text: fmt.Sprintf("Peer mit ID %s gefunden, Verbindung wird geschlossen", oppId)}
+
+		peer.CloseConnection()
+		delete(c.Peers, oppId)
+		c.LogChan <- t.Log{Text: fmt.Sprintf("Peer mit ID %s gelöscht", oppId)}
+
+		c.SendSignalingError(oppId, c.GetClientId(), t.RollbackDoneFlag)
+		c.LogChan <- t.Log{Text: fmt.Sprintf("SignalingError für Peer %s gesendet", oppId)}
+
+		if len(c.Peers) < 1 {
+			c.ClientChangeSignalChan <- t.ClientsChangeSignal{CallState: t.NoCallFlag, OppId: c.GetClientId()}
+		}
 		return
 	}
 
-	for _, peer := range c.Peers {
+	c.LogChan <- t.Log{Text: "Lösche alle Peers"}
+	for id, peer := range c.Peers {
+		if selfInitialized {
+			c.SendSignalingError(id, c.GetClientId(), t.FailedConnectionFlag)
+		}
+		c.LogChan <- t.Log{Text: fmt.Sprintf("Schließe Verbindung für Peer mit ID %s", id)}
+
 		peer.CloseConnection()
-		delete(c.Peers, peer.peerId)
-		c.SendSignalingError(clientId, t.RollbackDoneFlag)
+		delete(c.Peers, id)
+		c.LogChan <- t.Log{Text: fmt.Sprintf("Peer mit ID %s gelöscht", id)}
+
+		c.SendSignalingError(id, c.GetClientId(), t.RollbackDoneFlag)
+		c.LogChan <- t.Log{Text: fmt.Sprintf("SignalingError für Peer %s gesendet", id)}
 	}
+	c.LogChan <- t.Log{Text: "Alle Peers wurden gelöscht"}
+	c.ClientChangeSignalChan <- t.ClientsChangeSignal{CallState: t.NoCallFlag, OppId: c.GetClientId()}
+
 }
 
 // ResponseReceiver gets responses if client is registered
@@ -277,15 +322,29 @@ func (c *Client) CreateMessage(name string, plugin string, content string, clien
 	return msg
 }
 
-func (c *Client) HandleSignal(rsp *t.Response, initialSignal bool) {
-	err := c.HandlePeer(rsp, initialSignal)
-	if err != nil {
-		c.SendSignalingError(rsp.ClientId, "")
+func (c *Client) Mute(toMute string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for _, peer := range c.Peers {
+		switch toMute {
+		case t.Microphone:
+			peer.MuteMic()
+		case t.Speaker:
+			peer.MuteSpeaker()
+		}
 	}
 }
 
-func (c *Client) SendSignalingError(oppId string, content string) {
-	msg := c.CreateMessage(t.FailedConnectionFlag, fmt.Sprintf("/"+t.FailedConnectionFlag), content, oppId)
+func (c *Client) HandleSignal(rsp *t.Response, initialSignal bool) {
+	err := c.HandlePeer(rsp, initialSignal)
+	if err != nil {
+		c.SendSignalingError(rsp.ClientId, c.GetClientId(), "")
+	}
+}
+
+func (c *Client) SendSignalingError(oppId string, ownId string, content string) {
+	msg := c.CreateMessage(ownId, fmt.Sprintf("/"+t.FailedConnectionFlag), content, oppId)
 	_, err := c.PostMessage(msg, t.SignalWebRTC)
 	if err != nil {
 		c.LogChan <- t.Log{Text: fmt.Sprintf("WebRTC: Fehler beim senden des ConnectionFailedFlags %v", err)}
@@ -299,7 +358,7 @@ func (c *Client) HandlePeer(rsp *t.Response, initialSignal bool) error {
 	if err != nil || peer == nil {
 		c.LogChan <- t.Log{Text: "Peer existiert noch nicht, lege peer an"}
 
-		peer, err = NewPeer(rsp.ClientId, c.LogChan, c, c.GetClientId(), c.OnChangeChan)
+		peer, err = NewPeer(rsp.ClientId, c.LogChan, c, c.GetClientId(), c.ClientChangeSignalChan)
 		if err != nil {
 			c.LogChan <- t.Log{Text: fmt.Sprintf("Peer mit id: %s konnte nicht erstellt werden, server wird informiert", rsp.ClientId)}
 
@@ -326,13 +385,6 @@ func (c *Client) HandlePeer(rsp *t.Response, initialSignal bool) error {
 
 	return nil
 }
-
-// func (c *Client) PushIntoFinishedSignalChan(oppId string, rsp *t.Response, flag string) {
-// 	c.mu.RLock()
-// 	defer c.mu.RUnlock()
-
-// 	// c.Peers[oppId].OfferSignalFinishedChan <- rsp
-// }
 
 func (c *Client) SetPeer(peer *Peer) {
 	c.mu.Lock()

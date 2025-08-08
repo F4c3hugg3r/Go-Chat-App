@@ -21,8 +21,8 @@ func NewCallPlugin(s *ChatService) *CallPlugin {
 
 func (cp *CallPlugin) Description() *Description {
 	return &Description{
-		Description: "lets you start a voice call in your group",
-		Template:    "/call",
+		Description: "lets you start/stop a voice call in your group",
+		Template:    "/call | /call quit",
 	}
 }
 
@@ -197,8 +197,8 @@ func NewBroadcastPlugin(s *ChatService) *BroadcastPlugin {
 
 func (bp *BroadcastPlugin) Description() *Description {
 	return &Description{
-		Description: "distributes a message abroad all clients",
-		Template:    "{message} | /broadcast {message}",
+		Description: "sends a message in your current room",
+		Template:    "{message}",
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 
 	"github.com/charmbracelet/bubbles/table"
@@ -11,29 +12,30 @@ import (
 )
 
 type Table struct {
-	cols    []table.Column
-	rows    []table.Row
-	focused bool
-	height  int
-	width   int
-	clients map[string]*ty.JsonClient
-	ts      table.Styles
-	mu      *sync.RWMutex
+	cols       []table.Column
+	rows       []table.Row
+	focused    bool
+	height     int
+	width      int
+	clients    map[string]*ty.JsonClient
+	ts         table.Styles
+	mu         *sync.RWMutex
+	logChannel chan ty.Log
 }
 
 type MuteTable struct {
 	cols        []table.Column
 	rows        []table.Row
-	focused     bool
 	height      int
 	width       int
-	ts          table.Styles
 	micMute     bool
 	speakerMute bool
-	// mu      *sync.RWMutex
+	ts          table.Styles
+	mu          *sync.RWMutex
+	logChannel  chan ty.Log
 }
 
-func setUpTable() (table.Model, *Table) {
+func setUpTable(logChan chan ty.Log) (table.Model, *Table) {
 	tV := &Table{
 		cols: []table.Column{
 			{Title: "Name", Width: 5},
@@ -42,11 +44,12 @@ func setUpTable() (table.Model, *Table) {
 			{Title: "ClientId", Width: 0},
 			{Title: "GroupId", Width: 0},
 		},
-		rows:    []table.Row{},
-		focused: false,
-		height:  5,
-		clients: make(map[string]*ty.JsonClient),
-		mu:      &sync.RWMutex{},
+		rows:       []table.Row{},
+		focused:    false,
+		height:     5,
+		clients:    make(map[string]*ty.JsonClient),
+		mu:         &sync.RWMutex{},
+		logChannel: logChan,
 	}
 
 	ta := table.New(
@@ -72,40 +75,45 @@ func setUpTable() (table.Model, *Table) {
 	return ta, tV
 }
 
-func setUpMuteTable() (table.Model, *MuteTable) {
+func setUpMuteTable(logChan chan ty.Log) (table.Model, *MuteTable) {
 	mTV := &MuteTable{
 		cols: []table.Column{
-			{Title: "Mic", Width: 3},
-			{Title: "Speaker", Width: 3},
+			{Title: "Mic", Width: 7},
+			{Title: "Speaker", Width: 7},
 		},
-		rows:    []table.Row{},
-		focused: false,
-		height:  2,
-
-		// mu:      &sync.RWMutex{},
+		rows:        []table.Row{},
+		height:      1,
+		micMute:     false,
+		speakerMute: false,
+		mu:          &sync.RWMutex{},
+		logChannel:  logChan,
 	}
 
 	mTa := table.New(
 		table.WithColumns(mTV.cols),
 		table.WithRows(mTV.rows),
 		table.WithHeight(mTV.height),
-		table.WithFocused(mTV.focused),
+		table.WithFocused(false),
 	)
 
 	ts := table.DefaultStyles()
 	ts.Header = ts.Header.
-		BorderBottom(true).
 		BorderStyle(lipgloss.NormalBorder()).
+		BorderLeft(true).
+		BorderRight(true).
 		BorderForeground(purple.GetForeground()).
-		Bold(false)
-	ts.Selected = ts.Selected.
-		Foreground(lipgloss.NoColor{}).
-		Background(lipgloss.NoColor{}).
 		Bold(false)
 	mTa.SetStyles(ts)
 	mTV.ts = ts
 
 	return mTa, mTV
+}
+
+func (mT *MuteTable) GetFrameSize() int {
+	mT.mu.RLock()
+	defer mT.mu.RUnlock()
+
+	return mT.ts.Header.GetHorizontalFrameSize()
 }
 
 func (t *Table) SetClients(clients []*ty.JsonClient, client *ty.JsonClient) {
@@ -120,6 +128,42 @@ func (t *Table) SetClients(clients []*ty.JsonClient, client *ty.JsonClient) {
 	clear(t.clients)
 	for _, client := range clients {
 		t.clients[client.ClientId] = client
+	}
+}
+
+func (mT *MuteTable) SetMute(toMute string) {
+	mT.mu.Lock()
+	defer mT.mu.Unlock()
+
+	mT.logChannel <- t.Log{Text: fmt.Sprintf("muteTable: SetMute called with toMute=%s, micMute=%v, speakerMute=%v", toMute, mT.micMute, mT.speakerMute)}
+	switch toMute {
+	case ty.Microphone:
+		if mT.micMute {
+			mT.logChannel <- t.Log{Text: "muteTable: Unmuting Microphone"}
+			mT.cols[0].Title = noCol.Render(ty.Microphone)
+			mT.micMute = false
+			mT.logChannel <- t.Log{Text: "muteTable: Microphone is now unmuted"}
+			return
+		}
+		mT.logChannel <- t.Log{Text: "muteTable: Muting Microphone"}
+		mT.cols[0].Title = red.Render(ty.Microphone)
+		mT.micMute = true
+		mT.logChannel <- t.Log{Text: "muteTable: Microphone is now muted"}
+
+	case ty.Speaker:
+		if mT.speakerMute {
+			mT.logChannel <- t.Log{Text: "muteTable: Unmuting Speaker and Microphone"}
+			mT.cols[0].Title = noCol.Render(ty.Microphone)
+			mT.cols[1].Title = noCol.Render(ty.Speaker)
+			mT.speakerMute, mT.micMute = false, false
+			mT.logChannel <- t.Log{Text: "muteTable: Speaker and Microphone are now unmuted"}
+			return
+		}
+		mT.logChannel <- t.Log{Text: "muteTable: Muting Speaker and Microphone"}
+		mT.cols[0].Title = red.Render(ty.Microphone)
+		mT.cols[1].Title = red.Render(ty.Speaker)
+		mT.speakerMute, mT.micMute = true, true
+		mT.logChannel <- t.Log{Text: "muteTable: Speaker and Microphone are now muted"}
 	}
 }
 
@@ -194,6 +238,20 @@ func (t *Table) ChangeSelectedStyle() {
 			Bold(false)
 	}
 	t.focused = !t.focused
+}
+
+func (t *Table) GetClient(clientId string) *ty.JsonClient {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	return t.clients[clientId]
+}
+
+func (t *Table) GetCallState(clientId string) string {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	return t.clients[clientId].CallState
 }
 
 func (t *Table) Empty() bool {

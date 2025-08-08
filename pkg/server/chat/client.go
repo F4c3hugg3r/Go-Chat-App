@@ -164,7 +164,7 @@ func (c *Client) GetCallState(oppId string) string {
 
 	callState, exists := c.rtcs[oppId]
 	if !exists {
-		return "no call"
+		return ty.NoCallFlag
 	}
 	return callState
 }

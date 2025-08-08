@@ -19,9 +19,7 @@ import (
 
 // TODO ALLGEMEIN
 
-// TODO table für mute speaker/mic
-
-// TODO mute in server speichern und übergeben -> rot faint => mic, rot => mic + speaker
+// maybe TODO bg farben für connection und mute -> mute in server speichern und übergeben -> rot faint => mic, rot => mic + speaker
 
 // InitialModel initializes the model struct, which is the main struct for the TUI
 func InitialModel(u *i.UserService) model {
@@ -29,8 +27,8 @@ func InitialModel(u *i.UserService) model {
 
 	h := help.New()
 
-	ta, tV := setUpTable()
-	mTa, mTV := setUpMuteTable()
+	ta, tV := setUpTable(u.ChatClient.LogChan)
+	mTa, mTV := setUpMuteTable(u.ChatClient.LogChan)
 
 	vp := viewport.New(30, 5)
 	vp.KeyMap = viewportKeys
@@ -74,16 +72,18 @@ func (m model) Init() tea.Cmd {
 // Update handles every input
 func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 	var (
-		vpCmd tea.Cmd
-		tiCmd tea.Cmd
-		loCmd tea.Cmd
-		tbCmd tea.Cmd
+		vpCmd  tea.Cmd
+		tiCmd  tea.Cmd
+		loCmd  tea.Cmd
+		tbCmd  tea.Cmd
+		mTbCmd tea.Cmd
 	)
 
 	m.viewport, vpCmd = m.viewport.Update(rsp)
 	m.textinput, tiCmd = m.textinput.Update(rsp)
 	m.logViewport, loCmd = m.logViewport.Update(rsp)
 	m.table, tbCmd = m.table.Update(rsp)
+	m.muteTable, mTbCmd = m.muteTable.Update(rsp)
 
 	if m.textinput.Value() == "" {
 		m.inH.SaveInput("")
@@ -93,17 +93,17 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 	case t.ClientsChangeSignal:
 		m.HandleClientsChangeSignal(rsp)
 
-		return m, tea.Batch(tiCmd, vpCmd, loCmd, tbCmd, m.waitForClientsChangeSignal())
+		return m, tea.Batch(tiCmd, vpCmd, loCmd, tbCmd, mTbCmd, m.waitForClientsChangeSignal())
 
 	case t.Log:
 		m.PrintLog(rsp)
 
-		return m, tea.Batch(tiCmd, vpCmd, loCmd, tbCmd, m.waitForLog())
+		return m, tea.Batch(tiCmd, vpCmd, loCmd, tbCmd, mTbCmd, m.waitForLog())
 
 	case *t.Response:
 		m.HandleResponse(rsp)
 
-		return m, tea.Batch(tiCmd, vpCmd, loCmd, tbCmd, m.waitForExternalResponse())
+		return m, tea.Batch(tiCmd, vpCmd, loCmd, tbCmd, mTbCmd, m.waitForExternalResponse())
 
 	case tea.WindowSizeMsg:
 		m.HandleWindowResize(&rsp)
@@ -120,19 +120,10 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 			if m.table.Focused() {
 				// maybe TODO ausgewähltes Feld in zwischenablage oder in textinput
 				// mit zB zuvor eingegebenen Text kopieren oder automatisch suggesten
-				message := fmt.Sprintf("%s\n%s%s\n%s%s",
-					//maybe TODO align center funktioniert nicht
-					turkis.Bold(true).AlignHorizontal(lipgloss.Center).Render(fmt.Sprintf("- %s -", m.table.SelectedRow()[0])),
-					blue.Render("ClientId: "),
-					m.table.SelectedRow()[3],
-					blue.Render("GroupId: "),
-					m.table.SelectedRow()[4],
-				)
-				m.AddMessageToViewport(message)
-				m.SwitchFocus()
-
-				return m, tea.Batch(tiCmd, vpCmd, loCmd, tbCmd)
+				m.HandleTableSelect()
+				return m, tea.Batch(tiCmd, vpCmd, loCmd, tbCmd, mTbCmd)
 			}
+
 			m.HandleMessage()
 		}
 
@@ -146,10 +137,16 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 				m.refreshViewPortAndTableHeight(-6)
 			}
 
+		case key.Matches(rsp, m.keyMap.MuteMic):
+			m.HandleMute(t.Microphone)
+
+		case key.Matches(rsp, m.keyMap.MuteSpeaker):
+			m.HandleMute(t.Speaker)
+
 		case key.Matches(rsp, m.keyMap.SelectUser):
 			if m.tableValues.Empty() {
 				m.AddMessageToViewport(red.Render(fmt.Sprintf("%v: register yourself first", t.ErrNoPermission)))
-				return m, tea.Batch(tiCmd, vpCmd, loCmd, tbCmd)
+				return m, tea.Batch(tiCmd, vpCmd, loCmd, tbCmd, mTbCmd)
 			}
 			m.SwitchFocus()
 
@@ -167,7 +164,7 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	return m, tea.Batch(tiCmd, vpCmd, loCmd, tbCmd)
+	return m, tea.Batch(tiCmd, vpCmd, loCmd, tbCmd, mTbCmd)
 }
 
 // View describes the terminal view
@@ -176,12 +173,19 @@ func (m model) View() string {
 		"%s%s%s%s%s%s%s%s%s",
 		m.title,
 		Gap,
-		lipgloss.JoinHorizontal(lipgloss.Center, m.viewport.View(), m.table.View()),
+		lipgloss.JoinHorizontal(
+			lipgloss.Center,
+			m.viewport.View(),
+			m.table.View()),
 		Gap,
 		m.textinput.View(),
 		Gap,
-		m.helpModel.View(m.keyMap),
-		Gap,
+		lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			lipgloss.NewStyle().Width(m.helpModel.Width).Render(m.helpModel.View(m.keyMap)),
+			lipgloss.NewStyle().Width(m.muteTable.Width()+2*m.muteTableValues.GetFrameSize()).Render(m.muteTable.View()),
+		),
+		"\n",
 		m.logViewport.View(),
 	)
 }
@@ -189,6 +193,38 @@ func (m model) View() string {
 //
 // logic functions
 //
+
+func (m *model) ToggleLogs() {
+	switch m.logViewport.Height {
+	case 0:
+		m.logViewport.Height = 8
+		m.refreshViewPortAndTableHeight(8)
+		m.refreshLogViewPort()
+		m.viewport.KeyMap = viewport.KeyMap{}
+		m.table.KeyMap = table.KeyMap{}
+	case 8:
+		m.logViewport.Height = 0
+		m.refreshViewPortAndTableHeight(-8)
+		m.viewport.KeyMap = viewportKeys
+		m.table.KeyMap = table.DefaultKeyMap()
+	}
+	m.refreshViewPort()
+}
+
+func (m *model) ToggleMuteTable() {
+	switch m.muteTable.Height() {
+	case 0:
+		m.muteTable.SetHeight(2)
+		m.muteTable.SetColumns([]table.Column{})
+		// m.muteTable.SetRows(m.muteTableValues.rows)
+		m.textinput.Width = m.textinput.Width - m.muteTable.Width()
+	case 2:
+		m.muteTable.SetHeight(0)
+		m.muteTable.SetColumns(m.muteTableValues.cols)
+		// m.muteTable.SetRows([]table.Row{})
+		m.textinput.Width = m.textinput.Width + m.muteTable.Width()
+	}
+}
 
 // TODO bei logs (crtl l) keybinds ändern, sodass textinput sich nicht bewegt
 func (m *model) SwitchFocus() {
@@ -238,9 +274,9 @@ func (m *model) SearchInputHistory(rsp tea.KeyMsg) string {
 	return m.inH.inputs[m.inH.current]
 }
 
-// renderTitle decides between the registered and unregistered title sets it into the viewport
+// RenderTitle decides between the registered and unregistered title sets it into the viewport
 // and return the heightDiff of the old and new title
-func (m *model) renderTitle(title string, param []string) {
+func (m *model) RenderTitle(title string, param []string) {
 	if param == nil || param[0] != WindowResizeFlag {
 		switch {
 		case strings.Contains(title, t.UnregisterFlag):
@@ -258,124 +294,6 @@ func (m *model) renderTitle(title string, param []string) {
 	heightDiff := lipgloss.Height(title) - lipgloss.Height(m.title)
 	m.title = centered.Width(m.viewport.Width + m.table.Width()).Bold(true).Render(title)
 	m.refreshViewPortAndTableHeight(heightDiff)
-}
-
-// TODO das in Interface bzw Plugins auslagern zB rsp in Plugin verarbeiten
-// und in error flag zurückgeben, dass es nicht geprinted werden soll
-
-// evaluateResponse evaluates an incoming Response and returns the
-// corresponding rendered string
-func (m *model) evaluateReponse(rsp *t.Response) string {
-	var rspString string
-
-	switch {
-	// error output
-	case rsp.Err != "":
-		if rsp.Err == t.IgnoreResponseTag {
-			return ""
-		}
-		return red.Render(rsp.Err)
-
-	// empty output
-	case rsp.Content == "":
-		return ""
-
-	// register output
-	case strings.Contains(rsp.Content, t.RegisterFlag):
-		m.renderTitle(t.RegisterFlag, []string{m.userService.ChatClient.GetName()})
-		m.userService.Executor("/users")
-
-		return blue.Render("-> Du kannst nun Nachrichten schreiben oder Commands ausführen" +
-			"\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen\n'/users' → Tabelle aktualisieren")
-
-	// server output
-	case rsp.RspName == "":
-		rspString = fmt.Sprintf("%s", blue.Render(rsp.Content))
-
-		// unregister output
-		if strings.Contains(rsp.Content, t.UnregisterFlag) {
-			m.renderTitle(t.UnregisterFlag, nil)
-			m.userService.ChatClient.DeletePeersSafely("", true)
-			m.userService.ChatClient.OnChangeChan <- t.ClientsChangeSignal{
-				CallState: t.UnregisterFlag,
-			}
-		}
-
-		return rspString
-
-	// one user left output
-	case strings.Contains(rsp.RspName, t.UserRemoveFlag):
-		return fmt.Sprintf("%s %s", purple.Render(rsp.Content), blue.Faint(true).Render("hat den Chat verlassen"))
-
-	// one user joined output
-	case strings.Contains(rsp.RspName, t.UserAddFlag):
-		return fmt.Sprintf("%s %s", purple.Render(rsp.Content), blue.Faint(true).Render("ist dem Chat beigetreten"))
-
-	// addGroup output
-	case strings.Contains(rsp.RspName, t.AddGroupFlag):
-		group, err := m.userService.HandleAddGroup(rsp.Content)
-		if err != nil {
-			return red.Render(fmt.Sprintf("%v: error formatting json to group", err))
-		}
-
-		m.renderTitle(t.AddGroupFlag, []string{m.userService.ChatClient.GetName(), group.Name})
-		m.userService.Executor("/group users")
-
-		return fmt.Sprintf("%s %s %s\n%s",
-			blue.Render("-> Du bist nun Teil der Gruppe"),
-			turkis.Render(group.Name),
-			blue.Render("und kannst Nachrichten in ihr schreiben"),
-			blue.Faint(true).Render("Private Nachrichten kannst du weiterhin außerhalb verschicken"),
-		)
-
-	// leaveGroup output
-	case strings.Contains(rsp.RspName, t.LeaveGroupFlag):
-		m.userService.ChatClient.UnsetGroupId()
-		m.renderTitle(t.RegisterFlag, []string{m.userService.ChatClient.GetName()})
-		m.userService.ChatClient.DeletePeersSafely("", true)
-		m.userService.Executor("/users")
-
-		return blue.Render("Du hast die Gruppe verlassen!\n-> Du kannst nun Nachrichten schreiben oder Commands ausführen\n'/help' → Befehle anzeigen\n'/quit' → Chat verlassen")
-
-	// Rollback/Delete Peer output
-	case strings.Contains(rsp.RspName, t.FailedConnectionFlag):
-		m.userService.ChatClient.DeletePeersSafely(rsp.ClientId, false)
-
-	// Receive webRTC signal (Offer SDP Signal, Answer SDP Signal or ICE Candidate)
-	case strings.Contains(rsp.RspName, t.OfferSignalFlag),
-		strings.Contains(rsp.RspName, t.AnswerSignalFlag),
-		strings.Contains(rsp.RspName, t.ICECandidateFlag):
-
-		m.logChan <- t.Log{Text: "webrtc related response detected"}
-		m.userService.ChatClient.HandleSignal(rsp, false)
-
-		return ""
-
-	// // FinishedSignal output
-	// case strings.Contains(rsp.RspName, t.OfferSignalFinished):
-	// 	m.userService.ChatClient.PushIntoFinishedSignalChan(rsp.ClientId, rsp, t.OfferSignalFinished)
-
-	// slice output
-	case strings.HasPrefix(rsp.Content, "["):
-		if strings.Contains(rsp.RspName, t.UsersFlag) {
-			m.userService.ChatClient.OnChangeChan <- t.ClientsChangeSignal{
-				ClientsJson: rsp.Content,
-			}
-			return ""
-		}
-
-		output, err := JSONToTable(rsp.Content)
-		if err != nil {
-			return red.Render(fmt.Sprintf("%v: error formatting json to table", err))
-		}
-
-		return output
-	}
-
-	// response output
-	rspString = fmt.Sprintf("%s: %s", turkis.Render(rsp.RspName), rsp.Content)
-
-	return rspString
 }
 
 //
@@ -400,8 +318,6 @@ func (m *model) refreshTable() {
 	m.tableValues.ConvertClientsToRows()
 	m.table.SetRows(m.tableValues.rows)
 	m.table.SetStyles(m.tableValues.ts)
-
-	// maybe TODO wenn callState connected ist, grün machen
 }
 
 // refreshViewPort refreshes the size of the viewport
@@ -417,6 +333,36 @@ func (m *model) refreshViewPort() {
 //
 // handler functions
 //
+
+func (m *model) HandleMute(toMute string) {
+	if !m.userService.ChatClient.Registered {
+		m.AddMessageToViewport(red.Render("you are not registered yet"))
+		return
+	}
+
+	if m.tableValues.GetCallState(m.userService.ChatClient.GetClientId()) != t.ConnectedFlag {
+		m.AddMessageToViewport(red.Render("you have to be in a call first"))
+		return
+	}
+	m.userService.ChatClient.Mute(toMute)
+	m.muteTableValues.SetMute(toMute)
+	m.muteTable.SetColumns(m.muteTableValues.cols)
+}
+
+func (m *model) HandleTableSelect() {
+	message := turkis.BorderStyle(lipgloss.NormalBorder()).BorderLeft(true).BorderForeground(purple.GetForeground()).Render(
+		fmt.Sprintf("%s%s\n%s%s\n%s%s",
+			blue.Render("Name:		"),
+			turkis.Bold(true).Render(fmt.Sprintf("%s", m.table.SelectedRow()[0])),
+			blue.Render("ClientId:	"),
+			m.table.SelectedRow()[3],
+			blue.Render("GroupId:	"),
+			m.table.SelectedRow()[4],
+		))
+	m.AddMessageToViewport(message)
+	m.SwitchFocus()
+
+}
 
 func (m *model) HandleClientsChangeSignal(rsp t.ClientsChangeSignal) error {
 	// maybe TODO
@@ -474,8 +420,18 @@ func (m *model) HandleWindowResize(rsp *tea.WindowSizeMsg) {
 	columns[2].Width = m.table.Width() / 3
 	m.table.SetColumns(columns)
 
+	m.helpModel.Width = rsp.Width/8*7 - m.muteTableValues.GetFrameSize()*2
+
+	m.logChan <- t.Log{Text: fmt.Sprintf("rsp.Width = %d", rsp.Width)}
+
+	m.muteTable.SetWidth(rsp.Width / 8)
+	m.muteTable.Columns()[0].Width = m.muteTable.Width() / 2
+	m.muteTable.Columns()[1].Width = m.muteTable.Width() / 2
+
+	m.logChan <- t.Log{Text: fmt.Sprintf("helpWidth = %d, viewport width = %d", m.helpModel.Width, m.viewport.Width)}
+	m.logChan <- t.Log{Text: fmt.Sprintf("muteTableWidth = %d", m.muteTable.Width())}
+
 	m.textinput.Width = rsp.Width
-	m.helpModel.Width = rsp.Width
 	m.logViewport.Width = rsp.Width
 
 	var logPortHeight int
@@ -489,7 +445,7 @@ func (m *model) HandleWindowResize(rsp *tea.WindowSizeMsg) {
 	m.viewport.Height = rsp.Height - (lipgloss.Height(Gap) * 2) - lipgloss.Height(m.title) - logPortHeight
 	m.table.SetHeight(m.viewport.Height)
 
-	m.renderTitle(m.title, []string{WindowResizeFlag})
+	m.RenderTitle(m.title, []string{WindowResizeFlag})
 	m.refreshViewPort()
 	m.refreshTable()
 }
@@ -497,12 +453,12 @@ func (m *model) HandleWindowResize(rsp *tea.WindowSizeMsg) {
 // HandleResponse handles an incoming Response by evaluating it and refreshing
 // the viewport by adding the corresponding string
 func (m *model) HandleResponse(rsp *t.Response) {
-	str := m.evaluateReponse(rsp)
+	str := m.EvaluateReponse(rsp)
 	if str != "" {
-		m.messages = append(m.messages, str)
+		m.AddMessageToViewport(str)
 	}
 
-	m.refreshViewPort()
+	// m.refreshViewPort()
 }
 
 // HandleMessage hanbles the input message by saving it for the inputHistory and
@@ -513,7 +469,7 @@ func (m *model) HandleMessage() {
 	m.userService.Executor(m.textinput.Value())
 	m.textinput.Reset()
 
-	m.refreshViewPort()
+	// m.refreshViewPort()
 }
 
 //
@@ -545,12 +501,12 @@ func (m *model) LogPoller() t.Log {
 
 func (m *model) waitForClientsChangeSignal() tea.Cmd {
 	return func() tea.Msg {
-		return m.ClientsChangeSignalPoller()
+		return m.clientsChangeSignalPoller()
 	}
 }
 
-func (m *model) ClientsChangeSignalPoller() t.ClientsChangeSignal {
-	signal, ok := <-m.userService.ChatClient.OnChangeChan
+func (m *model) clientsChangeSignalPoller() t.ClientsChangeSignal {
+	signal, ok := <-m.userService.ChatClient.ClientChangeSignalChan
 	if !ok {
 		m.logChan <- t.Log{Text: "ClientsChangeSignal channel is closed"}
 		return t.ClientsChangeSignal{}
@@ -568,23 +524,6 @@ func (m *model) AddMessageToViewport(message string) {
 	m.refreshViewPort()
 }
 
-func (m *model) ToggleLogs() {
-	switch m.logViewport.Height {
-	case 0:
-		m.logViewport.Height = 8
-		m.refreshViewPortAndTableHeight(8)
-		m.refreshLogViewPort()
-		m.viewport.KeyMap = viewport.KeyMap{}
-		m.table.KeyMap = table.KeyMap{}
-	case 8:
-		m.logViewport.Height = 0
-		m.refreshViewPortAndTableHeight(-8)
-		m.viewport.KeyMap = viewportKeys
-		m.table.KeyMap = table.DefaultKeyMap()
-	}
-	m.refreshViewPort()
-}
-
 func (m *model) PrintLog(rsp t.Log) {
 	m.logs = append(m.logs, fmt.Sprintf("%s: %s", rsp.Method, rsp.Text))
 	m.refreshLogViewPort()
@@ -592,13 +531,16 @@ func (m *model) PrintLog(rsp t.Log) {
 
 // ShortHelp decides what to see in the short help window
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Help, k.Quit, k.Complete, k.SelectUser, k.Logs, k.NextSug, k.PrevSug}
+	return []key.Binding{k.Help, k.Complete, k.SelectUser, k.Quit, k.Logs}
 }
 
 // ShortHelp decides what to see in the extended help window
 func (k keyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{k.Up, k.Down, k.HalfPageUp, k.HalfPageDown, k.InputRight, k.InputLeft},
-		{k.Help, k.SelectUser, k.Logs, k.Quit, k.Complete, k.NextSug, k.PrevSug}}
+	return [][]key.Binding{
+		{k.Up, k.Down, k.HalfPageUp, k.HalfPageDown, k.NextSug, k.PrevSug},
+		{k.Help, k.SelectUser, k.Logs, k.Quit, k.Complete},
+		{k.MuteMic, k.MuteSpeaker, k.InputRight, k.InputLeft},
+	}
 }
 
 // setUpTexInput sets up a textinput.Model with every needed setting

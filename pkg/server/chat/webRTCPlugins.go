@@ -87,7 +87,6 @@ func (osp *OfferSignalPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	if msg.Content == "" {
 		fmt.Printf("\n[OfferSignalPlugin] Empty content, setting call state to OfferSignalFlag for client %s", msg.ClientId)
 		err = ownClient.SetCallState(msg.ClientId, ty.OfferSignalFlag)
-		// cp.chatService.Echo(msg.Name, &ty.Response{ClientId: msg.ClientId, RspName: ty.OfferSignalFinished, Content: ty.OfferSignalFinished})
 		return nil, err
 	}
 
