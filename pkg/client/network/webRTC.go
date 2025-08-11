@@ -348,6 +348,15 @@ func (p *Peer) CloseConnection() {
 	p.logChannel <- t.Log{Text: "WebRTC: CloseConnection abgeschlossen"}
 }
 
+func (p *Peer) GetConnectionState() string {
+	switch p.peerConn.ConnectionState() {
+	case webrtc.PeerConnectionStateConnected:
+		return t.ConnectedFlag
+	default:
+		return t.FailedConnectionFlag
+	}
+}
+
 // signaling
 func (p *Peer) pollSignals() {
 	var err error

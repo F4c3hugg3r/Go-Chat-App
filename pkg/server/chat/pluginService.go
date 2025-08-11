@@ -63,6 +63,9 @@ func ClientsToJsonSliceRequireLock(clientsToIterate map[string]*Client, ownId st
 	var result []json.RawMessage
 
 	for _, item := range clientsToIterate {
+		if item.ClientId == ownId {
+			continue
+		}
 		client := ty.JsonClient{
 			Name:      item.Name,
 			ClientId:  item.ClientId,

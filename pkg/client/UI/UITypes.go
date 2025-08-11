@@ -28,7 +28,7 @@ var (
 	blue   lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#3571bfff"))
 	purple lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
 	turkis lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#35BFBC"))
-	// green  lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#53BF35"))
+	green  lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#3e8a29ff"))
 
 	titleStyle lipgloss.Style = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -109,10 +109,11 @@ type keyMap struct {
 type model struct {
 	viewport viewport.Model
 	// logging
-	logViewport     viewport.Model
-	logs            []string
-	messages        []string
-	logChan         chan t.Log
+	logViewport viewport.Model
+	logs        []string
+	messages    []string
+	logChan     chan t.Log
+
 	title           string
 	textinput       textinput.Model
 	showSuggestions bool
@@ -136,4 +137,8 @@ type InputHistory struct {
 	current int
 	inputs  []string
 	first   bool
+}
+
+type CallResultMsg struct {
+	Accepted bool
 }

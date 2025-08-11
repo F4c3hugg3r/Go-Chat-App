@@ -75,6 +75,7 @@ func (s *SilenceSource) Read() (wave.Audio, func(), error) {
 	}
 
 	samples := Samplerate / 50 // 20ms bei 48000Hz = 960 Samples
+	// Interleaved nur für Stereo audio benötigt
 	chunk := wave.NewInt16NonInterleaved(wave.ChunkInfo{
 		Len:          samples,
 		Channels:     Channels,

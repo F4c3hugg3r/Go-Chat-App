@@ -145,6 +145,8 @@ func (handler *ServerHandler) HandleSignals(w http.ResponseWriter, r *http.Reque
 
 	rsp, err := client.Execute(handler.WebRTC, &message)
 	if err != nil {
+		// TODO überlegen, ob das besser gelöst werden kann da hierdurch manchmal clients mehrmals informiert oder informiert
+		// werden, wenn sie gar nichts initiiert haben
 		handler.Service.Echo(message.Name, &ty.Response{ClientId: message.ClientId, RspName: ty.FailedConnectionFlag, Content: err.Error()})
 		handler.Service.Echo(message.ClientId, &ty.Response{ClientId: message.Name, RspName: ty.FailedConnectionFlag, Content: err.Error()})
 		return

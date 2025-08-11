@@ -12,12 +12,12 @@ import (
 
 // UserService handles user inputs and outputs
 type UserService struct {
-	ChatClient *n.Client
-	PlugReg    *p.PluginRegistry
-	poll       bool
-	typing     bool
-	mu         *sync.RWMutex
-	cond       *sync.Cond
+	Client  *n.Client
+	PlugReg *p.PluginRegistry
+	poll    bool
+	typing  bool
+	mu      *sync.RWMutex
+	cond    *sync.Cond
 	// logging
 	LoggChan chan t.Log
 }
@@ -25,10 +25,10 @@ type UserService struct {
 // NewUserService creates a UserService
 func NewUserService(c *n.Client) *UserService {
 	u := &UserService{
-		ChatClient: c,
-		poll:       false,
-		mu:         &sync.RWMutex{},
-		PlugReg:    p.RegisterPlugins(c),
+		Client:  c,
+		poll:    false,
+		mu:      &sync.RWMutex{},
+		PlugReg: p.RegisterPlugins(c),
 	}
 
 	u.cond = sync.NewCond(u.mu)
@@ -42,7 +42,7 @@ func (u *UserService) HandleAddGroup(groupJson string) (*t.JsonGroup, error) {
 		return nil, err
 	}
 
-	u.ChatClient.SetGroupId(group.GroupId)
+	u.Client.SetGroupId(group.GroupId)
 	return group, nil
 }
 
@@ -60,7 +60,7 @@ func (u *UserService) InitializeSuggestions() []string {
 func (u *UserService) ResponsePoller() *t.Response {
 	var rsp *t.Response
 
-	rsp, ok := <-u.ChatClient.Output
+	rsp, ok := <-u.Client.Output
 	if !ok {
 		return &t.Response{Err: fmt.Sprintf("%v: channel is closed", t.ErrNoPermission)}
 	}
@@ -85,7 +85,7 @@ func (u *UserService) ParseInputToMessage(input string) *t.Message {
 	content := strings.ReplaceAll(input, plugin, "")
 	content, _ = strings.CutPrefix(content, " ")
 
-	return u.ChatClient.CreateMessage("", plugin, content, "")
+	return u.Client.CreateMessage("", plugin, content, "")
 }
 
 // Executor takes the parsed input message, executes the corresponding plugin
@@ -94,9 +94,9 @@ func (u *UserService) Executor(input string) {
 
 	err, comment := u.PlugReg.FindAndExecute(msg)
 	if err != nil {
-		u.ChatClient.Output <- &t.Response{Err: err.Error()}
+		u.Client.Output <- &t.Response{Err: err.Error()}
 		return
 	}
 
-	u.ChatClient.Output <- &t.Response{Content: comment}
+	u.Client.Output <- &t.Response{Content: comment}
 }

@@ -31,6 +31,9 @@ const UserRemoveFlag = "Remove User"
 const ICECandidateFlag = "ICE Candidate"
 const RollbackDoneFlag = "Rollback Done"
 const InitializeSignalFlag = "Initialize Call"
+const CallAccepted = "Call Accepted"
+const CallDenied = "Call denied"
+const ReceiveCall = "ReceiveCall"
 
 // signalflags -> callStates
 const OfferSignalFlag = "Offer Signal"

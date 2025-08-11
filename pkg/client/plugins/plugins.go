@@ -9,6 +9,8 @@ import (
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
+// TODO Option für Mic/Speaker refresh
+
 // CallPlugin lets you participate in a voice call
 type CallPlugin struct {
 	c *n.Client
@@ -25,9 +27,21 @@ func (cp *CallPlugin) CheckScope() int {
 func (cp *CallPlugin) Execute(message *t.Message) (error, string) {
 	cp.c.LogChan <- t.Log{Text: "CallPlugin.Execute: Initiating call plugin execution", Method: "CallPlugin.Execute"}
 
-	if strings.Contains(message.Content, "quit") {
+	switch {
+	case strings.Contains(message.Content, "quit"):
+		cp.c.LogChan <- t.Log{Text: "CallPlugin.Execute: Received 'quit' command, deleting peers", Method: "CallPlugin.Execute"}
 		cp.c.DeletePeersSafely(cp.c.GetClientId(), true, true)
 		return nil, ""
+
+	case strings.Contains(message.Content, "accept"):
+		cp.c.LogChan <- t.Log{Text: "CallPlugin.Execute: Received 'accept' command, answering call initialization as accepted", Method: "CallPlugin.Execute"}
+		cp.c.CallTimeoutChan <- true
+		return cp.c.AnswerCallInitialization(message, t.CallAccepted), ""
+
+	case strings.Contains(message.Content, "deny"):
+		cp.c.LogChan <- t.Log{Text: "CallPlugin.Execute: Received 'deny' command, answering call initialization as denied", Method: "CallPlugin.Execute"}
+		cp.c.CallTimeoutChan <- false
+		return cp.c.AnswerCallInitialization(message, t.CallDenied), ""
 	}
 
 	// gathering group clients
@@ -52,10 +66,10 @@ func (cp *CallPlugin) Execute(message *t.Message) (error, string) {
 
 	for _, oppClientId := range callableClientIds {
 		cp.c.LogChan <- t.Log{Text: fmt.Sprintf("Starting HandleSignal for client %s", oppClientId), Method: "CallPlugin.Execute"}
-		go cp.c.HandleSignal(&t.Response{ClientId: oppClientId}, true)
+		go cp.c.HandleSignal(&t.Response{ClientId: oppClientId}, true, false)
 	}
 
-	cp.c.LogChan <- t.Log{Text: "CallPlugin.Execute: Finished initiating calls", Method: "CallPlugin.Execute"}
+	cp.c.LogChan <- t.Log{Text: "CallPlugin.Execute: Finished sending initialisation offers", Method: "CallPlugin.Execute"}
 	return nil, ""
 }
 

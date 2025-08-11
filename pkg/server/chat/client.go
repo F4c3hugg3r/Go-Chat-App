@@ -16,16 +16,17 @@ type PluginHandler interface {
 // Client is a communication participant who has a name, unique id and
 // channel to receive messages
 type Client struct {
-	Name      string `json:"name"`
-	ClientId  string `json:"clientId"`
-	GroupName string `json:"groupName"`
-	clientCh  chan *ty.Response
-	active    bool
-	authToken string
-	lastSign  time.Time
-	mu        sync.RWMutex
-	chClosed  bool
-	groupId   string
+	Name          string `json:"name"`
+	ClientId      string `json:"clientId"`
+	GroupName     string `json:"groupName"`
+	clientCh      chan *ty.Response
+	active        bool
+	authToken     string
+	lastSign      time.Time
+	mu            sync.RWMutex
+	chClosed      bool
+	groupId       string
+	isNegotiating bool
 	// key represents opposing clientId and value the current callState
 	rtcs map[string]string
 }
@@ -202,4 +203,18 @@ func (c *Client) CheckRTC(oppId string) (string, error) {
 	}
 
 	return state, nil
+}
+
+func (c *Client) SetIsNegotiating(isNegotiating bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.isNegotiating = isNegotiating
+}
+
+func (c *Client) GetIsNegotiating() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.isNegotiating
 }

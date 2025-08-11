@@ -83,8 +83,10 @@ func (r *opusRTPReader) Read(p []byte) (int, error) {
 		r.byteBuf = r.byteBuf[:n*Channels*2]
 	}
 
+	// daten in oto buffer kopieren
 	n := copy(p, r.byteBuf[r.offset:])
 
+	// offset anpassen / zurücksetzen
 	r.offset += n
 	if r.offset >= len(r.byteBuf) {
 		r.offset = 0

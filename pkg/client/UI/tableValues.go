@@ -167,13 +167,23 @@ func (mT *MuteTable) SetMute(toMute string) {
 	}
 }
 
-func (t *Table) ConvertClientsToRows() {
+func (t *Table) ConvertClientsToRows(clientToBlink string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	t.rows = t.rows[:0]
 
 	for _, client := range t.clients {
+		if client.ClientId == clientToBlink {
+			t.rows = append(t.rows, []string{
+				green.Render(client.Name),
+				green.Render(client.CallState),
+				green.Render(client.GroupName),
+				client.ClientId,
+				client.GroupId,
+			})
+			continue
+		}
 		t.rows = append(t.rows, []string{
 			client.Name,
 			client.CallState,

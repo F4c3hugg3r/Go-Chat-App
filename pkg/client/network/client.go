@@ -13,17 +13,19 @@ import (
 
 // Client handles all network tasks
 type Client struct {
-	clientName string
-	clientId   string
-	authToken  string
-	groupId    string
-	Registered bool
+	clientName     string
+	clientId       string
+	authToken      string
+	groupId        string
+	Registered     bool
+	CurrentCalling string
 
 	mu                     *sync.RWMutex
 	cond                   *sync.Cond
 	Output                 chan *t.Response
 	LogChan                chan t.Log
 	ClientChangeSignalChan chan t.ClientsChangeSignal
+	CallTimeoutChan        chan bool
 
 	Url        string
 	HttpClient *http.Client
@@ -46,8 +48,10 @@ func NewClient(server string) *Client {
 		authToken:              "",
 		Output:                 make(chan *t.Response, 10000),
 		ClientChangeSignalChan: make(chan t.ClientsChangeSignal, 10000),
+		CallTimeoutChan:        make(chan bool, 100),
 		HttpClient:             &http.Client{},
 		Registered:             false,
+		CurrentCalling:         "",
 
 		mu:      &sync.RWMutex{},
 		Url:     server,
@@ -103,12 +107,12 @@ func (c *Client) Interrupt() {
 }
 
 // DeletePeersSafely deletes a Peer or all Peers out of the peers map
-func (c *Client) DeletePeersSafely(oppId string, wholeMap bool, selfInitialized bool) {
+func (c *Client) DeletePeersSafely(oppId string, wholeMap bool, sendToOppClient bool) {
 	// TODO untersuchen wo der deadlock zustande kommt
 	// c.mu.Lock()
 	// defer c.mu.Unlock()
-
 	c.LogChan <- t.Log{Text: "DeletePeersSafely gestartet"}
+
 	if wholeMap == false {
 		c.LogChan <- t.Log{Text: fmt.Sprintf("Versuche Peer mit ID %s zu löschen", oppId)}
 		peer, exists := c.Peers[oppId]
@@ -117,7 +121,7 @@ func (c *Client) DeletePeersSafely(oppId string, wholeMap bool, selfInitialized 
 			return
 		}
 
-		if selfInitialized {
+		if sendToOppClient {
 			c.SendSignalingError(oppId, c.GetClientId(), t.FailedConnectionFlag)
 		}
 		c.LogChan <- t.Log{Text: fmt.Sprintf("Peer mit ID %s gefunden, Verbindung wird geschlossen", oppId)}
@@ -137,7 +141,7 @@ func (c *Client) DeletePeersSafely(oppId string, wholeMap bool, selfInitialized 
 
 	c.LogChan <- t.Log{Text: "Lösche alle Peers"}
 	for id, peer := range c.Peers {
-		if selfInitialized {
+		if sendToOppClient {
 			c.SendSignalingError(id, c.GetClientId(), t.FailedConnectionFlag)
 		}
 		c.LogChan <- t.Log{Text: fmt.Sprintf("Schließe Verbindung für Peer mit ID %s", id)}
@@ -152,6 +156,14 @@ func (c *Client) DeletePeersSafely(oppId string, wholeMap bool, selfInitialized 
 	c.LogChan <- t.Log{Text: "Alle Peers wurden gelöscht"}
 	c.ClientChangeSignalChan <- t.ClientsChangeSignal{CallState: t.NoCallFlag, OppId: c.GetClientId()}
 
+}
+
+func (c *Client) SendSignalingError(oppId string, ownId string, content string) {
+	msg := c.CreateMessage(ownId, fmt.Sprintf("/"+t.FailedConnectionFlag), content, oppId)
+	_, err := c.PostMessage(msg, t.SignalWebRTC)
+	if err != nil {
+		c.LogChan <- t.Log{Text: fmt.Sprintf("WebRTC: Fehler beim senden des ConnectionFailedFlags %v", err)}
+	}
 }
 
 // ResponseReceiver gets responses if client is registered
@@ -322,36 +334,65 @@ func (c *Client) CreateMessage(name string, plugin string, content string, clien
 	return msg
 }
 
-func (c *Client) Mute(toMute string) {
+func (c *Client) Mute(toMute string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	var inCall int
+
 	for _, peer := range c.Peers {
+		if peer.GetConnectionState() != t.ConnectedFlag {
+			continue
+		}
 		switch toMute {
 		case t.Microphone:
 			peer.MuteMic()
 		case t.Speaker:
 			peer.MuteSpeaker()
 		}
+		inCall = inCall + 1
 	}
-}
 
-func (c *Client) HandleSignal(rsp *t.Response, initialSignal bool) {
-	err := c.HandlePeer(rsp, initialSignal)
-	if err != nil {
-		c.SendSignalingError(rsp.ClientId, c.GetClientId(), "")
+	if inCall < 1 {
+		return t.ErrNoPermission
 	}
-}
 
-func (c *Client) SendSignalingError(oppId string, ownId string, content string) {
-	msg := c.CreateMessage(ownId, fmt.Sprintf("/"+t.FailedConnectionFlag), content, oppId)
+	return nil
+}
+func (c *Client) AnswerCallInitialization(message *t.Message, answer string) error {
+	c.LogChan <- t.Log{Text: "AnswerCallInitialization aufgerufen"}
+	if c.GetCurrentCalling() == "" {
+		c.LogChan <- t.Log{Text: "Kein aktiver Anruf, Antwort nicht möglich"}
+		return fmt.Errorf("%v: you are not being called", t.ErrNoPermission)
+	}
+
+	c.LogChan <- t.Log{Text: fmt.Sprintf("Sende Antwort '%s' auf Initialisierungsanruf von %s", answer, c.GetCurrentCalling())}
+	msg := c.CreateMessage(message.ClientId, fmt.Sprintf("/"+t.InitializeSignalFlag), answer, c.GetCurrentCalling())
+
 	_, err := c.PostMessage(msg, t.SignalWebRTC)
 	if err != nil {
-		c.LogChan <- t.Log{Text: fmt.Sprintf("WebRTC: Fehler beim senden des ConnectionFailedFlags %v", err)}
+		c.LogChan <- t.Log{Text: fmt.Sprintf("Fehler beim Senden der Antwort: %v", err)}
+		return err
+	}
+
+	c.LogChan <- t.Log{Text: "Antwort erfolgreich gesendet, Anrufstatus wird zurückgesetzt"}
+	c.SetCurrentCalling("")
+
+	return nil
+}
+
+func (c *Client) HandleSignal(rsp *t.Response, initialSignal bool, accepted bool) {
+	err := c.HandlePeer(rsp, initialSignal, accepted)
+	if err != nil {
+		if initialSignal {
+			c.DeletePeersSafely(rsp.ClientId, false, true)
+			return
+		}
+		c.DeletePeersSafely(rsp.ClientId, false, false)
 	}
 }
 
-func (c *Client) HandlePeer(rsp *t.Response, initialSignal bool) error {
+func (c *Client) HandlePeer(rsp *t.Response, initialSignal bool, accepted bool) error {
 	peer, err := c.GetPeer(rsp.ClientId)
 	c.LogChan <- t.Log{Text: "Getting Peer"}
 
@@ -376,8 +417,12 @@ func (c *Client) HandlePeer(rsp *t.Response, initialSignal bool) error {
 				return err
 			}
 
-			return peer.OfferConnection()
+			return nil
 		}
+	}
+
+	if accepted {
+		return peer.OfferConnection()
 	}
 
 	c.LogChan <- t.Log{Text: "Response wird in den Signalchannel gepusht"}
@@ -441,4 +486,18 @@ func (c *Client) GetName() string {
 	defer c.mu.RUnlock()
 
 	return c.clientName
+}
+
+func (c *Client) GetCurrentCalling() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.CurrentCalling
+}
+
+func (c *Client) SetCurrentCalling(oppId string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.CurrentCalling = oppId
 }

@@ -3,6 +3,7 @@ package UI
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	i "github.com/F4c3hugg3r/Go-Chat-Server/pkg/client/input"
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
@@ -19,6 +20,8 @@ import (
 
 // TODO ALLGEMEIN
 
+// TODO call accept / deny functionality
+
 // maybe TODO bg farben für connection und mute -> mute in server speichern und übergeben -> rot faint => mic, rot => mic + speaker
 
 // InitialModel initializes the model struct, which is the main struct for the TUI
@@ -27,8 +30,8 @@ func InitialModel(u *i.UserService) model {
 
 	h := help.New()
 
-	ta, tV := setUpTable(u.ChatClient.LogChan)
-	mTa, mTV := setUpMuteTable(u.ChatClient.LogChan)
+	ta, tV := setUpTable(u.Client.LogChan)
+	mTa, mTV := setUpMuteTable(u.Client.LogChan)
 
 	vp := viewport.New(30, 5)
 	vp.KeyMap = viewportKeys
@@ -47,7 +50,7 @@ func InitialModel(u *i.UserService) model {
 		logs:            []string{},
 		err:             nil,
 		userService:     u,
-		outputChan:      u.ChatClient.Output,
+		outputChan:      u.Client.Output,
 		textinput:       ti,
 		helpModel:       h,
 		keyMap:          helpKeys,
@@ -59,7 +62,7 @@ func InitialModel(u *i.UserService) model {
 		muteTableValues: mTV,
 	}
 
-	model.logChan = model.userService.ChatClient.LogChan
+	model.logChan = model.userService.Client.LogChan
 
 	return model
 }
@@ -90,6 +93,14 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch rsp := rsp.(type) {
+	case CallResultMsg:
+		if rsp.Accepted {
+			m.DisplayMessage(green.Render("- Du hast den Anruf angenommen -"))
+		} else {
+			m.DisplayMessage(green.Render("- Du hast den Anruf abgelehnt -"))
+		}
+		m.refreshTable("")
+
 	case t.ClientsChangeSignal:
 		m.HandleClientsChangeSignal(rsp)
 
@@ -103,6 +114,10 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 	case *t.Response:
 		m.HandleResponse(rsp)
 
+		if strings.Contains(rsp.Content, t.ReceiveCall) {
+			return m, tea.Batch(tiCmd, vpCmd, loCmd, tbCmd, mTbCmd, m.ReceiveCall(rsp), m.waitForExternalResponse())
+		}
+
 		return m, tea.Batch(tiCmd, vpCmd, loCmd, tbCmd, mTbCmd, m.waitForExternalResponse())
 
 	case tea.WindowSizeMsg:
@@ -112,7 +127,7 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch rsp.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
-			m.userService.ChatClient.Interrupt()
+			m.userService.Client.Interrupt()
 
 			return m, tea.Quit
 
@@ -144,11 +159,7 @@ func (m model) Update(rsp tea.Msg) (tea.Model, tea.Cmd) {
 			m.HandleMute(t.Speaker)
 
 		case key.Matches(rsp, m.keyMap.SelectUser):
-			if m.tableValues.Empty() {
-				m.AddMessageToViewport(red.Render(fmt.Sprintf("%v: register yourself first", t.ErrNoPermission)))
-				return m, tea.Batch(tiCmd, vpCmd, loCmd, tbCmd, mTbCmd)
-			}
-			m.SwitchFocus()
+			m.HandleTableFocus()
 
 		case key.Matches(rsp, m.keyMap.Logs):
 			m.ToggleLogs()
@@ -190,9 +201,25 @@ func (m model) View() string {
 	)
 }
 
-//
 // logic functions
-//
+func (m *model) ReceiveCall(rsp *t.Response) tea.Cmd {
+	m.userService.Client.SetCurrentCalling(rsp.ClientId)
+	m.refreshTable(rsp.ClientId)
+	m.logChan <- t.Log{Text: fmt.Sprintf("ReceiveCall started for ClientId: %s", rsp.ClientId), Method: "ReceiveCall"}
+
+	return func() tea.Msg {
+		select {
+		case <-time.After(15 * time.Second):
+			message := m.userService.ParseInputToMessage("/call deny")
+			m.logChan <- t.Log{Text: "Call timed out after 15 seconds, denying call", Method: "ReceiveCall"}
+			m.userService.Client.AnswerCallInitialization(message, t.CallDenied)
+			return CallResultMsg{Accepted: false}
+		case accepted := <-m.userService.Client.CallTimeoutChan:
+			m.logChan <- t.Log{Text: fmt.Sprintf("CallTimeoutChan received: %v", accepted), Method: "ReceiveCall"}
+			return CallResultMsg{Accepted: accepted}
+		}
+	}
+}
 
 func (m *model) ToggleLogs() {
 	switch m.logViewport.Height {
@@ -243,7 +270,7 @@ func (m *model) SwitchFocus() {
 		m.viewport.KeyMap = viewport.KeyMap{}
 		m.table.KeyMap = table.DefaultKeyMap()
 	}
-	m.refreshTable()
+	m.refreshTable("")
 	m.refreshViewPort()
 }
 
@@ -314,8 +341,8 @@ func (m *model) refreshLogViewPort() {
 	m.logViewport.GotoBottom()
 }
 
-func (m *model) refreshTable() {
-	m.tableValues.ConvertClientsToRows()
+func (m *model) refreshTable(clientToBlink string) {
+	m.tableValues.ConvertClientsToRows(clientToBlink)
 	m.table.SetRows(m.tableValues.rows)
 	m.table.SetStyles(m.tableValues.ts)
 }
@@ -334,17 +361,30 @@ func (m *model) refreshViewPort() {
 // handler functions
 //
 
+func (m *model) HandleTableFocus() {
+	if m.userService.Client.GetGroupId() != "" {
+		m.userService.Executor("/group users")
+	} else {
+		m.userService.Executor("/users")
+	}
+	if m.tableValues.Empty() {
+		m.DisplayMessage(red.Render(fmt.Sprintf("%v: register yourself first", t.ErrNoPermission)))
+		return
+	}
+	m.SwitchFocus()
+}
+
 func (m *model) HandleMute(toMute string) {
-	if !m.userService.ChatClient.Registered {
-		m.AddMessageToViewport(red.Render("you are not registered yet"))
+	if !m.userService.Client.Registered {
+		m.DisplayMessage(red.Render("you are not registered yet"))
 		return
 	}
 
-	if m.tableValues.GetCallState(m.userService.ChatClient.GetClientId()) != t.ConnectedFlag {
-		m.AddMessageToViewport(red.Render("you have to be in a call first"))
+	err := m.userService.Client.Mute(toMute)
+	if err != nil {
+		m.DisplayMessage(red.Render("you have to be in a call first"))
 		return
 	}
-	m.userService.ChatClient.Mute(toMute)
 	m.muteTableValues.SetMute(toMute)
 	m.muteTable.SetColumns(m.muteTableValues.cols)
 }
@@ -356,10 +396,10 @@ func (m *model) HandleTableSelect() {
 			turkis.Bold(true).Render(fmt.Sprintf("%s", m.table.SelectedRow()[0])),
 			blue.Render("ClientId:	"),
 			m.table.SelectedRow()[3],
-			blue.Render("GroupId:	"),
+			blue.Render("GroupId:	 "),
 			m.table.SelectedRow()[4],
 		))
-	m.AddMessageToViewport(message)
+	m.DisplayMessage(message)
 	m.SwitchFocus()
 
 }
@@ -405,7 +445,7 @@ func (m *model) HandleClientsChangeSignal(rsp t.ClientsChangeSignal) error {
 		m.tableValues.SetClients(clients, nil)
 	}
 
-	m.refreshTable()
+	m.refreshTable("")
 	return nil
 }
 
@@ -422,14 +462,14 @@ func (m *model) HandleWindowResize(rsp *tea.WindowSizeMsg) {
 
 	m.helpModel.Width = rsp.Width/8*7 - m.muteTableValues.GetFrameSize()*2
 
-	m.logChan <- t.Log{Text: fmt.Sprintf("rsp.Width = %d", rsp.Width)}
+	// m.logChan <- t.Log{Text: fmt.Sprintf("rsp.Width = %d", rsp.Width)}
 
 	m.muteTable.SetWidth(rsp.Width / 8)
 	m.muteTable.Columns()[0].Width = m.muteTable.Width() / 2
 	m.muteTable.Columns()[1].Width = m.muteTable.Width() / 2
 
-	m.logChan <- t.Log{Text: fmt.Sprintf("helpWidth = %d, viewport width = %d", m.helpModel.Width, m.viewport.Width)}
-	m.logChan <- t.Log{Text: fmt.Sprintf("muteTableWidth = %d", m.muteTable.Width())}
+	// m.logChan <- t.Log{Text: fmt.Sprintf("helpWidth = %d, viewport width = %d", m.helpModel.Width, m.viewport.Width)}
+	// m.logChan <- t.Log{Text: fmt.Sprintf("muteTableWidth = %d", m.muteTable.Width())}
 
 	m.textinput.Width = rsp.Width
 	m.logViewport.Width = rsp.Width
@@ -447,7 +487,7 @@ func (m *model) HandleWindowResize(rsp *tea.WindowSizeMsg) {
 
 	m.RenderTitle(m.title, []string{WindowResizeFlag})
 	m.refreshViewPort()
-	m.refreshTable()
+	m.refreshTable("")
 }
 
 // HandleResponse handles an incoming Response by evaluating it and refreshing
@@ -455,7 +495,7 @@ func (m *model) HandleWindowResize(rsp *tea.WindowSizeMsg) {
 func (m *model) HandleResponse(rsp *t.Response) {
 	str := m.EvaluateReponse(rsp)
 	if str != "" {
-		m.AddMessageToViewport(str)
+		m.DisplayMessage(str)
 	}
 
 	// m.refreshViewPort()
@@ -468,8 +508,6 @@ func (m *model) HandleMessage() {
 
 	m.userService.Executor(m.textinput.Value())
 	m.textinput.Reset()
-
-	// m.refreshViewPort()
 }
 
 //
@@ -506,7 +544,7 @@ func (m *model) waitForClientsChangeSignal() tea.Cmd {
 }
 
 func (m *model) clientsChangeSignalPoller() t.ClientsChangeSignal {
-	signal, ok := <-m.userService.ChatClient.ClientChangeSignalChan
+	signal, ok := <-m.userService.Client.ClientChangeSignalChan
 	if !ok {
 		m.logChan <- t.Log{Text: "ClientsChangeSignal channel is closed"}
 		return t.ClientsChangeSignal{}
@@ -519,7 +557,7 @@ func (m *model) clientsChangeSignalPoller() t.ClientsChangeSignal {
 // helper functions
 //
 
-func (m *model) AddMessageToViewport(message string) {
+func (m *model) DisplayMessage(message string) {
 	m.messages = append(m.messages, message)
 	m.refreshViewPort()
 }

@@ -2,6 +2,7 @@ package chat
 
 import (
 	"fmt"
+	"strings"
 
 	ty "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
@@ -26,6 +27,7 @@ func (isp *InitializeSignalPlugin) Execute(msg *ty.Message) (*ty.Response, error
 		fmt.Printf("\n[InitializeSignalPlugin] Error getting current group: %v", err)
 		return nil, err
 	}
+	fmt.Printf("\n[InitializeSignalPlugin] Own client: %+v", ownClient)
 
 	if group == nil {
 		fmt.Printf("\n[InitializeSignalPlugin] Group is nil for msg.Name: %s", msg.Name)
@@ -37,10 +39,20 @@ func (isp *InitializeSignalPlugin) Execute(msg *ty.Message) (*ty.Response, error
 		fmt.Printf("\n[InitializeSignalPlugin] Error getting opposing client: %v", err)
 		return nil, fmt.Errorf("%w: error getting opposing client", err)
 	}
+	fmt.Printf("\n[InitializeSignalPlugin] Opposing client: %+v", oppClient)
 
-	fmt.Printf("\n[InitializeSignalPlugin] checking if there is already a connection")
-	if group.CheckConnection(msg.Name, msg.ClientId) {
-		return nil, fmt.Errorf("%w: there is already a connection between %s - %s", ty.ErrNoPermission, msg.Name, msg.ClientId)
+	if strings.Contains(msg.Content, ty.CallAccepted) || strings.Contains(msg.Content, ty.CallDenied) {
+		fmt.Printf("\n[InitializeSignalPlugin] CallAccepted or CallDenied detected in content: %s", msg.Content)
+		oppClient.Send(&ty.Response{RspName: ty.InitializeSignalFlag, ClientId: msg.Name, Content: msg.Content})
+		ownClient.SetIsNegotiating(false)
+		oppClient.SetIsNegotiating(false)
+		return nil, nil
+	}
+
+	fmt.Printf("\n[InitializeSignalPlugin] checking if there is already a connection or negotiation process")
+	if group.CheckConnection(msg.Name, msg.ClientId) || ownClient.GetIsNegotiating() || oppClient.GetIsNegotiating() {
+		fmt.Printf("\n[InitializeSignalPlugin] There is already a connection or negotiation process between %s and %s", msg.Name, msg.ClientId)
+		return nil, fmt.Errorf("%w: there is already a connection between or a negotiation process, please try again later", ty.ErrNoPermission)
 	}
 
 	fmt.Printf("\n[InitializeSignalPlugin] no current connectin found, connecting %s - %s", msg.Name, msg.ClientId)
@@ -52,6 +64,14 @@ func (isp *InitializeSignalPlugin) Execute(msg *ty.Message) (*ty.Response, error
 	}
 
 	err = oppClient.SetCallState(msg.Name, ty.AnswerSignalFlag)
+	if err != nil {
+		return nil, err
+	}
+
+	err = oppClient.Send(&ty.Response{RspName: ty.InitializeSignalFlag, ClientId: msg.Name, Content: ty.ReceiveCall})
+
+	ownClient.SetIsNegotiating(true)
+	oppClient.SetIsNegotiating(true)
 
 	return nil, err
 }
@@ -219,6 +239,7 @@ func (ssp *StableSignalPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	return nil, err
 }
 
+// TODO kann wahrscheinlich weg wird nicht aufgerufen
 // ConnectedPlugin forwards rtc signals
 type ConnectedPlugin struct {
 	chatService *ChatService
@@ -284,9 +305,13 @@ func (fcp *FailedConnectionPlugin) Execute(msg *ty.Message) (*ty.Response, error
 		}
 		ownClient.RemoveRTC(msg.ClientId)
 		oppClient.RemoveRTC(msg.Name)
+		ownClient.SetIsNegotiating(false)
+		oppClient.SetIsNegotiating(false)
+
 		return nil, nil
 	}
 
+	// TODO change echo to send
 	fmt.Printf("\n[FailedConnectionPlugin] Echoing failed connection to %s and %s", msg.Name, msg.ClientId)
 	fcp.chatService.Echo(msg.Name, &ty.Response{ClientId: msg.ClientId, RspName: ty.FailedConnectionFlag, Content: ty.FailedConnectionFlag})
 	fcp.chatService.Echo(msg.ClientId, &ty.Response{ClientId: msg.Name, RspName: ty.FailedConnectionFlag, Content: ty.FailedConnectionFlag})
