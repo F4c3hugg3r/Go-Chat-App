@@ -2,26 +2,47 @@ package audio
 
 import (
 	"fmt"
-	"io"
-	"sync"
+	"time"
 
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
+	p "github.com/gordonklaus/portaudio"
 	"github.com/pion/mediadevices"
 	"github.com/pion/mediadevices/pkg/codec/opus"
-	"github.com/pion/mediadevices/pkg/prop"
-	"github.com/pion/mediadevices/pkg/wave"
+	"github.com/pion/webrtc/v4"
+	"github.com/pion/webrtc/v4/pkg/media"
+	opusEnc "gopkg.in/hraban/opus.v2"
 )
 
-type MicrophoneInput struct {
-	MediaStream        mediadevices.MediaStream
-	OriginalAudioTrack mediadevices.Track
-	SilentAudioTrack   mediadevices.Track
-	CodecSelector      *mediadevices.CodecSelector
+type PortAudioMicInput struct {
+	// SampleRate float64
+	byteBuf []byte
+	pcmBuf  []int16
+	// Channels   int
+	Stream        *p.Stream
+	Muted         bool
+	Track         *webrtc.TrackLocalStaticSample
+	OpusEnc       *opusEnc.Encoder
+	CodecSelector *mediadevices.CodecSelector
 }
 
-func NewMicrophoneInput(logChannel chan t.Log) (*MicrophoneInput, error) {
-	input := &MicrophoneInput{}
-	var err error
+func InitializePortAudioMic(logChannel chan t.Log) (*PortAudioMicInput, error) {
+	logChannel <- t.Log{Text: "[InitializePortAudio] Initialisiere PortAudio Mikrofon"}
+	frameSize := Samplerate * FrameSizeMs * Channels / 1000
+
+	err := p.Initialize()
+	if err != nil {
+		return nil, fmt.Errorf("PortAudio: Fehler bei Initialisierung: %w", err)
+	}
+
+	pcmBuf := make([]int16, frameSize)
+	byteBuf := make([]byte, 1000)
+
+	pm := &PortAudioMicInput{
+		pcmBuf: pcmBuf,
+		// SampleRate: mic.DefaultSampleRate,
+		// Channels:   1,
+		byteBuf: byteBuf,
+	}
 
 	opusParams, err := opus.NewParams()
 	if err != nil {
@@ -29,77 +50,54 @@ func NewMicrophoneInput(logChannel chan t.Log) (*MicrophoneInput, error) {
 		return nil, err
 	}
 
-	input.CodecSelector = mediadevices.NewCodecSelector(mediadevices.WithAudioEncoders(&opusParams))
+	pm.CodecSelector = mediadevices.NewCodecSelector(mediadevices.WithAudioEncoders(&opusParams))
 
-	input.MediaStream, err = mediadevices.GetUserMedia(mediadevices.MediaStreamConstraints{
-		Audio: func(c *mediadevices.MediaTrackConstraints) {
-			c.SampleRate = prop.Int(Samplerate)
-			c.ChannelCount = prop.Int(Channels)
-		},
-		Codec: input.CodecSelector,
-	})
+	logChannel <- t.Log{Text: "[InitializePortAudio] CodecSelector initialized"}
+
+	pm.OpusEnc, err = opusEnc.NewEncoder(Samplerate, Channels, opusEnc.AppAudio)
 	if err != nil {
-		logChannel <- t.Log{Text: fmt.Sprintf("Input: Fehler bei GetUserMedia: %v", err)}
-		return nil, err
+		return nil, fmt.Errorf("Opus Encoder: Fehler beim Erstellen: %w", err)
 	}
 
-	logChannel <- t.Log{Text: "Input: MediaStream erhalten"}
+	// maybe zum Quality verbessern
+	// pm.OpusEnc.SetBitrate(64000)
+	// pm.OpusEnc.SetComplexity(10)
 
-	for _, track := range input.MediaStream.GetTracks() {
-		logChannel <- t.Log{Text: fmt.Sprintf("Input: Füge Track hinzu: ID=%s, Kind=%s", track.ID(), track.Kind())}
-		track.OnEnded(func(err error) {
-			logChannel <- t.Log{Text: fmt.Sprintf("Input: Track (ID: %s) beendet mit Fehler: %v", track.ID(), err)}
-		})
-
-		input.OriginalAudioTrack = track
+	stream, err := p.OpenDefaultStream(Channels, 0, Samplerate, len(pcmBuf), pm.SendToWebRTCCallback(logChannel))
+	if err != nil {
+		return nil, fmt.Errorf("PortAudio: Fehler beim Öffnen des DefaultStreams: %w", err)
 	}
 
-	source := &SilenceSource{closed: false, mu: &sync.RWMutex{}}
-	input.SilentAudioTrack = mediadevices.NewAudioTrack(source, input.CodecSelector)
+	pm.Stream = stream
 
-	return input, nil
+	pm.Track, err = webrtc.NewTrackLocalStaticSample(
+		webrtc.RTPCodecCapability{
+			MimeType:  opusParams.RTPCodec().MimeType,
+			Channels:  uint16(Channels),
+			ClockRate: uint32(Samplerate),
+		}, "audio", "microphone",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("WebRTC: Fehler beim Erstellen des Tracks: %w", err)
+	}
+
+	logChannel <- t.Log{Text: "[InitializePortAudio] PortAudio Mikrofon erfolgreich initialisiert"}
+	return pm, nil
 }
 
-// SilenceSource implementiert die mediadevices.AudioSource Schnittstelle
-type SilenceSource struct {
-	mu     *sync.RWMutex
-	closed bool
-}
+func (pm *PortAudioMicInput) SendToWebRTCCallback(logChannel chan t.Log) func(in []int16) {
+	return func(in []int16) {
+		pm.pcmBuf = in
 
-func (s *SilenceSource) Read() (wave.Audio, func(), error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+		n, err := pm.OpusEnc.Encode(pm.pcmBuf, pm.byteBuf)
+		if err != nil {
+			logChannel <- t.Log{Text: fmt.Sprintf("[PortAudioMicInput] Opus encode error: %v", err)}
+			return
+		}
 
-	if s.closed {
-		return nil, nil, io.EOF
-	}
-
-	samples := Samplerate / 50 // 20ms bei 48000Hz = 960 Samples
-	// Interleaved nur für Stereo audio benötigt
-	chunk := wave.NewInt16NonInterleaved(wave.ChunkInfo{
-		Len:          samples,
-		Channels:     Channels,
-		SamplingRate: Samplerate,
-	})
-
-	// Fülle mit Nullwerten (Stille)
-	for ch := 0; ch < Channels; ch++ {
-		for i := 0; i < samples; i++ {
-			chunk.Data[ch][i] = 0
+		err = pm.Track.WriteSample(media.Sample{Data: pm.byteBuf[:n], Duration: 20 * time.Millisecond})
+		if err != nil {
+			logChannel <- t.Log{Text: fmt.Sprintf("[PortAudioMicInput] WebRTC WriteSample error: %v", err)}
 		}
 	}
-
-	return chunk, func() {}, nil
-}
-
-func (s *SilenceSource) Close() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.closed = !s.closed
-	return nil
-}
-
-func (s *SilenceSource) ID() string {
-	return "silence-audio-source"
 }

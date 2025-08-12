@@ -28,7 +28,7 @@ func main() {
 	programm := tea.NewProgram(ui.InitialModel(u))
 	interChan := make(chan os.Signal, 3)
 
-	signal.Notify(interChan, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
+	signal.Notify(interChan, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP, os.Interrupt)
 
 	go interruptListener(interChan, c)
 

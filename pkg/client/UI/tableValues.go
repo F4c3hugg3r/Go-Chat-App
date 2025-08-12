@@ -129,6 +129,8 @@ func (t *Table) SetClients(clients []*ty.JsonClient, client *ty.JsonClient) {
 	for _, client := range clients {
 		t.clients[client.ClientId] = client
 	}
+
+	t.logChannel <- ty.Log{Text: fmt.Sprintf("length t.clients = %d", len(t.rows))}
 }
 
 func (mT *MuteTable) SetMute(toMute string) {
@@ -140,30 +142,28 @@ func (mT *MuteTable) SetMute(toMute string) {
 	case ty.Microphone:
 		if mT.micMute {
 			mT.logChannel <- t.Log{Text: "muteTable: Unmuting Microphone"}
-			mT.cols[0].Title = noCol.Render(ty.Microphone)
+			mT.cols[0].Title = ty.Microphone
 			mT.micMute = false
 			mT.logChannel <- t.Log{Text: "muteTable: Microphone is now unmuted"}
 			return
 		}
 		mT.logChannel <- t.Log{Text: "muteTable: Muting Microphone"}
-		mT.cols[0].Title = red.Render(ty.Microphone)
+		mT.cols[0].Title = "Muted"
 		mT.micMute = true
 		mT.logChannel <- t.Log{Text: "muteTable: Microphone is now muted"}
 
 	case ty.Speaker:
 		if mT.speakerMute {
-			mT.logChannel <- t.Log{Text: "muteTable: Unmuting Speaker and Microphone"}
-			mT.cols[0].Title = noCol.Render(ty.Microphone)
-			mT.cols[1].Title = noCol.Render(ty.Speaker)
-			mT.speakerMute, mT.micMute = false, false
-			mT.logChannel <- t.Log{Text: "muteTable: Speaker and Microphone are now unmuted"}
+			mT.logChannel <- t.Log{Text: "muteTable: Unmuting Speaker"}
+			mT.cols[1].Title = ty.Speaker
+			mT.speakerMute = false
+			mT.logChannel <- t.Log{Text: "muteTable: Speaker is now unmuted"}
 			return
 		}
-		mT.logChannel <- t.Log{Text: "muteTable: Muting Speaker and Microphone"}
-		mT.cols[0].Title = red.Render(ty.Microphone)
-		mT.cols[1].Title = red.Render(ty.Speaker)
-		mT.speakerMute, mT.micMute = true, true
-		mT.logChannel <- t.Log{Text: "muteTable: Speaker and Microphone are now muted"}
+		mT.logChannel <- t.Log{Text: "muteTable: Muting Speaker"}
+		mT.cols[1].Title = "Muted"
+		mT.speakerMute = true
+		mT.logChannel <- t.Log{Text: "muteTable: Speaker is are now muted"}
 	}
 }
 
@@ -171,7 +171,7 @@ func (t *Table) ConvertClientsToRows(clientToBlink string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	t.rows = t.rows[:0]
+	t.rows = []table.Row{}
 
 	for _, client := range t.clients {
 		if client.ClientId == clientToBlink {
@@ -192,6 +192,8 @@ func (t *Table) ConvertClientsToRows(clientToBlink string) {
 			client.GroupId,
 		})
 	}
+
+	t.logChannel <- ty.Log{Text: fmt.Sprintf("length t.rows = %d", len(t.rows))}
 }
 
 func (t *Table) SetCallState(clientId string, callState string) error {
@@ -257,12 +259,12 @@ func (t *Table) GetClient(clientId string) *ty.JsonClient {
 	return t.clients[clientId]
 }
 
-func (t *Table) GetCallState(clientId string) string {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
+// func (t *Table) GetCallState(clientId string) string {
+// 	t.mu.RLock()
+// 	defer t.mu.RUnlock()
 
-	return t.clients[clientId].CallState
-}
+// 	return t.clients[clientId].CallState
+// }
 
 func (t *Table) Empty() bool {
 	t.mu.RLock()

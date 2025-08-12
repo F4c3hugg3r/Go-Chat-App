@@ -9,8 +9,6 @@ import (
 	t "github.com/F4c3hugg3r/Go-Chat-Server/pkg/shared"
 )
 
-// TODO Option für Mic/Speaker refresh
-
 // CallPlugin lets you participate in a voice call
 type CallPlugin struct {
 	c *n.Client
@@ -30,7 +28,7 @@ func (cp *CallPlugin) Execute(message *t.Message) (error, string) {
 	switch {
 	case strings.Contains(message.Content, "quit"):
 		cp.c.LogChan <- t.Log{Text: "CallPlugin.Execute: Received 'quit' command, deleting peers", Method: "CallPlugin.Execute"}
-		cp.c.DeletePeersSafely(cp.c.GetClientId(), true, true)
+		cp.c.DeletePeers(cp.c.GetClientId(), true, true)
 		return nil, ""
 
 	case strings.Contains(message.Content, "accept"):

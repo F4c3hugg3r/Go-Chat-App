@@ -8,8 +8,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// TODO das in Interface bzw Plugins auslagern
-
 // evaluateResponse evaluates an incoming Response and returns the
 // corresponding rendered string
 func (m *model) EvaluateReponse(rsp *t.Response) string {
@@ -22,6 +20,15 @@ func (m *model) EvaluateReponse(rsp *t.Response) string {
 			return ""
 		}
 		return red.Render(rsp.Err)
+
+	// Users output
+	case strings.Contains(rsp.RspName, t.UsersFlag):
+		m.userService.Client.ClientChangeSignalChan <- t.ClientsChangeSignal{
+			ClientsJson: rsp.Content,
+		}
+		m.logChan <- t.Log{Text: fmt.Sprintf("clients = %s", rsp.Content)}
+
+		return ""
 
 	// empty output
 	case rsp.Content == "", rsp.Content == "null":
@@ -42,7 +49,7 @@ func (m *model) EvaluateReponse(rsp *t.Response) string {
 		// unregister output
 		if strings.Contains(rsp.Content, t.UnregisterFlag) {
 			m.RenderTitle(t.UnregisterFlag, nil)
-			m.userService.Client.DeletePeersSafely("", true, true)
+			m.userService.Client.DeletePeers("", true, true)
 			m.userService.Client.ClientChangeSignalChan <- t.ClientsChangeSignal{
 				CallState: t.UnregisterFlag,
 			}
@@ -89,7 +96,7 @@ func (m *model) EvaluateReponse(rsp *t.Response) string {
 	case strings.Contains(rsp.RspName, t.LeaveGroupFlag):
 		m.userService.Client.UnsetGroupId()
 		m.RenderTitle(t.RegisterFlag, []string{m.userService.Client.GetName()})
-		m.userService.Client.DeletePeersSafely("", true, true)
+		m.userService.Client.DeletePeers("", true, true)
 		m.userService.Executor("/users")
 
 		return purple.BorderStyle(lipgloss.NormalBorder()).BorderLeft(true).
@@ -98,7 +105,17 @@ func (m *model) EvaluateReponse(rsp *t.Response) string {
 
 	// Rollback/Delete Peer output
 	case strings.Contains(rsp.RspName, t.FailedConnectionFlag):
-		m.userService.Client.DeletePeersSafely(rsp.ClientId, false, false)
+		if len(m.userService.Client.Peers) < 1 {
+			return ""
+		}
+
+		m.userService.Client.DeletePeers(rsp.ClientId, false, false)
+		if m.userService.Client.GetGroupId() != "" {
+			m.userService.Executor("/group users")
+		} else {
+			m.userService.Executor("/users")
+		}
+
 		return fmt.Sprintf("%s %s %s", blue.Render("Anruf mit"), purple.Faint(true).Render(rsp.ClientId), blue.Render("beendet"))
 
 	// Receive webRTC signal (Offer SDP Signal, Answer SDP Signal or ICE Candidate)
@@ -119,7 +136,7 @@ func (m *model) EvaluateReponse(rsp *t.Response) string {
 			return green.Render("Dein Anruf wurde angenommen, verbinde...")
 
 		case t.CallDenied:
-			m.userService.Client.DeletePeersSafely(rsp.ClientId, false, false)
+			m.userService.Client.DeletePeers(rsp.ClientId, false, false)
 			return green.Render("- Dein Anruf wurde abgelehnt -")
 		}
 
@@ -129,12 +146,6 @@ func (m *model) EvaluateReponse(rsp *t.Response) string {
 
 	// slice output
 	case strings.HasPrefix(rsp.Content, "["):
-		if strings.Contains(rsp.RspName, t.UsersFlag) {
-			m.userService.Client.ClientChangeSignalChan <- t.ClientsChangeSignal{
-				ClientsJson: rsp.Content,
-			}
-			return ""
-		}
 
 		output, err := JSONToTable(rsp.Content)
 		if err != nil {

@@ -20,10 +20,6 @@ import (
 
 // TODO ALLGEMEIN
 
-// TODO call accept / deny functionality
-
-// maybe TODO bg farben für connection und mute -> mute in server speichern und übergeben -> rot faint => mic, rot => mic + speaker
-
 // InitialModel initializes the model struct, which is the main struct for the TUI
 func InitialModel(u *i.UserService) model {
 	ti := SetUpTextInput(u)
@@ -37,6 +33,7 @@ func InitialModel(u *i.UserService) model {
 	vp.KeyMap = viewportKeys
 
 	logVp := viewport.New(30, 0)
+	logVp.KeyMap = viewportKeys
 
 	inputManager := &InputHistory{
 		current: -1,
@@ -238,22 +235,22 @@ func (m *model) ToggleLogs() {
 	m.refreshViewPort()
 }
 
-func (m *model) ToggleMuteTable() {
-	switch m.muteTable.Height() {
-	case 0:
-		m.muteTable.SetHeight(2)
-		m.muteTable.SetColumns([]table.Column{})
-		// m.muteTable.SetRows(m.muteTableValues.rows)
-		m.textinput.Width = m.textinput.Width - m.muteTable.Width()
-	case 2:
-		m.muteTable.SetHeight(0)
-		m.muteTable.SetColumns(m.muteTableValues.cols)
-		// m.muteTable.SetRows([]table.Row{})
-		m.textinput.Width = m.textinput.Width + m.muteTable.Width()
-	}
-}
+// maybe TODO einbauen oder löschen
+// func (m *model) ToggleMuteTable() {
+// 	switch m.muteTable.Height() {
+// 	case 0:
+// 		m.muteTable.SetHeight(2)
+// 		m.muteTable.SetColumns([]table.Column{})
+// 		// m.muteTable.SetRows(m.muteTableValues.rows)
+// 		m.textinput.Width = m.textinput.Width - m.muteTable.Width()
+// 	case 2:
+// 		m.muteTable.SetHeight(0)
+// 		m.muteTable.SetColumns(m.muteTableValues.cols)
+// 		// m.muteTable.SetRows([]table.Row{})
+// 		m.textinput.Width = m.textinput.Width + m.muteTable.Width()
+// 	}
+// }
 
-// TODO bei logs (crtl l) keybinds ändern, sodass textinput sich nicht bewegt
 func (m *model) SwitchFocus() {
 	switch m.textinput.Focused() {
 	case false:
@@ -270,7 +267,7 @@ func (m *model) SwitchFocus() {
 		m.viewport.KeyMap = viewport.KeyMap{}
 		m.table.KeyMap = table.DefaultKeyMap()
 	}
-	m.refreshTable("")
+	m.table.SetStyles(m.tableValues.ts)
 	m.refreshViewPort()
 }
 
@@ -344,7 +341,6 @@ func (m *model) refreshLogViewPort() {
 func (m *model) refreshTable(clientToBlink string) {
 	m.tableValues.ConvertClientsToRows(clientToBlink)
 	m.table.SetRows(m.tableValues.rows)
-	m.table.SetStyles(m.tableValues.ts)
 }
 
 // refreshViewPort refreshes the size of the viewport
@@ -368,7 +364,7 @@ func (m *model) HandleTableFocus() {
 		m.userService.Executor("/users")
 	}
 	if m.tableValues.Empty() {
-		m.DisplayMessage(red.Render(fmt.Sprintf("%v: register yourself first", t.ErrNoPermission)))
+		m.DisplayMessage(red.Render(fmt.Sprintf("%v: there a no clients to chose from", t.ErrNotAvailable)))
 		return
 	}
 	m.SwitchFocus()
@@ -376,7 +372,7 @@ func (m *model) HandleTableFocus() {
 
 func (m *model) HandleMute(toMute string) {
 	if !m.userService.Client.Registered {
-		m.DisplayMessage(red.Render("you are not registered yet"))
+		m.DisplayMessage(red.Render(fmt.Sprintf("%v: you are not registered yet", t.ErrNoPermission)))
 		return
 	}
 
@@ -437,13 +433,11 @@ func (m *model) HandleClientsChangeSignal(rsp t.ClientsChangeSignal) error {
 		}
 	}
 
-	if rsp.ClientsJson != "" {
-		clients, err := t.ParseJsonToJsonClients(rsp.ClientsJson)
-		if err != nil {
-			return fmt.Errorf("%w: error formatting json to clients", err)
-		}
-		m.tableValues.SetClients(clients, nil)
+	clients, err := t.ParseJsonToJsonClients(rsp.ClientsJson)
+	if err != nil {
+		return fmt.Errorf("%w: error formatting json to clients", err)
 	}
+	m.tableValues.SetClients(clients, nil)
 
 	m.refreshTable("")
 	return nil
@@ -487,7 +481,6 @@ func (m *model) HandleWindowResize(rsp *tea.WindowSizeMsg) {
 
 	m.RenderTitle(m.title, []string{WindowResizeFlag})
 	m.refreshViewPort()
-	m.refreshTable("")
 }
 
 // HandleResponse handles an incoming Response by evaluating it and refreshing

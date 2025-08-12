@@ -22,13 +22,14 @@ const RegisterOutput = "-> Du kannst nun Nachrichten schreiben oder Commands aus
 	"\n		'/users' → Tabelle aktualisieren"
 
 var (
-	red    lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#BF3535"))
-	redBg  lipgloss.Style = lipgloss.NewStyle().Background(lipgloss.Color("#BF3535"))
-	noCol  lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.NoColor{})
-	blue   lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#3571bfff"))
-	purple lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
-	turkis lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#35BFBC"))
-	green  lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#3e8a29ff"))
+	red           lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#bf3535ff"))
+	redBg         lipgloss.Style = lipgloss.NewStyle().Background(lipgloss.Color("#bf3535ff"))
+	noCol         lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.NoColor{})
+	strikeThrough lipgloss.Style = lipgloss.NewStyle().Strikethrough(true).StrikethroughSpaces(false)
+	blue          lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#3571bfff"))
+	purple        lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
+	turkis        lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#35BFBC"))
+	green         lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#3e8a29ff"))
 
 	titleStyle lipgloss.Style = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).

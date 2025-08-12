@@ -20,7 +20,8 @@ import (
 type Peer struct {
 	peerId                  string
 	ownId                   string
-	isMuted                 bool
+	micMuted                bool
+	speakerMuted            bool
 	SignalChan              chan *t.Response
 	ClientsChangeSignalChan chan t.ClientsChangeSignal
 	logChannel              chan t.Log
@@ -48,7 +49,7 @@ func NewPeer(opposingId string, logChannel chan t.Log, chatClient *Client, ownId
 		mu:                      &sync.RWMutex{},
 		ClientsChangeSignalChan: clientsSingalChan,
 		iceCandidates:           []webrtc.ICECandidateInit{},
-		isMuted:                 false,
+		micMuted:                false,
 	}
 
 	p.Ctx, p.Cancel = context.WithCancel(context.Background())
@@ -116,8 +117,7 @@ func (p *Peer) InitWebRTCAPI() error {
 	p.logChannel <- t.Log{Text: "WebRTC: InitWebRTCAPI gestartet"}
 
 	mediaEngine := webrtc.MediaEngine{}
-	p.chatClient.MicrophoneInput.CodecSelector.Populate(&mediaEngine)
-	// einheitliche API Instanz damit alle Peers die gleichen Codecs nutzen
+	p.chatClient.PortAudioMicInput.CodecSelector.Populate(&mediaEngine)
 	p.api = webrtc.NewAPI(webrtc.WithMediaEngine(&mediaEngine))
 
 	p.logChannel <- t.Log{Text: "WebRTC: InitWebRTCAPI abgeschlossen"}
@@ -127,7 +127,7 @@ func (p *Peer) InitWebRTCAPI() error {
 
 func (p *Peer) AddTracksToPeerConnection(logChannel chan t.Log) error {
 	var err error
-	p.audioTransceiver, err = p.peerConn.AddTransceiverFromTrack(p.chatClient.MicrophoneInput.OriginalAudioTrack,
+	p.audioTransceiver, err = p.peerConn.AddTransceiverFromTrack(p.chatClient.PortAudioMicInput.Track,
 		webrtc.RTPTransceiverInit{
 			Direction: webrtc.RTPTransceiverDirectionSendrecv,
 		},
@@ -137,10 +137,14 @@ func (p *Peer) AddTracksToPeerConnection(logChannel chan t.Log) error {
 		return err
 	}
 
+	err = p.chatClient.PortAudioMicInput.Stream.Start()
+	if err != nil {
+		p.logChannel <- t.Log{Text: fmt.Sprintf("PortAudio: Fehler beim Starten des Streams: %v", err)}
+	}
+
 	return nil
 }
 
-// maybe TODO error returnen und behandeln
 // handler functions
 func (p *Peer) OnICEGatheringStateChangeHandler(state webrtc.ICEGatheringState) {
 	p.logChannel <- t.Log{Text: fmt.Sprintf("WebRTC: ICEGatheringState has changed to %s", state.String())}
@@ -184,7 +188,7 @@ func (p *Peer) OnICEConnectionStateChangeHandler(connectionState webrtc.ICEConne
 		}
 	}
 
-	if connectionState == webrtc.ICEConnectionStateFailed {
+	if connectionState == webrtc.ICEConnectionStateFailed || connectionState == webrtc.ICEConnectionStateClosed {
 		p.chatClient.SendSignalingError(p.peerId, p.ownId, "")
 	}
 }
@@ -278,25 +282,16 @@ func (p *Peer) OfferConnection() error {
 func (p *Peer) MuteMic() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	switch p.isMuted {
-	case false:
-		err := p.audioTransceiver.Sender().ReplaceTrack(p.chatClient.MicrophoneInput.SilentAudioTrack)
-		if err != nil {
-			p.logChannel <- t.Log{Text: fmt.Sprintf("Failed to replace track: %v", err)}
-			return err
-		}
 
-		p.isMuted = true
+	switch p.micMuted {
+	case false:
+		p.chatClient.PortAudioMicInput.Stream.Stop()
+		p.micMuted = true
 		p.logChannel <- t.Log{Text: "Microphone muted"}
 
 	case true:
-		err := p.audioTransceiver.Sender().ReplaceTrack(p.chatClient.MicrophoneInput.OriginalAudioTrack)
-		if err != nil {
-			p.logChannel <- t.Log{Text: fmt.Sprintf("Failed to replace track: %v", err)}
-			return err
-		}
-
-		p.isMuted = false
+		p.chatClient.PortAudioMicInput.Stream.Start()
+		p.micMuted = false
 		p.logChannel <- t.Log{Text: "Microphone unmuted"}
 	}
 
@@ -304,17 +299,25 @@ func (p *Peer) MuteMic() error {
 }
 
 func (p *Peer) MuteSpeaker() {
-	for _, player := range p.players {
-		if player != nil && player.IsPlaying() {
-			player.Pause()
-			p.logChannel <- t.Log{Text: "WebRTC: Speaker stummgeschaltet"}
+	switch p.micMuted {
+	case false:
+		for _, player := range p.players {
+			if player != nil {
+				player.Pause()
+				p.logChannel <- t.Log{Text: "WebRTC: Speaker muted"}
+			}
 		}
-		if player != nil && !player.IsPlaying() {
-			player.Play()
-			p.logChannel <- t.Log{Text: "WebRTC: Speaker aktiviert"}
+		p.micMuted = true
+
+	case true:
+		for _, player := range p.players {
+			if player != nil {
+				player.Play()
+				p.logChannel <- t.Log{Text: "WebRTC: Speaker unmuted"}
+			}
 		}
+		p.micMuted = false
 	}
-	p.MuteMic()
 }
 
 func (p *Peer) CloseConnection() {

@@ -31,10 +31,9 @@ type Client struct {
 	HttpClient *http.Client
 	Endpoints  map[int]string
 
-	MicrophoneInput *a.MicrophoneInput
-	SpeakerOutput   *a.SpeakerOutput
+	PortAudioMicInput *a.PortAudioMicInput
+	SpeakerOutput     *a.SpeakerOutput
 
-	// maybe TODO functionallity to clear inactive Peers garbage collection if there are still leaks
 	Peers map[string]*Peer
 }
 
@@ -63,7 +62,7 @@ func NewClient(server string) *Client {
 	chatClient.Endpoints = chatClient.RegisterEndpoints(chatClient.Url)
 	chatClient.cond = sync.NewCond(chatClient.mu)
 
-	chatClient.MicrophoneInput, err = a.NewMicrophoneInput(chatClient.LogChan)
+	chatClient.PortAudioMicInput, err = a.InitializePortAudioMic(chatClient.LogChan)
 	if err != nil {
 		chatClient.LogChan <- t.Log{Text: fmt.Sprintf("%v: Microphone couldn't be initialized", err)}
 	}
@@ -99,25 +98,22 @@ func (c *Client) Interrupt() {
 		}
 	}
 
-	c.DeletePeersSafely("", true, true)
-	c.MicrophoneInput.OriginalAudioTrack.Close()
-	c.MicrophoneInput.SilentAudioTrack.Close()
+	c.DeletePeers("", true, true)
+	c.PortAudioMicInput.Stream.Close()
 
 	c.HttpClient.CloseIdleConnections()
 }
 
-// DeletePeersSafely deletes a Peer or all Peers out of the peers map
-func (c *Client) DeletePeersSafely(oppId string, wholeMap bool, sendToOppClient bool) {
-	// TODO untersuchen wo der deadlock zustande kommt
-	// c.mu.Lock()
-	// defer c.mu.Unlock()
+// DeletePeers deletes a Peer or all Peers out of the peers map
+func (c *Client) DeletePeers(oppId string, wholeMap bool, sendToOppClient bool) {
 	c.LogChan <- t.Log{Text: "DeletePeersSafely gestartet"}
 
 	if wholeMap == false {
 		c.LogChan <- t.Log{Text: fmt.Sprintf("Versuche Peer mit ID %s zu löschen", oppId)}
-		peer, exists := c.Peers[oppId]
-		if !exists {
-			c.LogChan <- t.Log{Text: fmt.Sprintf("Peer mit ID %s existiert nicht, Abbruch", oppId)}
+
+		peer, err := c.GetPeer(oppId)
+		if err != nil {
+			c.LogChan <- t.Log{Text: fmt.Sprintf("%v: Peer mit ID %s existiert nicht, Abbruch", err, oppId)}
 			return
 		}
 
@@ -127,7 +123,7 @@ func (c *Client) DeletePeersSafely(oppId string, wholeMap bool, sendToOppClient 
 		c.LogChan <- t.Log{Text: fmt.Sprintf("Peer mit ID %s gefunden, Verbindung wird geschlossen", oppId)}
 
 		peer.CloseConnection()
-		delete(c.Peers, oppId)
+		c.DeletePeerSafely(oppId)
 		c.LogChan <- t.Log{Text: fmt.Sprintf("Peer mit ID %s gelöscht", oppId)}
 
 		c.SendSignalingError(oppId, c.GetClientId(), t.RollbackDoneFlag)
@@ -146,8 +142,10 @@ func (c *Client) DeletePeersSafely(oppId string, wholeMap bool, sendToOppClient 
 		}
 		c.LogChan <- t.Log{Text: fmt.Sprintf("Schließe Verbindung für Peer mit ID %s", id)}
 
-		peer.CloseConnection()
-		delete(c.Peers, id)
+		if peer != nil {
+			peer.CloseConnection()
+		}
+		c.DeletePeerSafely(id)
 		c.LogChan <- t.Log{Text: fmt.Sprintf("Peer mit ID %s gelöscht", id)}
 
 		c.SendSignalingError(id, c.GetClientId(), t.RollbackDoneFlag)
@@ -155,7 +153,6 @@ func (c *Client) DeletePeersSafely(oppId string, wholeMap bool, sendToOppClient 
 	}
 	c.LogChan <- t.Log{Text: "Alle Peers wurden gelöscht"}
 	c.ClientChangeSignalChan <- t.ClientsChangeSignal{CallState: t.NoCallFlag, OppId: c.GetClientId()}
-
 }
 
 func (c *Client) SendSignalingError(oppId string, ownId string, content string) {
@@ -385,10 +382,10 @@ func (c *Client) HandleSignal(rsp *t.Response, initialSignal bool, accepted bool
 	err := c.HandlePeer(rsp, initialSignal, accepted)
 	if err != nil {
 		if initialSignal {
-			c.DeletePeersSafely(rsp.ClientId, false, true)
+			c.DeletePeers(rsp.ClientId, false, true)
 			return
 		}
-		c.DeletePeersSafely(rsp.ClientId, false, false)
+		c.DeletePeers(rsp.ClientId, false, false)
 	}
 }
 
@@ -500,4 +497,11 @@ func (c *Client) SetCurrentCalling(oppId string) {
 	defer c.mu.Unlock()
 
 	c.CurrentCalling = oppId
+}
+
+func (c *Client) DeletePeerSafely(oppId string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	delete(c.Peers, oppId)
 }

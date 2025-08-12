@@ -43,7 +43,11 @@ func (isp *InitializeSignalPlugin) Execute(msg *ty.Message) (*ty.Response, error
 
 	if strings.Contains(msg.Content, ty.CallAccepted) || strings.Contains(msg.Content, ty.CallDenied) {
 		fmt.Printf("\n[InitializeSignalPlugin] CallAccepted or CallDenied detected in content: %s", msg.Content)
-		oppClient.Send(&ty.Response{RspName: ty.InitializeSignalFlag, ClientId: msg.Name, Content: msg.Content})
+		err = isp.chatService.Echo(msg.ClientId, &ty.Response{RspName: ty.InitializeSignalFlag, ClientId: msg.Name, Content: msg.Content})
+		if err != nil {
+			return nil, err
+		}
+		// err = oppClient.Send(&ty.Response{RspName: ty.InitializeSignalFlag, ClientId: msg.Name, Content: msg.Content})
 		ownClient.SetIsNegotiating(false)
 		oppClient.SetIsNegotiating(false)
 		return nil, nil
@@ -68,7 +72,8 @@ func (isp *InitializeSignalPlugin) Execute(msg *ty.Message) (*ty.Response, error
 		return nil, err
 	}
 
-	err = oppClient.Send(&ty.Response{RspName: ty.InitializeSignalFlag, ClientId: msg.Name, Content: ty.ReceiveCall})
+	err = isp.chatService.Echo(msg.ClientId, &ty.Response{RspName: ty.InitializeSignalFlag, ClientId: msg.Name, Content: ty.ReceiveCall})
+	// err = oppClient.Send(&ty.Response{RspName: ty.InitializeSignalFlag, ClientId: msg.Name, Content: ty.ReceiveCall})
 
 	ownClient.SetIsNegotiating(true)
 	oppClient.SetIsNegotiating(true)
@@ -171,13 +176,6 @@ func (asp *AnswerSignalPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 			"is in the wrong callState %s", ty.ErrNoPermission, ownClient.GetCallState(msg.ClientId))
 	}
 
-	// maybe TODO prolly überflüssig wie brücken
-	// no current connection so connection is canceled
-	// if !group.CheckConnection(msg.Name, msg.ClientId) {
-	// 	fmt.Printf("\n[AnswerSignalPlugin] No registered connection between %s and %s", msg.Name, msg.ClientId)
-	// 	return nil, fmt.Errorf("%w: offer couldn't be sent because there is no registered connection", ty.ErrNotAvailable)
-	// }
-
 	fmt.Printf("\n[AnswerSignalPlugin] Forwarding answer signal between %s and %s", msg.Name, msg.ClientId)
 	asp.chatService.ForwardSignal(msg, ty.AnswerSignalFlag)
 
@@ -217,6 +215,7 @@ func (ice *ICECandidatePlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	return nil, nil
 }
 
+// maybe TODO kann wahrscheinlich weg wird nicht aufgerufen
 // StableSignalPlugin forwards rtc signals
 type StableSignalPlugin struct {
 	chatService *ChatService
@@ -239,7 +238,6 @@ func (ssp *StableSignalPlugin) Execute(msg *ty.Message) (*ty.Response, error) {
 	return nil, err
 }
 
-// TODO kann wahrscheinlich weg wird nicht aufgerufen
 // ConnectedPlugin forwards rtc signals
 type ConnectedPlugin struct {
 	chatService *ChatService
@@ -311,7 +309,6 @@ func (fcp *FailedConnectionPlugin) Execute(msg *ty.Message) (*ty.Response, error
 		return nil, nil
 	}
 
-	// TODO change echo to send
 	fmt.Printf("\n[FailedConnectionPlugin] Echoing failed connection to %s and %s", msg.Name, msg.ClientId)
 	fcp.chatService.Echo(msg.Name, &ty.Response{ClientId: msg.ClientId, RspName: ty.FailedConnectionFlag, Content: ty.FailedConnectionFlag})
 	fcp.chatService.Echo(msg.ClientId, &ty.Response{ClientId: msg.Name, RspName: ty.FailedConnectionFlag, Content: ty.FailedConnectionFlag})

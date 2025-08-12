@@ -33,12 +33,6 @@ func RegisterGroupPlugins(s *ChatService, pr *PluginRegistry) *GroupPluginRegist
 	gp.gPlugins["leave"] = NewGroupLeavePlugin(s, pr)
 	gp.gPlugins["users"] = NewGroupUsersPlugin(s)
 
-	// maybe TODO:
-	// kick
-	// admin
-	// invite
-	// rules
-
 	return gp
 }
 
